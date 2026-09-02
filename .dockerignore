@@ -1,0 +1,12 @@
+**/bin
+**/obj
+**/node_modules
+**/.quasar
+**/dist
+**/TestResults
+.git
+.env
+.idea
+.vscode
+openspec
+tests

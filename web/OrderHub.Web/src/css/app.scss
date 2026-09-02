@@ -1,0 +1,12 @@
+@use '../themes/tokens';
+
+:root {
+  color-scheme: light;
+  font-family: var(--oh-font-family);
+  background: var(--oh-color-background);
+  color: var(--oh-color-text);
+}
+
+body {
+  margin: 0;
+}

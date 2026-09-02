@@ -1,0 +1,66 @@
+name: orderhub
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-orderhub}
+      POSTGRES_USER: ${POSTGRES_USER:-orderhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderhub_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - orderhub-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [orderhub]
+
+  api:
+    build:
+      context: .
+      dockerfile: src/OrderHub.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-orderhub};Username=${POSTGRES_USER:-orderhub};Password=${POSTGRES_PASSWORD:-orderhub_dev}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && grep -q \"200 OK\" <&3'"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [orderhub]
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:${API_PORT:-8080}
+    ports:
+      - "${WEB_PORT:-9000}:80"
+    depends_on:
+      api:
+        # No Fast Mode, o Visual Studio inicia a aplicação somente após criar a
+        # composição. Aguardar o health check aqui impediria o debugger de
+        # iniciar o próprio processo da API.
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [orderhub]
+
+volumes:
+  orderhub-postgres:
+
+networks:
+  orderhub:
+    driver: bridge

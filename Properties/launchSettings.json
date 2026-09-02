@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Docker Compose": {
+      "commandName": "DockerCompose",
+      "commandVersion": "1.0",
+      "composeLaunchAction": "LaunchBrowser",
+      "composeLaunchServiceName": "web",
+      "composeLaunchUrl": "http://localhost:{ServicePort}",
+      "serviceActions": {
+        "postgres": "StartWithoutDebugging",
+        "api": "StartDebugging",
+        "web": "StartWithoutDebugging"
+      }
+    }
+  }
+}

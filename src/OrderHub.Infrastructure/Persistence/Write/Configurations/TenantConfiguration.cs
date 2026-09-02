@@ -1,0 +1,19 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderHub.Domain.Tenancy;
+
+namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
+
+internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
+{
+    public void Configure(EntityTypeBuilder<Tenant> builder)
+    {
+        builder.ToTable("tenant", DatabaseSchemas.Tenancy);
+        builder.HasKey(tenant => tenant.Id).HasName("pk_tenant");
+        builder.Property(tenant => tenant.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(tenant => tenant.Name).HasColumnName("name").HasMaxLength(150).IsRequired();
+        builder.Property(tenant => tenant.IsActive).HasColumnName("is_active").IsRequired();
+        builder.Property(tenant => tenant.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone");
+        builder.Property(tenant => tenant.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone");
+    }
+}
