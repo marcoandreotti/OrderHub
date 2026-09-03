@@ -16,6 +16,7 @@ using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Application.Abstractions.Payments;
 using OrderHub.Application.Abstractions.PublicOrdering;
+using OrderHub.Application.Identity.Authentication;
 
 namespace OrderHub.Infrastructure;
 
@@ -38,8 +39,17 @@ public static class DependencyInjection
         services.AddScoped<IReadConnectionFactory, NpgsqlReadConnectionFactory>();
         services.AddScoped<IEstablishmentRepository, EstablishmentRepository>();
         services.AddScoped<IEstablishmentReadGateway, EstablishmentReadGateway>();
+        services.AddScoped<IPlatformScopeGateway, PlatformScopeGateway>();
         services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
         services.AddScoped<IAdministrativeUserRepository, AdministrativeUserRepository>();
+        services.AddSingleton(configuration.GetSection(AuthenticationOptions.SectionName).Get<AuthenticationOptions>() ?? new AuthenticationOptions());
+        services.AddSingleton<IAuthenticationSecretProtector, AuthenticationSecretProtector>();
+        services.AddOptions<AuthenticationEmailOptions>().Bind(configuration.GetSection(AuthenticationEmailOptions.SectionName));
+        services.AddScoped<IAuthenticationCodeSender, SmtpAuthenticationCodeSender>();
+        services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
+        services.AddScoped<IAuthenticationSessionResolver, AuthenticationSessionResolver>();
+        services.AddOptions<PlatformBootstrapOptions>().Bind(configuration.GetSection(PlatformBootstrapOptions.SectionName));
+        services.AddScoped<PlatformBootstrapper>();
         services.AddScoped<IEstablishmentAccessGateway, EstablishmentAccessGateway>();
         services.AddScoped<IOperationsReadGateway, OperationsReadGateway>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();

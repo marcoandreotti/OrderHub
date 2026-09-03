@@ -59,9 +59,13 @@ public sealed class OpenApiExposureTests
 
         using var documentResponse = await client.GetAsync("/openapi/v1.json", CancellationToken.None);
         using var uiResponse = await client.GetAsync("/swagger/index.html", CancellationToken.None);
+        var document = await documentResponse.Content.ReadAsStringAsync(CancellationToken.None);
 
         Assert.Equal(HttpStatusCode.OK, documentResponse.StatusCode);
         Assert.Equal(HttpStatusCode.OK, uiResponse.StatusCode);
+        Assert.Contains("/api/auth/begin", document);
+        Assert.Contains("/api/auth/complete", document);
+        Assert.Contains(nameof(OrderHub.Contracts.Authentication.BeginAuthenticationRequest), document);
     }
 
     [Fact]

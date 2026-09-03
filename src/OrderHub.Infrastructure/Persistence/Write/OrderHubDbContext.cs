@@ -11,6 +11,9 @@ public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> option
     public DbSet<OrderHub.Domain.Tenancy.Tenant> Tenants => Set<OrderHub.Domain.Tenancy.Tenant>();
     public DbSet<OrderHub.Domain.Tenancy.Establishment> Establishments => Set<OrderHub.Domain.Tenancy.Establishment>();
     public DbSet<OrderHub.Domain.Identity.AdministrativeUser> AdministrativeUsers => Set<OrderHub.Domain.Identity.AdministrativeUser>();
+    public DbSet<OrderHub.Domain.Identity.PlatformUser> PlatformUsers => Set<OrderHub.Domain.Identity.PlatformUser>();
+    public DbSet<OrderHub.Domain.Identity.AuthenticationChallenge> AuthenticationChallenges => Set<OrderHub.Domain.Identity.AuthenticationChallenge>();
+    public DbSet<OrderHub.Domain.Identity.AdministrativeSession> AdministrativeSessions => Set<OrderHub.Domain.Identity.AdministrativeSession>();
     public DbSet<OrderHub.Domain.Operations.ServiceTable> ServiceTables => Set<OrderHub.Domain.Operations.ServiceTable>();
     public DbSet<OrderHub.Domain.Operations.BusinessHours> BusinessHours => Set<OrderHub.Domain.Operations.BusinessHours>();
     public DbSet<OrderHub.Domain.Catalog.Category> Categories => Set<OrderHub.Domain.Catalog.Category>();

@@ -5,7 +5,8 @@ namespace OrderHub.Application.Tenancy;
 
 public sealed class EstablishmentScopeResolver(
     ITenantContext tenantContext,
-    IEstablishmentAccessGateway accessGateway)
+    IEstablishmentAccessGateway accessGateway,
+    IPlatformScopeGateway? platformScopeGateway = null)
 {
     private OperationalScope? resolvedScope;
 
@@ -29,8 +30,16 @@ public sealed class EstablishmentScopeResolver(
             return existing;
         }
 
-        var tenantId = tenantContext.GetRequiredTenantId();
         var userId = tenantContext.GetRequiredUserId();
+        if (tenantContext.IsPlatformUser)
+        {
+            var platformTenantId = platformScopeGateway is null ? null : await platformScopeGateway.FindTenantIdAsync(selectedEstablishmentId, cancellationToken);
+            if (platformTenantId is null) throw new ForbiddenException("An authorized establishment context is required.");
+            resolvedScope = new OperationalScope(platformTenantId.Value, userId, selectedEstablishmentId);
+            return resolvedScope;
+        }
+
+        var tenantId = tenantContext.GetRequiredTenantId();
         var hasAccess = await accessGateway.HasActiveAccessAsync(
             tenantId,
             userId,

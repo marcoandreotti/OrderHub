@@ -12,6 +12,7 @@ internal sealed class HttpTenantContext(IHttpContextAccessor httpContextAccessor
     public Guid TenantId => GetRequiredTenantId();
     public bool HasUser => TryGetUserId(out _);
     public Guid UserId => GetRequiredUserId();
+    public bool IsPlatformUser => httpContextAccessor.HttpContext?.User.HasClaim("platform_user", "true") == true;
 
     public Guid GetRequiredTenantId()
     {

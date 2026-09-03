@@ -8,6 +8,9 @@ using OrderHub.Application.Identity;
 using OrderHub.Api.Catalog;
 using OrderHub.Api.PublicOrdering;
 using OrderHub.Api.Administration;
+using OrderHub.Api.Authentication;
+using Microsoft.AspNetCore.Authentication;
+using OrderHub.Infrastructure.Identity;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,14 +20,19 @@ builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
-builder.Services.AddAuthentication(ExistingPrincipalAuthenticationHandler.SchemeName)
-    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ExistingPrincipalAuthenticationHandler>(ExistingPrincipalAuthenticationHandler.SchemeName, _ => { });
+var authentication = builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = builder.Environment.IsEnvironment("Testing") ? ExistingPrincipalAuthenticationHandler.SchemeName : SessionAuthenticationHandler.SchemeName;
+    options.DefaultChallengeScheme = options.DefaultAuthenticateScheme;
+});
+if (builder.Environment.IsEnvironment("Testing")) authentication.AddScheme<AuthenticationSchemeOptions, ExistingPrincipalAuthenticationHandler>(ExistingPrincipalAuthenticationHandler.SchemeName, _ => { });
+else authentication.AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, _ => { });
 builder.Services.AddProblemDetails();
 builder.Services.AddAuthorization(options =>
 {
     foreach (var (policyName, roles) in AdministrativePolicies.RoleMap)
     {
-        options.AddPolicy(policyName, policy => policy.RequireRole(roles.Select(role => role.ToString())));
+        options.AddPolicy(policyName, policy => policy.RequireAssertion(context => context.User.HasClaim("platform_user", "true") || roles.Any(role => context.User.IsInRole(role.ToString()))));
     }
 });
 
@@ -40,12 +48,14 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
+app.UseMiddleware<AuthenticationSecurityMiddleware>();
 app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapCatalogEndpoints();
 app.MapPublicOrderingEndpoints();
 app.MapAdministrationEndpoints();
+app.MapAuthenticationEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {
@@ -53,6 +63,11 @@ if (app.Environment.IsEnvironment("Testing"))
     {
         tenantId = tenantContext.GetRequiredTenantId()
     }));
+}
+else if (app.Environment.IsProduction())
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.GetRequiredService<PlatformBootstrapper>().InitializeAsync(CancellationToken.None);
 }
 
 app.Run();

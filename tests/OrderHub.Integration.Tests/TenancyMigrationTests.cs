@@ -2,6 +2,8 @@ using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.Extensions.Options;
+using OrderHub.Infrastructure.Identity;
 using OrderHub.Infrastructure.Migrations;
 using OrderHub.Infrastructure.Persistence.Write;
 using Npgsql;
@@ -119,5 +121,65 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
         await context.Database.MigrateAsync();
         Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
+    }
+
+    [Fact]
+    public async Task Administrative_authentication_migration_upgrades_rolls_back_and_reapplies()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await context.Database.MigrateAsync();
+        await using var connection = new NpgsqlConnection(database.GetConnectionString());
+        await connection.OpenAsync();
+        var expected = new[] { "administrative_session", "authentication_challenge", "platform_user" };
+        Assert.Equal(expected, (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='identity' and table_name in ('administrative_session','authentication_challenge','platform_user') order by table_name;")).ToArray());
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='tenancy' and table_name='tenant' and column_name='public_code';"));
+        await migrator.MigrateAsync("20260903001324_PublicOrderingApi");
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='identity' and table_name in ('administrative_session','authentication_challenge','platform_user');"));
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='tenancy' and table_name='tenant' and column_name='public_code';"));
+        await context.Database.MigrateAsync();
+        Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='identity' and table_name in ('administrative_session','authentication_challenge','platform_user');"));
+    }
+
+    [Fact]
+    public async Task Concurrent_platform_bootstrap_creates_exactly_one_superuser()
+    {
+        var contextOptions = new DbContextOptionsBuilder<OrderHubDbContext>()
+            .UseNpgsql(database.GetConnectionString(), npgsql =>
+                npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName))
+            .Options;
+        await using (var migrationContext = new OrderHubDbContext(contextOptions))
+        {
+            await migrationContext.Database.MigrateAsync();
+        }
+
+        var bootstrapOptions = Options.Create(new PlatformBootstrapOptions
+        {
+            Email = "first.superuser@orderhub.test",
+            TemporaryPassword = "temporary-password"
+        });
+
+        async Task BootstrapAsync()
+        {
+            await using var context = new OrderHubDbContext(contextOptions);
+            var bootstrapper = new PlatformBootstrapper(
+                new AuthenticationRepository(context),
+                new AspNetPasswordHasher(),
+                bootstrapOptions,
+                TimeProvider.System);
+            await bootstrapper.InitializeAsync(CancellationToken.None);
+        }
+
+        await Task.WhenAll(BootstrapAsync(), BootstrapAsync());
+
+        await using var verificationContext = new OrderHubDbContext(contextOptions);
+        var user = Assert.Single(await verificationContext.PlatformUsers.AsNoTracking().ToListAsync());
+        Assert.True(user.IsActive);
+        Assert.True(user.PasswordChangeRequired);
+        Assert.NotEqual("temporary-password", user.PasswordHash);
+
+        await BootstrapAsync();
+        Assert.Equal(1, await verificationContext.PlatformUsers.CountAsync());
     }
 }

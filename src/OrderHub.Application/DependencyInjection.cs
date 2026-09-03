@@ -18,6 +18,7 @@ using OrderHub.Application.Abstractions.Payments;
 using OrderHub.Application.Payments;
 using OrderHub.Application.Abstractions.PublicOrdering;
 using OrderHub.Application.PublicOrdering;
+using OrderHub.Application.Identity.Authentication;
 
 namespace OrderHub.Application;
 
@@ -33,6 +34,16 @@ public static class DependencyInjection
         services.AddScoped<IValidator<CreateEstablishmentCommand>, CreateEstablishmentCommandValidator>();
         services.AddScoped<ICommandHandler<CreateAdministrativeUserCommand, Guid>, CreateAdministrativeUserCommandHandler>();
         services.AddScoped<IValidator<CreateAdministrativeUserCommand>, CreateAdministrativeUserCommandValidator>();
+        services.AddScoped<ICommandHandler<BeginAuthenticationCommand, AuthenticationChallengeResult>, BeginAuthenticationCommandHandler>();
+        services.AddScoped<ICommandHandler<CompleteAuthenticationCommand, AuthenticationTokens>, CompleteAuthenticationCommandHandler>();
+        services.AddScoped<ICommandHandler<RefreshAuthenticationCommand, AuthenticationTokens>, RefreshAuthenticationCommandHandler>();
+        services.AddScoped<ICommandHandler<LogoutCommand>, LogoutCommandHandler>();
+        services.AddScoped<ICommandHandler<ChangeTemporaryPasswordCommand>, ChangeTemporaryPasswordCommandHandler>();
+        services.AddScoped<ICommandHandler<CreatePlatformUserCommand, Guid>, CreatePlatformUserCommandHandler>();
+        services.AddScoped<ICommandHandler<SetPlatformUserActiveCommand>, SetPlatformUserActiveCommandHandler>();
+        services.AddScoped<IValidator<BeginAuthenticationCommand>, BeginAuthenticationCommandValidator>();
+        services.AddScoped<IValidator<CompleteAuthenticationCommand>, CompleteAuthenticationCommandValidator>();
+        services.AddScoped<IValidator<ChangeTemporaryPasswordCommand>, ChangeTemporaryPasswordCommandValidator>();
         services.AddScoped<ICommandHandler<UpsertCategoryCommand, Guid>, UpsertCategoryCommandHandler>();
         services.AddScoped<ICommandHandler<UpsertProductCommand, Guid>, UpsertProductCommandHandler>();
         services.AddScoped<ICommandHandler<UpsertAdditionalCommand, Guid>, UpsertAdditionalCommandHandler>();
