@@ -12,7 +12,7 @@ internal static class CatalogEndpoints
     /// <summary>Registra os endpoints administrativos e públicos do catálogo.</summary>
     public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        var admin = endpoints.MapGroup("/api/admin/establishments/{establishmentId:guid}/catalog").RequireAuthorization(AdministrativePolicies.Management);
+        var admin = endpoints.MapGroup("/api/admin/establishments/{establishmentId:guid}/catalog").RequireAuthorization(AdministrativePolicies.Management).WithTags("Administration - Catalog");
         admin.MapGet("/", GetAdministrativeAsync);
         admin.MapPost("/categories", (Guid establishmentId, UpsertCategoryRequest request, ICommandDispatcher dispatcher, CancellationToken ct) => UpsertCategoryAsync(establishmentId, null, request, dispatcher, ct));
         admin.MapPut("/categories/{id:guid}", (Guid establishmentId, Guid id, UpsertCategoryRequest request, ICommandDispatcher dispatcher, CancellationToken ct) => UpsertCategoryAsync(establishmentId, id, request, dispatcher, ct));

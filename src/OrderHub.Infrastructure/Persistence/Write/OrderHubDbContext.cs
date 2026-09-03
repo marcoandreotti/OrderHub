@@ -14,6 +14,12 @@ public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> option
     public DbSet<OrderHub.Domain.Catalog.Additional> Additionals => Set<OrderHub.Domain.Catalog.Additional>();
     public DbSet<OrderHub.Domain.Catalog.AdditionalGroup> AdditionalGroups => Set<OrderHub.Domain.Catalog.AdditionalGroup>();
     public DbSet<OrderHub.Domain.Customers.Customer> Customers => Set<OrderHub.Domain.Customers.Customer>();
+    public DbSet<OrderHub.Domain.Ordering.Order> Orders => Set<OrderHub.Domain.Ordering.Order>();
+    public DbSet<OrderHub.Domain.Promotions.Coupon> Coupons => Set<OrderHub.Domain.Promotions.Coupon>();
+    public DbSet<OrderHub.Domain.Payments.PaymentMethod> PaymentMethods => Set<OrderHub.Domain.Payments.PaymentMethod>();
+    public DbSet<OrderHub.Domain.Payments.Payment> Payments => Set<OrderHub.Domain.Payments.Payment>();
+    public DbSet<OrderHub.Domain.Payments.PaymentIdempotency> PaymentIdempotencies => Set<OrderHub.Domain.Payments.PaymentIdempotency>();
+    public DbSet<OrderHub.Domain.Ordering.PublicOrderRequest> PublicOrderRequests => Set<OrderHub.Domain.Ordering.PublicOrderRequest>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -74,4 +74,50 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync();
         Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='customers';"));
     }
+
+    [Fact]
+    public async Task Order_lifecycle_migration_upgrades_rolls_back_and_reapplies()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>();
+        await context.Database.MigrateAsync(); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        var expected = new[] { "order", "order_item", "order_item_additional", "order_number_counter", "order_status_history", "public_order_request" };
+        Assert.Equal(expected, (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='orders' order by table_name;")).ToArray());
+        await migrator.MigrateAsync("20260902201903_CustomerRecords");
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
+        await context.Database.MigrateAsync();
+        Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
+    }
+
+    [Fact]
+    public async Task Coupon_management_migration_upgrades_rolls_back_and_reapplies()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>(); await context.Database.MigrateAsync();
+        await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        Assert.Equal(["coupon", "coupon_use"], (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='promotions' order by table_name;")).ToArray());
+        await migrator.MigrateAsync("20260902220405_OrderLifecycle"); Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='promotions';"));
+        await context.Database.MigrateAsync(); Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='promotions';"));
+    }
+
+    [Fact]
+    public async Task Order_payments_migration_upgrades_rolls_back_and_reapplies()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>(); await context.Database.MigrateAsync(); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        Assert.Equal(["payment", "payment_idempotency", "payment_method"], (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='payments' order by table_name;")).ToArray());
+        await migrator.MigrateAsync("20260902231354_CouponManagement"); Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='payments';")); await context.Database.MigrateAsync(); Assert.Equal(3, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='payments';"));
+    }
+
+    [Fact]
+    public async Task Public_ordering_migration_upgrades_rolls_back_and_reapplies()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>(); await context.Database.MigrateAsync(); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
+        await migrator.MigrateAsync("20260902235922_OrderPayments");
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
+        await context.Database.MigrateAsync();
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
+    }
 }

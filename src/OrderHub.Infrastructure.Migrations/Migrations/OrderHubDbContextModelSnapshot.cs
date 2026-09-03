@@ -687,6 +687,688 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                     b.ToTable("service_table", "operations");
                 });
 
+            modelBuilder.Entity("OrderHub.Domain.Ordering.Order", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("CouponCode")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("coupon_code");
+
+                    b.Property<Guid?>("CouponId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coupon_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<string>("CustomerName")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("customer_name");
+
+                    b.Property<string>("CustomerPhone")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("customer_phone");
+
+                    b.Property<decimal>("Discount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<decimal>("Fees")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("fees");
+
+                    b.Property<long?>("Number")
+                        .HasColumnType("bigint")
+                        .HasColumnName("number");
+
+                    b.Property<string>("PublicReference")
+                        .HasMaxLength(48)
+                        .HasColumnType("character varying(48)")
+                        .HasColumnName("public_reference");
+
+                    b.Property<string>("ServiceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("service_type");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("subtotal");
+
+                    b.Property<Guid?>("TableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("table_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublicReference")
+                        .IsUnique()
+                        .HasFilter("public_reference is not null");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "CouponId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Number")
+                        .IsUnique()
+                        .HasFilter("number is not null");
+
+                    b.ToTable("order", "orders", t =>
+                        {
+                            t.HasCheckConstraint("ck_order_number", "number is null or number > 0");
+
+                            t.HasCheckConstraint("ck_order_totals", "subtotal >= 0 and discount >= 0 and fees >= 0 and total >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("notes");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("product_name");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("Total")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<Guid?>("VariationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("variation_id");
+
+                    b.Property<string>("VariationName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("variation_name");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "OrderId");
+
+                    b.ToTable("order_item", "orders", t =>
+                        {
+                            t.HasCheckConstraint("ck_order_item_values", "unit_price >= 0 and quantity > 0 and total >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemAdditional", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AdditionalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("additional_id");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_item_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("numeric(18,3)")
+                        .HasColumnName("quantity");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "OrderItemId");
+
+                    b.ToTable("order_item_additional", "orders", t =>
+                        {
+                            t.HasCheckConstraint("ck_order_item_additional_values", "unit_price >= 0 and quantity > 0");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_id");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("NewStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("new_status");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("note");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("PreviousStatus")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("previous_status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "OrderId", "OccurredAt");
+
+                    b.ToTable("order_status_history", "orders");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.PublicOrderRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "EstablishmentId", "OrderId");
+
+                    b.ToTable("public_order_request", "orders");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Payments.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<decimal>("Change")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("change");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("external_id");
+
+                    b.Property<DateTimeOffset?>("FailedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("failed_at");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_online");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<string>("PaymentMethodCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("payment_method_code");
+
+                    b.Property<Guid>("PaymentMethodId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_method_id");
+
+                    b.Property<string>("PaymentMethodName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("payment_method_name");
+
+                    b.Property<decimal?>("ReceivedAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("received_amount");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "PaymentMethodId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "OrderId", "Status");
+
+                    b.ToTable("payment", "payments", t =>
+                        {
+                            t.HasCheckConstraint("ck_payment_amounts", "amount > 0 and (received_amount is null or received_amount >= amount) and change >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Payments.PaymentIdempotency", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("payload_hash");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Key")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "EstablishmentId", "PaymentId");
+
+                    b.ToTable("payment_idempotency", "payments");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Payments.PaymentMethod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("AllowsChange")
+                        .HasColumnType("boolean")
+                        .HasColumnName("allows_change");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsOnline")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_online");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("payment_method", "payments");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Promotions.Coupon", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DiscountType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("discount_type");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<int?>("MaximumUses")
+                        .HasColumnType("integer")
+                        .HasColumnName("maximum_uses");
+
+                    b.Property<decimal>("MinimumOrder")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("minimum_order");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<int>("UsedCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("used_count");
+
+                    b.Property<decimal>("Value")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("value");
+
+                    b.Property<Guid>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("uuid")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Code")
+                        .IsUnique();
+
+                    b.ToTable("coupon", "promotions", t =>
+                        {
+                            t.HasCheckConstraint("ck_coupon_uses", "used_count >= 0 and (maximum_uses is null or (maximum_uses > 0 and used_count <= maximum_uses))");
+
+                            t.HasCheckConstraint("ck_coupon_value", "value > 0 and (discount_type <> 'Percentage' or value <= 100)");
+
+                            t.HasCheckConstraint("ck_coupon_window", "starts_at < ends_at");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Promotions.CouponUse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("code");
+
+                    b.Property<Guid>("CouponId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("coupon_id");
+
+                    b.Property<decimal>("Discount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("order_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UsedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("used_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "OrderId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "CouponId", "OrderId")
+                        .IsUnique();
+
+                    b.ToTable("coupon_use", "promotions", t =>
+                        {
+                            t.HasCheckConstraint("ck_coupon_use_discount", "discount >= 0");
+                        });
+                });
+
             modelBuilder.Entity("OrderHub.Domain.Tenancy.Establishment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -824,6 +1506,28 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                             Id = (short)6,
                             Code = "DELIVERY",
                             Name = "Delivery"
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Infrastructure.Persistence.Write.Configurations.OrderNumberCounter", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<long>("LastNumber")
+                        .HasColumnType("bigint")
+                        .HasColumnName("last_number");
+
+                    b.HasKey("TenantId", "EstablishmentId");
+
+                    b.ToTable("order_number_counter", "orders", t =>
+                        {
+                            t.HasCheckConstraint("ck_order_number_counter", "last_number > 0");
                         });
                 });
 
@@ -1050,6 +1754,182 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("OrderHub.Domain.Ordering.Order", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("OrderHub.Domain.Promotions.Coupon", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId", "CouponId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.OwnsOne("OrderHub.Domain.Ordering.DeliveryAddressSnapshot", "DeliveryAddress", b1 =>
+                        {
+                            b1.Property<Guid>("OrderId")
+                                .HasColumnType("uuid");
+
+                            b1.Property<string>("City")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("delivery_city");
+
+                            b1.Property<string>("Complement")
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("delivery_complement");
+
+                            b1.Property<string>("Neighborhood")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("character varying(100)")
+                                .HasColumnName("delivery_neighborhood");
+
+                            b1.Property<string>("Number")
+                                .IsRequired()
+                                .HasMaxLength(30)
+                                .HasColumnType("character varying(30)")
+                                .HasColumnName("delivery_number");
+
+                            b1.Property<string>("PostalCode")
+                                .IsRequired()
+                                .HasMaxLength(12)
+                                .HasColumnType("character varying(12)")
+                                .HasColumnName("delivery_postal_code");
+
+                            b1.Property<string>("State")
+                                .IsRequired()
+                                .HasMaxLength(2)
+                                .HasColumnType("character varying(2)")
+                                .HasColumnName("delivery_state");
+
+                            b1.Property<string>("Street")
+                                .IsRequired()
+                                .HasMaxLength(200)
+                                .HasColumnType("character varying(200)")
+                                .HasColumnName("delivery_street");
+
+                            b1.HasKey("OrderId");
+
+                            b1.ToTable("order", "orders");
+
+                            b1.WithOwner()
+                                .HasForeignKey("OrderId");
+                        });
+
+                    b.Navigation("DeliveryAddress");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItem", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Ordering.Order", null)
+                        .WithMany("Items")
+                        .HasForeignKey("TenantId", "EstablishmentId", "OrderId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemAdditional", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Ordering.OrderItem", null)
+                        .WithMany("Additionals")
+                        .HasForeignKey("TenantId", "EstablishmentId", "OrderItemId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderStatusHistory", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Ordering.Order", null)
+                        .WithMany("History")
+                        .HasForeignKey("TenantId", "EstablishmentId", "OrderId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.PublicOrderRequest", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId", "OrderId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Payments.Payment", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId", "OrderId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("OrderHub.Domain.Payments.PaymentMethod", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId", "PaymentMethodId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Payments.PaymentIdempotency", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Payments.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId", "PaymentId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Payments.PaymentMethod", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Promotions.Coupon", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Promotions.CouponUse", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Promotions.Coupon", null)
+                        .WithMany("Uses")
+                        .HasForeignKey("TenantId", "EstablishmentId", "CouponId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("OrderHub.Domain.Ordering.Order", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId", "OrderId")
+                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OrderHub.Domain.Tenancy.Establishment", b =>
                 {
                     b.HasOne("OrderHub.Domain.Tenancy.Tenant", null)
@@ -1115,6 +1995,16 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("OrderHub.Infrastructure.Persistence.Write.Configurations.OrderNumberCounter", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OrderHub.Domain.Catalog.AdditionalGroup", b =>
                 {
                     b.Navigation("Items");
@@ -1132,6 +2022,23 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
             modelBuilder.Entity("OrderHub.Domain.Customers.Customer", b =>
                 {
                     b.Navigation("Addresses");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.Order", b =>
+                {
+                    b.Navigation("History");
+
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItem", b =>
+                {
+                    b.Navigation("Additionals");
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Promotions.Coupon", b =>
+                {
+                    b.Navigation("Uses");
                 });
 #pragma warning restore 612, 618
         }

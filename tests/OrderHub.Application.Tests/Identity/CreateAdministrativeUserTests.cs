@@ -42,8 +42,11 @@ public sealed class CreateAdministrativeUserTests
     [Fact]
     public void Policies_map_operational_capabilities_to_explicit_roles()
     {
-        Assert.Contains(AdministrativeRole.Owner, AdministrativePolicies.RoleMap[AdministrativePolicies.Administration]);
-        Assert.DoesNotContain(AdministrativeRole.Delivery, AdministrativePolicies.RoleMap[AdministrativePolicies.Kitchen]);
+        Assert.Equal([AdministrativeRole.Owner,AdministrativeRole.Admin,AdministrativeRole.Manager],AdministrativePolicies.RoleMap[AdministrativePolicies.PromotionManagement]);
+        Assert.Equal([AdministrativeRole.Owner,AdministrativeRole.Admin,AdministrativeRole.Manager,AdministrativeRole.Attendant],AdministrativePolicies.RoleMap[AdministrativePolicies.CustomerOperations]);
+        Assert.Equal([AdministrativeRole.Owner,AdministrativeRole.Admin,AdministrativeRole.Manager,AdministrativeRole.Kitchen],AdministrativePolicies.RoleMap[AdministrativePolicies.OrderKitchen]);
+        Assert.Equal([AdministrativeRole.Owner,AdministrativeRole.Admin,AdministrativeRole.Manager,AdministrativeRole.Delivery],AdministrativePolicies.RoleMap[AdministrativePolicies.OrderDelivery]);
+        Assert.Equal(Enum.GetValues<AdministrativeRole>(),AdministrativePolicies.RoleMap[AdministrativePolicies.OrderRead]);
     }
 
     private sealed class FakeRepository : IAdministrativeUserRepository

@@ -47,3 +47,17 @@ Uma operação que alterar cliente, endereços e endereço principal como um ún
 #### Scenario: Falha ao definir endereço principal
 - **WHEN** a persistência falhar durante a troca do endereço principal
 - **THEN** o sistema SHALL preservar o cliente e a configuração de endereços anteriores integralmente
+
+### Requirement: Fluxo público mantém cliente no estabelecimento resolvido
+A API pública SHALL localizar ou registrar cliente e endereço somente dentro do estabelecimento resolvido e MUST NOT permitir consulta geral de clientes por contato.
+
+#### Scenario: Telefone existe em outra unidade
+- **WHEN** um visitante informar telefone registrado apenas em outro estabelecimento
+- **THEN** a API MUST tratar os dados de forma independente sem revelar o registro externo
+
+### Requirement: Administração pesquisa clientes da unidade autorizada
+A API SHALL permitir pesquisa paginada por nome, telefone ou e-mail normalizados somente no estabelecimento autorizado e SHALL permitir manutenção de seus endereços.
+
+#### Scenario: Pesquisa por telefone
+- **WHEN** um ator autorizado pesquisar telefone na unidade selecionada
+- **THEN** somente clientes daquela unidade SHALL compor o resultado

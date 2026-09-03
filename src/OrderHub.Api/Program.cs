@@ -6,6 +6,8 @@ using OrderHub.Infrastructure;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using OrderHub.Application.Identity;
 using OrderHub.Api.Catalog;
+using OrderHub.Api.PublicOrdering;
+using OrderHub.Api.Administration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +44,8 @@ app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
 app.MapCatalogEndpoints();
+app.MapPublicOrderingEndpoints();
+app.MapAdministrationEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {

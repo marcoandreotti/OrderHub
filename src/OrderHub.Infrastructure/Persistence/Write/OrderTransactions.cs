@@ -1,0 +1,34 @@
+using Dapper;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
+using OrderHub.Application.Abstractions.Ordering;
+
+namespace OrderHub.Infrastructure.Persistence.Write;
+
+public sealed class OrderNumberSequence(OrderHubDbContext context) : IOrderNumberSequence
+{
+    public async Task<long> ReserveAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            insert into orders.order_number_counter (tenant_id, establishment_id, last_number)
+            values (@TenantId, @EstablishmentId, 1)
+            on conflict (tenant_id, establishment_id)
+            do update set last_number = orders.order_number_counter.last_number + 1
+            returning last_number;
+            """;
+        var connection = context.Database.GetDbConnection();
+        var transaction = context.Database.CurrentTransaction?.GetDbTransaction();
+        return await connection.ExecuteScalarAsync<long>(new CommandDefinition(sql, new { TenantId = tenantId, EstablishmentId = establishmentId }, transaction, cancellationToken: cancellationToken));
+    }
+}
+
+public sealed class OrderConfirmationTransaction(OrderHubDbContext context) : IOrderConfirmationTransaction
+{
+    public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+    {
+        if (context.Database.CurrentTransaction is not null) { await operation(cancellationToken); return; }
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await operation(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+}

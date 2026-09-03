@@ -12,6 +12,10 @@ using OrderHub.Infrastructure.Identity;
 using OrderHub.Application.Abstractions.Operations;
 using OrderHub.Application.Abstractions.Catalog;
 using OrderHub.Application.Abstractions.Customers;
+using OrderHub.Application.Abstractions.Ordering;
+using OrderHub.Application.Abstractions.Promotions;
+using OrderHub.Application.Abstractions.Payments;
+using OrderHub.Application.Abstractions.PublicOrdering;
 
 namespace OrderHub.Infrastructure;
 
@@ -46,6 +50,25 @@ public static class DependencyInjection
         services.AddScoped<ICatalogReadGateway, CatalogReadGateway>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ICustomerReadGateway, CustomerReadGateway>();
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddScoped<IOrderNumberSequence, OrderNumberSequence>();
+        services.AddScoped<IOrderConfirmationTransaction, OrderConfirmationTransaction>();
+        services.AddScoped<IOrderOfferResolver, OrderOfferResolver>();
+        services.AddScoped<IOrderCustomerResolver, OrderCustomerResolver>();
+        services.AddScoped<IOrderTableResolver, OrderTableResolver>();
+        services.AddScoped<IOrderReadGateway, OrderReadGateway>();
+        services.AddScoped<ICouponRepository, CouponRepository>();
+        services.AddScoped<ICouponReadGateway, CouponReadGateway>();
+        services.AddScoped<IPaymentMethodRepository, PaymentMethodRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddScoped<IPaymentIdempotencyRepository, PaymentIdempotencyRepository>();
+        services.AddScoped<IPaymentOrderGateway, PaymentOrderGateway>();
+        services.AddScoped<IPaymentConfirmationTransaction, PaymentConfirmationTransaction>();
+        services.AddScoped<IPaymentReadGateway, PaymentReadGateway>();
+        services.AddScoped<IPublicOrderingContextGateway, PublicOrderingContextGateway>();
+        services.AddScoped<IPublicOrderLocator, PublicOrderLocator>();
+        services.AddScoped<IPublicOrderRequestRepository, PublicOrderRequestRepository>();
+        services.AddScoped<IPublicOrderTransaction, PublicOrderTransaction>();
         services.AddHealthChecks().AddDbContextCheck<OrderHubDbContext>("postgresql", tags: ["ready"]);
 
         return services;

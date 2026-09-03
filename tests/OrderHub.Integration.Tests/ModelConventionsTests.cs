@@ -5,6 +5,9 @@ using OrderHub.Infrastructure.Persistence.Write;
 using OrderHub.Domain.Catalog;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using OrderHub.Domain.Customers;
+using OrderHub.Domain.Ordering;
+using OrderHub.Domain.Promotions;
+using OrderHub.Domain.Payments;
 
 namespace OrderHub.Integration.Tests;
 
@@ -55,5 +58,42 @@ public sealed class ModelConventionsTests
         Assert.True(customer.FindProperty(nameof(Customer.Version))!.IsConcurrencyToken);
         Assert.Contains(address.GetIndexes(), index => index.IsUnique && index.GetFilter() == "is_primary");
         Assert.Equal(DeleteBehavior.Cascade, Assert.Single(address.GetForeignKeys()).DeleteBehavior);
+    }
+
+    [Fact]
+    public void Ordering_metadata_has_scoped_numbers_snapshots_and_concurrency()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql("Host=localhost;Database=metadata;Username=metadata;Password=metadata").Options;
+        using var context = new OrderHubDbContext(options);
+        var order = context.Model.FindEntityType(typeof(Order))!;
+        var item = context.Model.FindEntityType(typeof(OrderItem))!;
+        var history = context.Model.FindEntityType(typeof(OrderStatusHistory))!;
+
+        Assert.Equal("orders", order.GetSchema());
+        Assert.True(order.FindProperty(nameof(Order.Version))!.IsConcurrencyToken);
+        Assert.Contains(order.GetIndexes(), index => index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(Order.TenantId), nameof(Order.EstablishmentId), nameof(Order.Number)]));
+        Assert.Contains(order.GetIndexes(), index => index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(Order.PublicReference)]));
+        Assert.Equal(DeleteBehavior.Cascade, Assert.Single(item.GetForeignKeys(), key => key.PrincipalEntityType.ClrType == typeof(Order)).DeleteBehavior);
+        Assert.Equal(DeleteBehavior.Cascade, Assert.Single(history.GetForeignKeys()).DeleteBehavior);
+    }
+
+    [Fact]
+    public void Coupon_metadata_has_scoped_code_usage_and_concurrency_constraints()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql("Host=localhost;Database=metadata;Username=metadata;Password=metadata").Options;
+        using var context = new OrderHubDbContext(options); var coupon = context.Model.FindEntityType(typeof(Coupon))!; var use = context.Model.FindEntityType(typeof(CouponUse))!;
+        Assert.Equal("promotions", coupon.GetSchema()); Assert.True(coupon.FindProperty(nameof(Coupon.Version))!.IsConcurrencyToken);
+        Assert.Contains(coupon.GetIndexes(), index => index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(Coupon.TenantId), nameof(Coupon.EstablishmentId), nameof(Coupon.Code)]));
+        Assert.Contains(use.GetIndexes(), index => index.IsUnique && index.Properties.Select(property => property.Name).SequenceEqual([nameof(CouponUse.TenantId), nameof(CouponUse.EstablishmentId), nameof(CouponUse.CouponId), nameof(CouponUse.OrderId)]));
+    }
+
+    [Fact]
+    public void Payment_metadata_has_scoped_codes_idempotency_and_concurrency()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql("Host=localhost;Database=metadata;Username=metadata;Password=metadata").Options;
+        using var context = new OrderHubDbContext(options); var method = context.Model.FindEntityType(typeof(PaymentMethod))!; var payment = context.Model.FindEntityType(typeof(Payment))!; var idempotency = context.Model.FindEntityType(typeof(PaymentIdempotency))!;
+        Assert.Contains(method.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual([nameof(PaymentMethod.TenantId), nameof(PaymentMethod.EstablishmentId), nameof(PaymentMethod.Code)]));
+        Assert.True(payment.FindProperty(nameof(Payment.Version))!.IsConcurrencyToken);
+        Assert.Contains(idempotency.GetIndexes(), index => index.IsUnique && index.Properties.Select(x => x.Name).SequenceEqual([nameof(PaymentIdempotency.TenantId), nameof(PaymentIdempotency.EstablishmentId), nameof(PaymentIdempotency.Key)]));
     }
 }
