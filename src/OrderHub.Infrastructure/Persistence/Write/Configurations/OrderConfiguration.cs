@@ -5,6 +5,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade Order, definindo mapeamentos de propriedades, restrições e relacionamentos no banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> builder)
@@ -43,9 +46,13 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasMany(x => x.Items).WithOne().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Cascade);
         builder.HasMany(x => x.History).WithOne().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Cascade);
     }
+
     private static void Money(PropertyBuilder<Money> property, string column) => property.HasColumnName(column).HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x));
 }
 
+/// <summary>
+/// Classe de configuração para a entidade OrderItem, definindo mapeamentos de propriedades, restrições e relacionamentos no banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderItem>
 {
     public void Configure(EntityTypeBuilder<OrderItem> builder)
@@ -59,6 +66,9 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade OrderItemAdditional, definindo mapeamentos de propriedades, restrições e relacionamentos no banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class OrderItemAdditionalConfiguration : IEntityTypeConfiguration<OrderItemAdditional>
 {
     public void Configure(EntityTypeBuilder<OrderItemAdditional> builder)
@@ -68,6 +78,9 @@ internal sealed class OrderItemAdditionalConfiguration : IEntityTypeConfiguratio
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade OrderStatusHistory, definindo mapeamentos de propriedades, restrições e relacionamentos no banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class OrderStatusHistoryConfiguration : IEntityTypeConfiguration<OrderStatusHistory>
 {
     public void Configure(EntityTypeBuilder<OrderStatusHistory> builder)
@@ -76,6 +89,9 @@ internal sealed class OrderStatusHistoryConfiguration : IEntityTypeConfiguration
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade OrderNumberCounter, definindo mapeamentos de propriedades, restrições e relacionamentos no banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class OrderNumberCounter
 {
     public Guid TenantId { get; set; }
@@ -83,6 +99,9 @@ internal sealed class OrderNumberCounter
     public long LastNumber { get; set; }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade OrderNumberCounter, definindo mapeamentos de propriedades, restrições e relacionamentos no banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class OrderNumberCounterConfiguration : IEntityTypeConfiguration<OrderNumberCounter>
 {
     public void Configure(EntityTypeBuilder<OrderNumberCounter> builder)

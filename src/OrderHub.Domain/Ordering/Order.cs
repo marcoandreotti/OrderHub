@@ -4,14 +4,23 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Domain.Ordering;
 
-public enum OrderServiceType { Table, Pickup, Delivery }
-public enum OrderStatus { Draft, Confirmed, Preparing, Ready, OutForDelivery, Completed, Cancelled, Rejected }
+public enum OrderServiceType
+{ Table, Pickup, Delivery }
 
+public enum OrderStatus
+{ Draft, Confirmed, Preparing, Ready, OutForDelivery, Completed, Cancelled, Rejected }
+
+/// <summary>
+/// Representa o snapshot do endereço de entrega de um pedido, contendo informações normalizadas e validadas.
+/// </summary>
 public sealed class DeliveryAddressSnapshot
 {
-    private DeliveryAddressSnapshot() { }
+    private DeliveryAddressSnapshot()
+    { }
+
     public DeliveryAddressSnapshot(string street, string number, string? complement, string neighborhood, string city, string state, string postalCode)
     { Street = street; Number = number; Complement = complement; Neighborhood = neighborhood; City = city; State = state; PostalCode = postalCode; }
+
     public string Street { get; private set; } = string.Empty;
     public string Number { get; private set; } = string.Empty;
     public string? Complement { get; private set; }
@@ -28,7 +37,8 @@ public sealed class Order : IEstablishmentScopedEntity
     private readonly List<OrderItem> items = [];
     private readonly List<OrderStatusHistory> history = [];
 
-    private Order() { }
+    private Order()
+    { }
 
     private Order(
         Guid tenantId,
@@ -174,6 +184,7 @@ public sealed class Order : IEstablishmentScopedEntity
     }
 
     public void StartPreparation(DateTimeOffset now, Guid actorId) => Transition(OrderStatus.Preparing, now, actorId);
+
     public void MarkReady(DateTimeOffset now, Guid actorId) => Transition(OrderStatus.Ready, now, actorId);
 
     public void Dispatch(DateTimeOffset now, Guid actorId)
@@ -183,7 +194,9 @@ public sealed class Order : IEstablishmentScopedEntity
     }
 
     public void Complete(DateTimeOffset now, Guid actorId) => Transition(OrderStatus.Completed, now, actorId);
+
     public void Cancel(DateTimeOffset now, Guid? actorId, string? note = null) => Transition(OrderStatus.Cancelled, now, actorId, note);
+
     public void Reject(DateTimeOffset now, Guid? actorId, string? note = null) => Transition(OrderStatus.Rejected, now, actorId, note);
 
     private void Transition(OrderStatus next, DateTimeOffset now, Guid? actorId, string? note = null)
@@ -224,11 +237,15 @@ public sealed class Order : IEstablishmentScopedEntity
         if (Status != OrderStatus.Draft) throw new DomainException("Confirmed order composition is immutable.");
     }
 
-    private void Touch(DateTimeOffset now) { UpdatedAt = now; Version = Guid.NewGuid(); }
+    private void Touch(DateTimeOffset now)
+    { UpdatedAt = now; Version = Guid.NewGuid(); }
+
     private static string Required(string value, int max, string field)
     { var normalized = value.Trim(); if (normalized.Length is < 1 || normalized.Length > max) throw new DomainException($"{field} is invalid."); return normalized; }
+
     private static string? NormalizeOptional(string? value, int max)
     { if (string.IsNullOrWhiteSpace(value)) return null; var normalized = value.Trim(); if (normalized.Length > max) throw new DomainException("Order snapshot value is too long."); return normalized; }
+
     private static DeliveryAddressSnapshot Normalize(DeliveryAddressSnapshot value) => new(
         Required(value.Street, 200, "Street"), Required(value.Number, 30, "Number"), NormalizeOptional(value.Complement, 100),
         Required(value.Neighborhood, 100, "Neighborhood"), Required(value.City, 100, "City"),
@@ -238,7 +255,10 @@ public sealed class Order : IEstablishmentScopedEntity
 public sealed class OrderItem : IEstablishmentScopedEntity
 {
     private readonly List<OrderItemAdditional> additionals = [];
-    private OrderItem() { }
+
+    private OrderItem()
+    { }
+
     internal OrderItem(Guid tenantId, Guid establishmentId, Guid orderId, Guid productId, Guid? variationId, string productName, string? variationName, Money unitPrice, Quantity quantity, IEnumerable<OrderAdditionalInput> selected, string? notes)
     {
         Id = Guid.NewGuid(); TenantId = tenantId; EstablishmentId = establishmentId; OrderId = orderId; ProductId = productId; VariationId = variationId;
@@ -250,6 +270,7 @@ public sealed class OrderItem : IEstablishmentScopedEntity
         }
         Total = new Money((unitPrice.Amount + additionals.Sum(x => x.UnitPrice.Amount * x.Quantity.Value)) * quantity.Value);
     }
+
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid EstablishmentId { get; private set; }
@@ -263,15 +284,22 @@ public sealed class OrderItem : IEstablishmentScopedEntity
     public string? Notes { get; private set; }
     public Money Total { get; private set; }
     public IReadOnlyCollection<OrderItemAdditional> Additionals => additionals;
-    private static string Required(string value, int max) { var result = value.Trim(); if (result.Length is < 1 || result.Length > max) throw new DomainException("Order item snapshot is invalid."); return result; }
-    private static string? Optional(string? value, int max) { if (string.IsNullOrWhiteSpace(value)) return null; var result = value.Trim(); if (result.Length > max) throw new DomainException("Order item snapshot is invalid."); return result; }
+
+    private static string Required(string value, int max)
+    { var result = value.Trim(); if (result.Length is < 1 || result.Length > max) throw new DomainException("Order item snapshot is invalid."); return result; }
+
+    private static string? Optional(string? value, int max)
+    { if (string.IsNullOrWhiteSpace(value)) return null; var result = value.Trim(); if (result.Length > max) throw new DomainException("Order item snapshot is invalid."); return result; }
 }
 
 public sealed class OrderItemAdditional : IEstablishmentScopedEntity
 {
-    private OrderItemAdditional() { }
+    private OrderItemAdditional()
+    { }
+
     internal OrderItemAdditional(Guid tenantId, Guid establishmentId, Guid orderItemId, Guid additionalId, string name, Money unitPrice, Quantity quantity)
     { Id = Guid.NewGuid(); TenantId = tenantId; EstablishmentId = establishmentId; OrderItemId = orderItemId; AdditionalId = additionalId; Name = name.Trim(); if (Name.Length is < 1 or > 150) throw new DomainException("Additional snapshot is invalid."); UnitPrice = unitPrice; Quantity = quantity; }
+
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid EstablishmentId { get; private set; }
@@ -284,9 +312,12 @@ public sealed class OrderItemAdditional : IEstablishmentScopedEntity
 
 public sealed class OrderStatusHistory : IEstablishmentScopedEntity
 {
-    private OrderStatusHistory() { }
+    private OrderStatusHistory()
+    { }
+
     internal OrderStatusHistory(Guid tenantId, Guid establishmentId, Guid orderId, OrderStatus previousStatus, OrderStatus newStatus, DateTimeOffset occurredAt, Guid? actorId, string? note)
     { Id = Guid.NewGuid(); TenantId = tenantId; EstablishmentId = establishmentId; OrderId = orderId; PreviousStatus = previousStatus; NewStatus = newStatus; OccurredAt = occurredAt; ActorId = actorId; Note = note; }
+
     public Guid Id { get; private set; }
     public Guid TenantId { get; private set; }
     public Guid EstablishmentId { get; private set; }

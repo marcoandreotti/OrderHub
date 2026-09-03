@@ -1,5 +1,8 @@
 namespace OrderHub.Domain.Identity;
 
+/// <summary>
+/// Representa os papéis administrativos disponíveis para usuários administrativos, com valores numéricos curtos para armazenamento eficiente.
+/// </summary>
 public enum AdministrativeRole : short
 {
     Owner = 1,

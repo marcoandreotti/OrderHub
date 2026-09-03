@@ -4,6 +4,9 @@ using OrderHub.Domain.Customers;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade Customer, definindo o mapeamento entre a classe e a tabela do banco de dados, incluindo chaves primárias, propriedades e relacionamentos.
+/// </summary>
 internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
 {
     public void Configure(EntityTypeBuilder<Customer> builder)
@@ -37,6 +40,9 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade CustomerAddress, definindo o mapeamento entre a classe e a tabela do banco de dados, incluindo chaves primárias, propriedades e relacionamentos.
+/// </summary>
 internal sealed class CustomerAddressConfiguration : IEntityTypeConfiguration<CustomerAddress>
 {
     public void Configure(EntityTypeBuilder<CustomerAddress> builder)

@@ -4,6 +4,9 @@ using OrderHub.Domain.Tenancy;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade Tenant, definindo o mapeamento para o banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 {
     public void Configure(EntityTypeBuilder<Tenant> builder)

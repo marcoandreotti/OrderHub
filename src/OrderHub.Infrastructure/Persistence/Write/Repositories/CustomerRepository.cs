@@ -6,6 +6,9 @@ using OrderHub.Domain.Customers;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Repositories;
 
+/// <summary>
+/// Representa um repositório de clientes que fornece métodos para obter, adicionar e salvar alterações de clientes no banco de dados.
+/// </summary>
 public sealed class CustomerRepository(OrderHubDbContext context) : ICustomerRepository
 {
     public Task<Customer?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) =>

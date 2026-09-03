@@ -5,6 +5,9 @@ using OrderHub.Application.Abstractions.Ordering;
 
 namespace OrderHub.Infrastructure.Persistence.Write;
 
+/// <summary>
+/// Implementação do gerador de sequência de números de pedidos, garantindo a reserva de um número único para cada pedido dentro do contexto de um locatário (tenant) e estabelecimento específico.
+/// </summary>
 public sealed class OrderNumberSequence(OrderHubDbContext context) : IOrderNumberSequence
 {
     public async Task<long> ReserveAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken)

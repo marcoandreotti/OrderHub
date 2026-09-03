@@ -3,6 +3,11 @@ using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Domain.Tenancy;
 
+/// <summary>
+/// Slug é uma representação textual de um identificador único, geralmente usado em URLs para identificar recursos de forma legível e amigável.
+/// Ele é composto por letras minúsculas, números e hífens, e deve ter entre 3 e 100 caracteres de comprimento.
+/// O Slug é normalizado para garantir consistência, removendo espaços e convertendo todas as letras para minúsculas.
+/// </summary>
 public sealed partial record Slug
 {
     public string Value { get; }

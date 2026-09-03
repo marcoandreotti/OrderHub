@@ -2,6 +2,9 @@ using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Domain.Tenancy;
 
+/// <summary>
+/// Representa um tenant (inquilino) em um sistema multi-tenant, que é uma entidade que possui um conjunto de recursos e configurações específicas para um grupo de usuários ou clientes.
+/// </summary>
 public sealed class Tenant
 {
     private Tenant()

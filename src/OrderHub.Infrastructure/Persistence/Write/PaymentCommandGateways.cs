@@ -5,6 +5,9 @@ using OrderHub.Application.Abstractions.Payments;
 
 namespace OrderHub.Infrastructure.Persistence.Write;
 
+/// <summary>
+/// Implementação do gateway de acesso a dados para operações relacionadas a pedidos de pagamento.
+/// </summary>
 public sealed class PaymentOrderGateway(OrderHubDbContext context) : IPaymentOrderGateway
 {
     public async Task<PaymentOrderSnapshot?> GetAsync(Guid tenantId, Guid establishmentId, Guid orderId, CancellationToken cancellationToken)
@@ -13,6 +16,7 @@ public sealed class PaymentOrderGateway(OrderHubDbContext context) : IPaymentOrd
         var connection = context.Database.GetDbConnection(); if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync(cancellationToken);
         return await connection.QuerySingleOrDefaultAsync<PaymentOrderSnapshot>(new CommandDefinition(sql, new { TenantId = tenantId, EstablishmentId = establishmentId, OrderId = orderId }, context.Database.CurrentTransaction?.GetDbTransaction(), cancellationToken: cancellationToken));
     }
+
     public async Task<decimal> GetConfirmedAmountAsync(Guid tenantId, Guid establishmentId, Guid orderId, CancellationToken cancellationToken)
     {
         const string sql = "select coalesce(sum(amount), 0) from payments.payment where tenant_id=@TenantId and establishment_id=@EstablishmentId and order_id=@OrderId and status='Confirmed';";

@@ -4,6 +4,9 @@ using OrderHub.Domain.Identity;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade AdministrativeUser, definindo o mapeamento para o banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class AdministrativeUserConfiguration : IEntityTypeConfiguration<AdministrativeUser>
 {
     public void Configure(EntityTypeBuilder<AdministrativeUser> builder)
@@ -55,6 +58,9 @@ internal sealed class AdministrativeUserConfiguration : IEntityTypeConfiguration
     }
 }
 
+/// <summary>
+/// Representa a definição de um papel administrativo, incluindo seu identificador, código e nome, utilizado para gerenciar permissões e funções administrativas no sistema.
+/// </summary>
 internal sealed class AdministrativeRoleDefinition
 {
     public AdministrativeRole Id { get; init; }
@@ -62,6 +68,9 @@ internal sealed class AdministrativeRoleDefinition
     public string Name { get; init; } = string.Empty;
 }
 
+/// <summary>
+/// Classe de configuração para a entidade AdministrativeRoleDefinition, definindo o mapeamento para o banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class AdministrativeRoleDefinitionConfiguration : IEntityTypeConfiguration<AdministrativeRoleDefinition>
 {
     public void Configure(EntityTypeBuilder<AdministrativeRoleDefinition> builder)

@@ -6,6 +6,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um resolvedor de ofertas de pedidos que fornece métodos para resolver informações sobre produtos, variações e adicionais de um pedido com base em critérios específicos.
+/// </summary>
 public sealed class OrderOfferResolver(IReadConnectionFactory connectionFactory) : IOrderOfferResolver
 {
     public async Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, CancellationToken cancellationToken)
@@ -31,12 +34,12 @@ public sealed class OrderOfferResolver(IReadConnectionFactory connectionFactory)
             left join catalog.additional_group_item gi on gi.tenant_id=g.tenant_id and gi.establishment_id=g.establishment_id and gi.group_id=g.id
             where pg.tenant_id=@TenantId and pg.establishment_id=@EstablishmentId and pg.product_id=@ProductId;
             """;
-        var groupRows=(await connection.QueryAsync<GroupRow>(new CommandDefinition(groupsSql,new { TenantId=tenantId,EstablishmentId=establishmentId,ProductId=productId },cancellationToken:cancellationToken))).ToArray();
-        foreach(var group in groupRows.GroupBy(x=>new{x.GroupId,x.MinimumSelection,x.MaximumSelection}))
+        var groupRows = (await connection.QueryAsync<GroupRow>(new CommandDefinition(groupsSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId }, cancellationToken: cancellationToken))).ToArray();
+        foreach (var group in groupRows.GroupBy(x => new { x.GroupId, x.MinimumSelection, x.MaximumSelection }))
         {
-            var allowed=group.Where(x=>x.AdditionalId is not null).Select(x=>x.AdditionalId!.Value).ToHashSet();
-            var count=additionals.Where(x=>allowed.Contains(x.AdditionalId)).Sum(x=>x.Quantity);
-            if(count<group.Key.MinimumSelection || count>group.Key.MaximumSelection) return null;
+            var allowed = group.Where(x => x.AdditionalId is not null).Select(x => x.AdditionalId!.Value).ToHashSet();
+            var count = additionals.Where(x => allowed.Contains(x.AdditionalId)).Sum(x => x.Quantity);
+            if (count < group.Key.MinimumSelection || count > group.Key.MaximumSelection) return null;
         }
         IReadOnlyList<OrderAdditionalSnapshot> snapshots = [];
         if (ids.Length > 0)
@@ -55,6 +58,7 @@ public sealed class OrderOfferResolver(IReadConnectionFactory connectionFactory)
         }
         return new(row.ProductId, row.VariationId, row.ProductName, row.VariationName, new Money(row.UnitPrice), snapshots);
     }
+
     private sealed record OfferRow(Guid ProductId, string ProductName, Guid? VariationId, string? VariationName, decimal UnitPrice);
     private sealed record AdditionalRow(Guid AdditionalId, string Name, decimal UnitPrice);
     private sealed record GroupRow(Guid GroupId, int MinimumSelection, int MaximumSelection, Guid? AdditionalId);
@@ -79,6 +83,7 @@ public sealed class OrderCustomerResolver(IReadConnectionFactory connectionFacto
         var address = row.AddressId is null ? null : new DeliveryAddressSnapshot(row.Street!, row.Number!, row.Complement, row.Neighborhood!, row.City!, row.State!, row.PostalCode!);
         return new(row.CustomerId, row.Name, row.Phone, row.AddressId, address);
     }
+
     private sealed record CustomerRow(Guid CustomerId, string Name, string Phone, Guid? AddressId, string? Street, string? Number, string? Complement, string? Neighborhood, string? City, string? State, string? PostalCode);
 }
 

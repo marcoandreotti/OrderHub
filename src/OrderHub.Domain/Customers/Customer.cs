@@ -4,6 +4,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Domain.Customers;
 
+/// <summary>
+/// Representa um cliente dentro do escopo de um único estabelecimento.
+/// </summary>
 public sealed class Customer : IEstablishmentScopedEntity
 {
     private readonly List<CustomerAddress> addresses = [];

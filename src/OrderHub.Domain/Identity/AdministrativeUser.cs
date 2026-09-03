@@ -3,6 +3,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Domain.Identity;
 
+/// <summary>
+/// Representa um usuário administrativo de um tenant, com informações sobre identidade, credenciais, papéis administrativos, acessos a estabelecimentos e status de atividade.
+/// </summary>
 public sealed class AdministrativeUser : ITenantScopedEntity
 {
     private readonly List<AdministrativeUserRole> roleMemberships = [];

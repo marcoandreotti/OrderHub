@@ -6,11 +6,18 @@ using OrderHub.Domain.Catalog;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Repositories;
 
+/// <summary>
+/// Representa um repositório de categorias que fornece métodos para obter, adicionar e salvar alterações de categorias no banco de dados.
+/// </summary>
 public sealed class CategoryRepository(OrderHubDbContext context) : ICategoryRepository, ICategoryHierarchyGateway
 {
     public Task<Category?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => context.Categories.SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
-    public async Task AddAsync(Category category, CancellationToken cancellationToken) { await context.Categories.AddAsync(category, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
+    public async Task AddAsync(Category category, CancellationToken cancellationToken)
+    { await context.Categories.AddAsync(category, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken));
+
     public async Task<IReadOnlySet<Guid>> GetAncestorIdsAsync(Guid tenantId, Guid establishmentId, Guid categoryId, CancellationToken cancellationToken)
     {
         var result = new HashSet<Guid>(); var current = categoryId;
@@ -26,24 +33,36 @@ public sealed class CategoryRepository(OrderHubDbContext context) : ICategoryRep
 public sealed class ProductRepository(OrderHubDbContext context) : IProductRepository
 {
     public Task<Product?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => context.Products.Include(x => x.Images).Include(x => x.Variations).Include(x => x.AdditionalGroups).SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
+
     public Task<bool> CodeExistsAsync(Guid tenantId, Guid establishmentId, string code, Guid? exceptProductId, CancellationToken cancellationToken) => context.Products.AnyAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Code == code && (!exceptProductId.HasValue || x.Id != exceptProductId.Value), cancellationToken);
-    public async Task AddAsync(Product product, CancellationToken cancellationToken) { await context.Products.AddAsync(product, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
+    public async Task AddAsync(Product product, CancellationToken cancellationToken)
+    { await context.Products.AddAsync(product, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken));
 }
 
 public sealed class AdditionalRepository(OrderHubDbContext context) : IAdditionalRepository
 {
     public Task<Additional?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => context.Additionals.SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
+
     public async Task<IReadOnlyList<Additional>> GetManyAsync(Guid tenantId, Guid establishmentId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => await context.Additionals.Where(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && ids.Contains(x.Id)).ToListAsync(cancellationToken);
-    public async Task AddAsync(Additional additional, CancellationToken cancellationToken) { await context.Additionals.AddAsync(additional, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
+    public async Task AddAsync(Additional additional, CancellationToken cancellationToken)
+    { await context.Additionals.AddAsync(additional, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken));
 }
 
 public sealed class AdditionalGroupRepository(OrderHubDbContext context) : IAdditionalGroupRepository
 {
     public Task<AdditionalGroup?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => context.AdditionalGroups.Include(x => x.Items).SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
+
     public async Task<IReadOnlyList<AdditionalGroup>> GetManyAsync(Guid tenantId, Guid establishmentId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => await context.AdditionalGroups.Where(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && ids.Contains(x.Id)).ToListAsync(cancellationToken);
-    public async Task AddAsync(AdditionalGroup group, CancellationToken cancellationToken) { await context.AdditionalGroups.AddAsync(group, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
+    public async Task AddAsync(AdditionalGroup group, CancellationToken cancellationToken)
+    { await context.AdditionalGroups.AddAsync(group, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken) => CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken));
 }
 

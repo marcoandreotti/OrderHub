@@ -6,6 +6,10 @@ using OrderHub.Domain.Ordering;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Repositories;
 
+/// <summary>
+/// Representa um repositório de pedidos que fornece métodos para obter, adicionar e salvar alterações de pedidos no banco de dados.
+/// </summary>
+/// <param name="context"></param>
 public sealed class OrderRepository(OrderHubDbContext context) : IOrderRepository
 {
     public Task<Order?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) =>

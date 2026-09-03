@@ -5,11 +5,18 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade PaymentMethod, definindo o mapeamento para a tabela "payment_method" no esquema de banco de dados "payments".
+/// </summary>
 internal sealed class PaymentMethodConfiguration : IEntityTypeConfiguration<PaymentMethod>
 {
     public void Configure(EntityTypeBuilder<PaymentMethod> builder)
     { builder.ToTable("payment_method", DatabaseSchemas.Payments); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever(); builder.Property(x => x.TenantId).HasColumnName("tenant_id"); builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id"); builder.Property(x => x.Code).HasColumnName("code").HasMaxLength(30); builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(100); builder.Property(x => x.IsOnline).HasColumnName("is_online"); builder.Property(x => x.AllowsChange).HasColumnName("allows_change"); builder.Property(x => x.IsActive).HasColumnName("is_active"); builder.Property(x => x.CreatedAt).HasColumnName("created_at"); builder.Property(x => x.UpdatedAt).HasColumnName("updated_at"); builder.HasAlternateKey(x => new { x.TenantId, x.EstablishmentId, x.Id }); builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.Code }).IsUnique(); builder.HasOne<OrderHub.Domain.Tenancy.Establishment>().WithMany().HasForeignKey(x => new { x.TenantId, x.EstablishmentId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict); }
 }
+
+/// <summary>
+/// Classe de configuração para a entidade Payment, definindo o mapeamento para a tabela "payment" no esquema de banco de dados "payments".
+/// </summary>
 internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
 {
     public void Configure(EntityTypeBuilder<Payment> builder)
@@ -20,6 +27,10 @@ internal sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.HasAlternateKey(x => new { x.TenantId, x.EstablishmentId, x.Id }); builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.OrderId, x.Status }); builder.HasOne<PaymentMethod>().WithMany().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.PaymentMethodId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Restrict); builder.HasOne<OrderHub.Domain.Ordering.Order>().WithMany().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+/// <summary>
+/// Classe de configuração para a entidade PaymentIdempotency, definindo o mapeamento para a tabela "payment_idempotency" no esquema de banco de dados "payments".
+/// </summary>
 internal sealed class PaymentIdempotencyConfiguration : IEntityTypeConfiguration<PaymentIdempotency>
 {
     public void Configure(EntityTypeBuilder<PaymentIdempotency> builder)

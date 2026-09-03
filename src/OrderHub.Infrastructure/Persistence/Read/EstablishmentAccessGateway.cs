@@ -4,6 +4,9 @@ using OrderHub.Application.Abstractions.Tenancy;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um gateway de acesso a estabelecimentos que fornece métodos para verificar se um usuário tem acesso ativo a um estabelecimento específico.
+/// </summary>
 public sealed class EstablishmentAccessGateway(IReadConnectionFactory connectionFactory) : IEstablishmentAccessGateway
 {
     public async Task<bool> HasActiveAccessAsync(Guid tenantId, Guid userId, Guid establishmentId, CancellationToken cancellationToken)

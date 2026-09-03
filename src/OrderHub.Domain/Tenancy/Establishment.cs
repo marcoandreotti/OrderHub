@@ -3,6 +3,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Domain.Tenancy;
 
+/// <summary>
+/// Representa um estabelecimento vinculado a um tenant, com informações como nome comercial, slug, tema visual e status de atividade.
+/// </summary>
 public sealed class Establishment : ITenantScopedEntity
 {
     private Establishment()

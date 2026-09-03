@@ -4,6 +4,9 @@ using OrderHub.Application.Abstractions.Persistence;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um gateway de leitura para operações, fornecendo métodos para resolver informações de tabelas e verificar se um estabelecimento está aberto em um determinado horário.
+/// </summary>
 public sealed class OperationsReadGateway(IReadConnectionFactory connectionFactory) : IOperationsReadGateway
 {
     public async Task<TableContext?> ResolveTableAsync(string normalizedSlug, string token, CancellationToken cancellationToken)

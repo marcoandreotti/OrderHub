@@ -2,6 +2,9 @@ using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Domain.SharedKernel;
 
+/// <summary>
+/// Representa uma quantia monetária, garantindo que seja maior ou igual a zero e com precisão de até duas casas decimais.
+/// </summary>
 public readonly record struct Money
 {
     public static Money Zero => new(0m);

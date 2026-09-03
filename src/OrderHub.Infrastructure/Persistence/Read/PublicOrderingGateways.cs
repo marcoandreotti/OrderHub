@@ -4,6 +4,9 @@ using OrderHub.Application.Abstractions.PublicOrdering;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Represents a gateway for resolving public ordering context information based on a normalized slug and an optional table token.
+/// </summary>
 public sealed class PublicOrderingContextGateway(IReadConnectionFactory connectionFactory) : IPublicOrderingContextGateway
 {
     public async Task<PublicOrderingContext?> ResolveAsync(string normalizedSlug, string? tableToken, CancellationToken cancellationToken)
@@ -26,16 +29,20 @@ public sealed class PublicOrderingContextGateway(IReadConnectionFactory connecti
             where e.slug=@Slug and e.is_active and t.is_active and pm.is_active order by pm.name,pm.id;
             """;
         await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-        using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, new { Slug=normalizedSlug, TableToken=tableToken }, cancellationToken:cancellationToken));
+        using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, new { Slug = normalizedSlug, TableToken = tableToken }, cancellationToken: cancellationToken));
         var row = await grid.ReadSingleOrDefaultAsync<ContextRow>();
         var methods = (await grid.ReadAsync<PublicPaymentMethod>()).ToArray();
-        return row is null ? null : new(row.TenantId,row.EstablishmentId,row.EstablishmentName,row.Slug,row.PrimaryColor,row.SecondaryColor,row.BackgroundColor,row.TextColor,row.FontFamily,row.LogoUrl,row.TableId,row.TableCode,row.TableToken,methods);
+        return row is null ? null : new(row.TenantId, row.EstablishmentId, row.EstablishmentName, row.Slug, row.PrimaryColor, row.SecondaryColor, row.BackgroundColor, row.TextColor, row.FontFamily, row.LogoUrl, row.TableId, row.TableCode, row.TableToken, methods);
     }
-    private sealed record ContextRow(Guid TenantId,Guid EstablishmentId,string EstablishmentName,string Slug,string PrimaryColor,string SecondaryColor,string BackgroundColor,string TextColor,string FontFamily,string? LogoUrl,Guid? TableId,string? TableCode,string? TableToken);
+
+    private sealed record ContextRow(Guid TenantId, Guid EstablishmentId, string EstablishmentName, string Slug, string PrimaryColor, string SecondaryColor, string BackgroundColor, string TextColor, string FontFamily, string? LogoUrl, Guid? TableId, string? TableCode, string? TableToken);
 }
 
+/// <summary>
+/// Represents a gateway for locating public order information based on a public reference.
+/// </summary>
 public sealed class PublicOrderLocator(IReadConnectionFactory connectionFactory) : IPublicOrderLocator
 {
     public async Task<PublicOrderLocation?> FindAsync(string reference, CancellationToken cancellationToken)
-    { await using var connection=await connectionFactory.OpenConnectionAsync(cancellationToken); return await connection.QuerySingleOrDefaultAsync<PublicOrderLocation>(new CommandDefinition("select tenant_id as TenantId,establishment_id as EstablishmentId,id as OrderId from orders.\"order\" where public_reference=@Reference",new { Reference=reference.Trim().ToLowerInvariant() },cancellationToken:cancellationToken)); }
+    { await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken); return await connection.QuerySingleOrDefaultAsync<PublicOrderLocation>(new CommandDefinition("select tenant_id as TenantId,establishment_id as EstablishmentId,id as OrderId from orders.\"order\" where public_reference=@Reference", new { Reference = reference.Trim().ToLowerInvariant() }, cancellationToken: cancellationToken)); }
 }

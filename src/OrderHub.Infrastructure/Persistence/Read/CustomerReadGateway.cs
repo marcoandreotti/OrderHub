@@ -4,6 +4,9 @@ using OrderHub.Application.Abstractions.Persistence;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um gateway de leitura para clientes, fornecendo métodos para pesquisar clientes e seus endereços associados no banco de dados.
+/// </summary>
 public sealed class CustomerReadGateway(IReadConnectionFactory connectionFactory) : ICustomerReadGateway
 {
     public async Task<CustomerSearchResult> SearchAsync(

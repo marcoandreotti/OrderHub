@@ -4,6 +4,10 @@ using OrderHub.Domain.Tenancy;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Repositories;
 
+/// <summary>
+/// Representa um repositório de estabelecimentos que fornece métodos para verificar a existência de slugs e adicionar novos estabelecimentos.
+/// </summary>
+
 public sealed class EstablishmentRepository(OrderHubDbContext context) : IEstablishmentRepository
 {
     public Task<bool> SlugExistsAsync(string normalizedSlug, CancellationToken cancellationToken) =>

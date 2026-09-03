@@ -2,6 +2,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace OrderHub.Infrastructure.Persistence.Write;
 
+/// <summary>
+/// Representa o contexto do banco de dados para operações de escrita no OrderHub, utilizando o Entity Framework Core.
+/// </summary>
+/// <param name="options"></param>
 public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> options) : DbContext(options)
 {
     public DbSet<OrderHub.Domain.Tenancy.Tenant> Tenants => Set<OrderHub.Domain.Tenancy.Tenant>();

@@ -5,11 +5,14 @@ using OrderHub.Domain.Ordering;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um gateway de leitura para pedidos (orders) que fornece métodos para pesquisar e obter informações detalhadas sobre pedidos.
+/// </summary>
 public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) : IOrderReadGateway
 {
     public async Task<OrderSearchResult> SearchAsync(Guid tenantId, Guid establishmentId, DateTimeOffset? from, DateTimeOffset? to, OrderStatus? status, long? number, OrderServiceType? serviceType, int page, int pageSize, CancellationToken cancellationToken)
     {
-        const string sql="""
+        const string sql = """
             select count(*) from orders."order" o
             where o.tenant_id=@TenantId and o.establishment_id=@EstablishmentId
               and (@From is null or o.created_at>=@From) and (@To is null or o.created_at<@To)
@@ -23,12 +26,16 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
               and (@ServiceType is null or o.service_type=@ServiceType)
             order by o.created_at desc,o.id desc offset @Offset rows fetch next @PageSize rows only;
             """;
-        var parameters=new { TenantId=tenantId,EstablishmentId=establishmentId,From=from,To=to,Status=status?.ToString(),Number=number,ServiceType=serviceType?.ToString(),Offset=(page-1)*pageSize,PageSize=pageSize };
-        await using var connection=await connectionFactory.OpenConnectionAsync(cancellationToken);using var grid=await connection.QueryMultipleAsync(new CommandDefinition(sql,parameters,cancellationToken:cancellationToken));
-        var total=await grid.ReadSingleAsync<int>();var rows=(await grid.ReadAsync<SummaryRow>()).ToArray();
-        return new(total,rows.Select(x=>new OrderSummaryReadModel(x.Id,x.Number,Enum.Parse<OrderServiceType>(x.ServiceType),Enum.Parse<OrderStatus>(x.Status),x.CustomerName,x.CustomerPhone,x.Total,new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAt,DateTimeKind.Utc)))).ToArray());
+        var parameters = new { TenantId = tenantId, EstablishmentId = establishmentId, From = from, To = to, Status = status?.ToString(), Number = number, ServiceType = serviceType?.ToString(), Offset = (page - 1) * pageSize, PageSize = pageSize };
+        await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken); using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
+        var total = await grid.ReadSingleAsync<int>(); var rows = (await grid.ReadAsync<SummaryRow>()).ToArray();
+        return new(total, rows.Select(x => new OrderSummaryReadModel(x.Id, x.Number, Enum.Parse<OrderServiceType>(x.ServiceType), Enum.Parse<OrderStatus>(x.Status), x.CustomerName, x.CustomerPhone, x.Total, new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc)))).ToArray());
     }
 
+    /// <summary>
+    /// Obtém informações detalhadas de um pedido específico com base no ID do inquilino, ID do estabelecimento e ID do pedido.
+    /// </summary>
+    /// <returns></returns>
     public async Task<OrderReadModel?> GetAsync(Guid tenantId, Guid establishmentId, Guid orderId, CancellationToken cancellationToken)
     {
         const string sql = """
@@ -69,10 +76,14 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
             items.Select(item => new OrderItemReadModel(item.Id, item.ProductName, item.VariationName, item.UnitPrice, item.Quantity, item.Total, item.Notes, additionals[item.Id].Select(a => new OrderAdditionalReadModel(a.Name, a.UnitPrice, a.Quantity)).ToArray())).ToArray(),
             history.Select(item => new OrderHistoryReadModel(Enum.Parse<OrderStatus>(item.PreviousStatus), Enum.Parse<OrderStatus>(item.NewStatus), item.OccurredAt, item.ActorId, item.Note)).ToArray());
     }
+
     private sealed record OrderRow(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, string? DeliveryStreet, string? DeliveryNumber, string? DeliveryComplement, string? DeliveryNeighborhood, string? DeliveryCity, string? DeliveryState, string? DeliveryPostalCode, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal CouponDiscount);
     private sealed record ItemRow(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes);
     private sealed record AdditionalRow(Guid OrderItemId, string Name, decimal UnitPrice, decimal Quantity);
-    private sealed class SummaryRow { public Guid Id {get;set;} public long Number {get;set;} public string ServiceType {get;set;}=string.Empty; public string Status {get;set;}=string.Empty; public string? CustomerName {get;set;} public string? CustomerPhone {get;set;} public decimal Total {get;set;} public DateTime CreatedAt {get;set;} }
+
+    private sealed class SummaryRow
+    { public Guid Id { get; set; } public long Number { get; set; } public string ServiceType { get; set; } = string.Empty; public string Status { get; set; } = string.Empty; public string? CustomerName { get; set; } public string? CustomerPhone { get; set; } public decimal Total { get; set; } public DateTime CreatedAt { get; set; } }
+
     private sealed class HistoryRow
     {
         public string PreviousStatus { get; set; } = string.Empty;

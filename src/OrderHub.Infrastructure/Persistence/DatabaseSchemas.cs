@@ -1,5 +1,8 @@
 namespace OrderHub.Infrastructure.Persistence;
 
+/// <summary>
+/// Contém os nomes dos esquemas de banco de dados utilizados na aplicação.
+/// </summary>
 public static class DatabaseSchemas
 {
     public const string Tenancy = "tenancy";

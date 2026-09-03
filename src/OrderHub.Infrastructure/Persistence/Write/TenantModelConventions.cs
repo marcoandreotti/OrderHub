@@ -3,6 +3,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Infrastructure.Persistence.Write;
 
+/// <summary>
+/// Classe de convenções para aplicar índices relacionados a entidades com escopo de locatário (tenant) no modelo do Entity Framework Core.
+/// </summary>
 internal static class TenantModelConventions
 {
     public static void ApplyTenantIndexes(this ModelBuilder modelBuilder)

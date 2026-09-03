@@ -3,6 +3,9 @@ using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Domain.Tenancy;
 
+/// <summary>
+/// Representa o tema visual de um estabelecimento, incluindo cores primárias e secundárias, cor de fundo, cor do texto, família de fontes e URLs para logotipo e favicon.
+/// </summary>
 public sealed partial record EstablishmentTheme
 {
     public const string DefaultPrimaryColor = "#1976D2";

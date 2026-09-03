@@ -4,6 +4,9 @@ using OrderHub.Application.Abstractions.Tenancy;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um gateway de leitura para estabelecimentos, fornecendo métodos para consultar informações de estabelecimentos no banco de dados.
+/// </summary>
 public sealed class EstablishmentReadGateway(IReadConnectionFactory connectionFactory) : IEstablishmentReadGateway
 {
     public async Task<EstablishmentReadModel?> FindAsync(

@@ -4,6 +4,9 @@ using OrderHub.Domain.Tenancy;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade Establishment, definindo o mapeamento entre a classe e a tabela do banco de dados, incluindo chaves primárias, propriedades, índices e relacionamentos.
+/// </summary>
 internal sealed class EstablishmentConfiguration : IEntityTypeConfiguration<Establishment>
 {
     public void Configure(EntityTypeBuilder<Establishment> builder)

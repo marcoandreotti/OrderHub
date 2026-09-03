@@ -3,6 +3,9 @@ using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Domain.Identity;
 
+/// <summary>
+/// Representa um endereço de e-mail válido, com valor original e valor normalizado para comparação.
+/// </summary>
 public sealed record Email
 {
     public string Value { get; }

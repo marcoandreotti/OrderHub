@@ -2,6 +2,9 @@ using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Domain.SharedKernel;
 
+/// <summary>
+/// Representa a quantidade de um item em um pedido, garantindo que seja maior que zero e com precisão de até três casas decimais.
+/// </summary>
 public readonly record struct Quantity
 {
     public decimal Value { get; }

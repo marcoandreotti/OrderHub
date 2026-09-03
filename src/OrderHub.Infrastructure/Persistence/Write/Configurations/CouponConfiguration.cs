@@ -5,6 +5,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade Coupon, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
 {
     public void Configure(EntityTypeBuilder<Coupon> builder)
@@ -24,6 +27,9 @@ internal sealed class CouponConfiguration : IEntityTypeConfiguration<Coupon>
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade CouponUse, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class CouponUseConfiguration : IEntityTypeConfiguration<CouponUse>
 {
     public void Configure(EntityTypeBuilder<CouponUse> builder)

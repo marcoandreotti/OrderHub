@@ -4,6 +4,9 @@ using OrderHub.Domain.Operations;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade ServiceTable, definindo o mapeamento para a tabela "service_table" no esquema "operations" do banco de dados.
+/// </summary>
 internal sealed class ServiceTableConfiguration : IEntityTypeConfiguration<ServiceTable>
 {
     public void Configure(EntityTypeBuilder<ServiceTable> builder)
@@ -18,6 +21,9 @@ internal sealed class ServiceTableConfiguration : IEntityTypeConfiguration<Servi
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade BusinessHours, definindo o mapeamento para a tabela "business_hours" no esquema "operations" do banco de dados.
+/// </summary>
 internal sealed class BusinessHoursConfiguration : IEntityTypeConfiguration<BusinessHours>
 {
     public void Configure(EntityTypeBuilder<BusinessHours> builder)

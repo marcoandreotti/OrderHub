@@ -4,9 +4,13 @@ using OrderHub.Application.Abstractions.Persistence;
 
 namespace OrderHub.Infrastructure.Persistence.Read;
 
+/// <summary>
+/// Representa um gateway de leitura para o catálogo, fornecendo métodos para recuperar informações do catálogo, como estabelecimentos, categorias, produtos e grupos adicionais, a partir do banco de dados.
+/// </summary>
 public sealed class CatalogReadGateway(IReadConnectionFactory connectionFactory) : ICatalogReadGateway
 {
     public Task<CatalogReadModel?> GetAdministrativeAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken) => LoadAsync("e.tenant_id = @TenantId and e.id = @EstablishmentId", new { TenantId = tenantId, EstablishmentId = establishmentId }, false, cancellationToken);
+
     public Task<CatalogReadModel?> GetPublicAsync(string normalizedSlug, CancellationToken cancellationToken) => LoadAsync("e.slug = @Slug and e.is_active = true and t.is_active = true", new { Slug = normalizedSlug }, true, cancellationToken);
 
     private async Task<CatalogReadModel?> LoadAsync(string establishmentFilter, object parameters, bool publicOnly, CancellationToken cancellationToken)

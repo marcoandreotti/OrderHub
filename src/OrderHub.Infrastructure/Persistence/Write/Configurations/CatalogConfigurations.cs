@@ -5,6 +5,9 @@ using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
+/// <summary>
+/// Classe de configuração para a entidade Category, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
 {
     public void Configure(EntityTypeBuilder<Category> builder)
@@ -21,6 +24,9 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade Product, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
     public void Configure(EntityTypeBuilder<Product> builder)
@@ -37,6 +43,9 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade ProductImage, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class ProductImageConfiguration : IEntityTypeConfiguration<ProductImage>
 {
     public void Configure(EntityTypeBuilder<ProductImage> builder)
@@ -45,6 +54,9 @@ internal sealed class ProductImageConfiguration : IEntityTypeConfiguration<Produ
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade ProductVariation, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class ProductVariationConfiguration : IEntityTypeConfiguration<ProductVariation>
 {
     public void Configure(EntityTypeBuilder<ProductVariation> builder)
@@ -53,6 +65,9 @@ internal sealed class ProductVariationConfiguration : IEntityTypeConfiguration<P
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade Additional, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class AdditionalConfiguration : IEntityTypeConfiguration<Additional>
 {
     public void Configure(EntityTypeBuilder<Additional> builder)
@@ -61,6 +76,9 @@ internal sealed class AdditionalConfiguration : IEntityTypeConfiguration<Additio
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade AdditionalGroup, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class AdditionalGroupConfiguration : IEntityTypeConfiguration<AdditionalGroup>
 {
     public void Configure(EntityTypeBuilder<AdditionalGroup> builder)
@@ -69,6 +87,9 @@ internal sealed class AdditionalGroupConfiguration : IEntityTypeConfiguration<Ad
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade AdditionalGroupItem, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class AdditionalGroupItemConfiguration : IEntityTypeConfiguration<AdditionalGroupItem>
 {
     public void Configure(EntityTypeBuilder<AdditionalGroupItem> builder)
@@ -77,6 +98,9 @@ internal sealed class AdditionalGroupItemConfiguration : IEntityTypeConfiguratio
     }
 }
 
+/// <summary>
+/// Classe de configuração para a entidade ProductAdditionalGroup, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
+/// </summary>
 internal sealed class ProductAdditionalGroupConfiguration : IEntityTypeConfiguration<ProductAdditionalGroup>
 {
     public void Configure(EntityTypeBuilder<ProductAdditionalGroup> builder)
