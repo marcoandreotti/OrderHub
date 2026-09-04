@@ -49,7 +49,8 @@ public sealed class BeginAuthenticationCommandHandler(IAuthenticationRepository 
             type = AuthenticationIdentityType.AdministrativeUser; identityId = match.Value.User.Id; tenantId = match.Value.TenantId; email = match.Value.User.Email.Value;
         }
         var code = secrets.GenerateCode(); var challenge = AuthenticationChallenge.Create(type, identityId, tenantId, secrets.Hash(code), originHash, now, options.ChallengeLifetime);
-        await repository.AddChallengeAsync(challenge, ct); await repository.SaveChangesAsync(ct); await sender.SendAsync(email, code, challenge.ExpiresAt, ct);
+        if (!await repository.ReplaceChallengeAsync(challenge, options.ResendInterval, ct)) throw new ConflictException("Authentication could not be completed.");
+        await sender.SendAsync(email, code, challenge.ExpiresAt, ct);
         return new(challenge.Id, challenge.ExpiresAt);
     }
 }
@@ -81,7 +82,7 @@ public sealed class LogoutCommandHandler(IAuthenticationRepository repository, I
 
 public sealed class ChangeTemporaryPasswordCommandHandler(IAuthenticationRepository repository, IAuthenticationSecretProtector secrets, IPasswordHasher passwords, TimeProvider clock) : ICommandHandler<ChangeTemporaryPasswordCommand>
 {
-    public async Task HandleAsync(ChangeTemporaryPasswordCommand command, CancellationToken ct) { var now = clock.GetUtcNow(); var session = await repository.FindSessionByAccessHashAsync(secrets.Hash(command.AccessToken), ct) ?? throw new UnauthorizedException("Session is invalid."); if (session.IdentityType != AuthenticationIdentityType.PlatformUser || !session.PasswordChangeRequired || !session.IsAccessValid(now)) throw new ForbiddenException("Password change is not allowed."); var user = await repository.GetPlatformUserAsync(session.IdentityId, ct) ?? throw new UnauthorizedException("Session is invalid."); if (!passwords.Verify(user.PasswordHash, command.CurrentPassword)) throw new UnauthorizedException("Password change could not be completed."); user.ChangePassword(passwords.Hash(command.NewPassword), now); await repository.RevokeFamilyAsync(session.FamilyId, now, ct); await repository.SaveChangesAsync(ct); }
+    public async Task HandleAsync(ChangeTemporaryPasswordCommand command, CancellationToken ct) { var now = clock.GetUtcNow(); var session = await repository.FindSessionByAccessHashAsync(secrets.Hash(command.AccessToken), ct) ?? throw new UnauthorizedException("Session is invalid."); if (session.IdentityType != AuthenticationIdentityType.PlatformUser || !session.PasswordChangeRequired || !session.IsAccessValid(now)) throw new ForbiddenException("Password change is not allowed."); var user = await repository.GetPlatformUserAsync(session.IdentityId, ct) ?? throw new UnauthorizedException("Session is invalid."); if (!user.IsActive || !user.PasswordChangeRequired || !passwords.Verify(user.PasswordHash, command.CurrentPassword)) throw new UnauthorizedException("Password change could not be completed."); user.ChangePassword(passwords.Hash(command.NewPassword), now); await repository.RevokeIdentitySessionsAsync(session.IdentityType, session.IdentityId, now, ct); await repository.SaveChangesAsync(ct); }
 }
 
 public sealed class CreatePlatformUserCommandHandler(IAuthenticationSessionResolver resolver, IAuthenticationRepository repository, IPasswordHasher passwords, TimeProvider clock) : ICommandHandler<CreatePlatformUserCommand, Guid>
@@ -96,7 +97,26 @@ public sealed class SetPlatformUserActiveCommandHandler(IAuthenticationSessionRe
 internal static class AuthenticationTokenFactory
 {
     public static async Task<AuthenticationTokens> CreateAsync(IAuthenticationRepository repository, IAuthenticationSecretProtector secrets, AuthenticationIdentityType type, Guid identityId, Guid? tenantId, Guid familyId, DateTimeOffset now, AuthenticationOptions options, CancellationToken ct)
-    { var restricted = false; if (type == AuthenticationIdentityType.PlatformUser) { var user = await repository.GetPlatformUserAsync(identityId, ct) ?? throw new UnauthorizedException("Session is invalid."); if (!user.IsActive) throw new UnauthorizedException("Session is invalid."); restricted = user.PasswordChangeRequired; } var access = secrets.GenerateToken(); var refresh = secrets.GenerateToken(); var csrf = secrets.GenerateToken(); var session = AdministrativeSession.Create(familyId, type, identityId, tenantId, secrets.Hash(access), secrets.Hash(refresh), secrets.Hash(csrf), restricted, now, options.AccessLifetime, options.RefreshLifetime); await repository.AddSessionAsync(session, ct); return new(access, refresh, csrf, session.AccessExpiresAt, session.RefreshExpiresAt, restricted); }
+    {
+        var restricted = false;
+        if (type == AuthenticationIdentityType.PlatformUser)
+        {
+            var user = await repository.GetPlatformUserAsync(identityId, ct) ?? throw new UnauthorizedException("Session is invalid.");
+            if (!user.IsActive) throw new UnauthorizedException("Session is invalid.");
+            restricted = user.PasswordChangeRequired;
+        }
+        else if (type != AuthenticationIdentityType.AdministrativeUser || tenantId is not Guid tenant ||
+                 await repository.GetEligibleAdministrativeUserAsync(tenant, identityId, ct) is null)
+        {
+            await repository.RevokeIdentitySessionsAsync(type, identityId, now, ct);
+            await repository.SaveChangesAsync(ct);
+            throw new UnauthorizedException("Session is invalid.");
+        }
+        var access = secrets.GenerateToken(); var refresh = secrets.GenerateToken(); var csrf = secrets.GenerateToken();
+        var session = AdministrativeSession.Create(familyId, type, identityId, tenantId, secrets.Hash(access), secrets.Hash(refresh), secrets.Hash(csrf), restricted, now, options.AccessLifetime, options.RefreshLifetime);
+        await repository.AddSessionAsync(session, ct);
+        return new(access, refresh, csrf, session.AccessExpiresAt, session.RefreshExpiresAt, restricted);
+    }
 }
 
 public sealed class AuthenticationOptions
@@ -104,6 +124,7 @@ public sealed class AuthenticationOptions
     public const string SectionName = "Authentication";
     public string PlatformCode { get; set; } = "PLATFORM";
     public TimeSpan ChallengeLifetime { get; set; } = TimeSpan.FromMinutes(10);
+    public TimeSpan ResendInterval { get; set; } = TimeSpan.FromMinutes(1);
     public TimeSpan AccessLifetime { get; set; } = TimeSpan.FromMinutes(15);
     public TimeSpan RefreshLifetime { get; set; } = TimeSpan.FromDays(7);
     public TimeSpan RateLimitWindow { get; set; } = TimeSpan.FromMinutes(15);

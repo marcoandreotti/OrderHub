@@ -72,6 +72,7 @@ public sealed class AuthenticationChallenge
         new(Guid.NewGuid(), type, identityId, tenantId, codeHash, originHash, now, now.Add(lifetime));
 
     public bool CanAttempt(DateTimeOffset now, int maximumAttempts) => ConsumedAt is null && now < ExpiresAt && FailedAttempts < maximumAttempts;
+    public bool CanBeReplacedAt(DateTimeOffset now, TimeSpan resendInterval) => now >= CreatedAt.Add(resendInterval);
     public void Reject(DateTimeOffset now, int maximumAttempts) { FailedAttempts++; if (FailedAttempts >= maximumAttempts) ConsumedAt = now; }
     public void Consume(DateTimeOffset now) { if (ConsumedAt is not null) throw new DomainException("Challenge was already consumed."); ConsumedAt = now; }
 }

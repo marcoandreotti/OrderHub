@@ -113,6 +113,27 @@ public sealed class AdministrativeUser : ITenantScopedEntity
         UpdatedAt = now;
     }
 
+    /// <summary>Atualiza os dados públicos sem alterar credenciais ou permissões.</summary>
+    public void UpdateProfile(string name, DateTimeOffset now)
+    {
+        SetName(name);
+        UpdatedAt = now;
+    }
+
+    public void Activate(DateTimeOffset now)
+    {
+        IsActive = true;
+        UpdatedAt = now;
+    }
+
+    public void RevokeRole(AdministrativeRole role, DateTimeOffset now)
+    {
+        if (roleMemberships.Count == 1 && roleMemberships[0].Role == role)
+            throw new DomainException("An administrative user must retain at least one role.");
+        roleMemberships.RemoveAll(item => item.Role == role);
+        UpdatedAt = now;
+    }
+
     /// <summary>Registra um acesso bem-sucedido somente para usuários ativos.</summary>
     public void RecordSuccessfulAccess(DateTimeOffset now)
     {

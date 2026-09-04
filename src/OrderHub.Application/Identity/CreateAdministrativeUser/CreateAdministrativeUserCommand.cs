@@ -7,4 +7,5 @@ public sealed record CreateAdministrativeUserCommand(
     string Name,
     string Email,
     string Password,
-    AdministrativeRole InitialRole) : ICommand<Guid>;
+    AdministrativeRole InitialRole,
+    Guid EstablishmentId = default) : ICommand<Guid>;

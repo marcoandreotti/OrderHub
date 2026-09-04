@@ -57,7 +57,7 @@ public sealed class CatalogApplicationTests
     public void Application_module_registers_every_catalog_handler_and_validator()
     {
         var services = new ServiceCollection(); services.AddApplication();
-        Assert.Equal(12, services.Count(x => x.ImplementationType?.Namespace == typeof(UpsertCategoryCommand).Namespace));
+        Assert.Equal(16, services.Count(x => x.ImplementationType?.Namespace == typeof(UpsertCategoryCommand).Namespace));
     }
 
     private sealed class TenantContext : ITenantContext

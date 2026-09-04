@@ -47,6 +47,32 @@ public sealed class SmtpAuthenticationCodeSender(IOptions<AuthenticationEmailOpt
 
 public sealed class AuthenticationRepository(OrderHubDbContext db) : IAuthenticationRepository
 {
+    public Task<AdministrativeUser?> GetEligibleAdministrativeUserAsync(Guid tenantId, Guid userId, CancellationToken ct) =>
+        db.AdministrativeUsers.SingleOrDefaultAsync(user => user.Id == userId && user.TenantId == tenantId && user.IsActive &&
+            db.Tenants.Any(tenant => tenant.Id == tenantId && tenant.IsActive), ct);
+
+    public async Task RevokeIdentitySessionsAsync(AuthenticationIdentityType type, Guid identityId, DateTimeOffset now, CancellationToken ct)
+    {
+        var sessions = await db.AdministrativeSessions.Where(session => session.IdentityType == type && session.IdentityId == identityId && session.RevokedAt == null).ToListAsync(ct);
+        foreach (var session in sessions) session.Revoke(now);
+        // Desafios anteriores também não podem abrir uma nova sessão após a troca de senha.
+        var challenges = await db.AuthenticationChallenges.Where(challenge => challenge.IdentityType == type && challenge.IdentityId == identityId && challenge.ConsumedAt == null).ToListAsync(ct);
+        foreach (var challenge in challenges.Where(item => item.ConsumedAt is null)) challenge.Consume(now);
+    }
+
+    public async Task<bool> ReplaceChallengeAsync(AuthenticationChallenge challenge, TimeSpan resendInterval, CancellationToken ct)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        // Serializa reenvios da mesma identidade entre instâncias da API.
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({challenge.IdentityType.ToString() + challenge.IdentityId}, 0))", ct);
+        var previous = await db.AuthenticationChallenges.Where(item => item.IdentityType == challenge.IdentityType && item.IdentityId == challenge.IdentityId).ToListAsync(ct);
+        if (previous.Any(item => !item.CanBeReplacedAt(challenge.CreatedAt, resendInterval))) return false;
+        foreach (var item in previous.Where(item => item.ConsumedAt == null)) item.Consume(challenge.CreatedAt);
+        await db.AuthenticationChallenges.AddAsync(challenge, ct);
+        await db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
+        return true;
+    }
     public async Task<(Guid TenantId, AdministrativeUser User)?> FindAdministrativeUserAsync(string tenantCode, string normalizedEmail, CancellationToken ct)
     { var code = Tenant.NormalizePublicCode(tenantCode); var user = await db.AdministrativeUsers.Include(x => x.RoleMemberships).Include(x => x.EstablishmentAccesses).SingleOrDefaultAsync(x => x.NormalizedEmail == normalizedEmail && db.Tenants.Any(t => t.Id == x.TenantId && t.PublicCode == code && t.IsActive), ct); return user is null ? null : (user.TenantId, user); }
     public Task<PlatformUser?> FindPlatformUserAsync(string email, CancellationToken ct) => db.PlatformUsers.SingleOrDefaultAsync(x => x.NormalizedEmail == email, ct);
@@ -68,7 +94,9 @@ public sealed class AuthenticationSessionResolver(OrderHubDbContext db, IAuthent
 {
     public async Task<AuthenticatedIdentity?> ResolveAsync(string token, CancellationToken ct)
     {
+        if (string.IsNullOrWhiteSpace(token)) return null;
         var hash = secrets.Hash(token); var s = await db.AdministrativeSessions.AsNoTracking().SingleOrDefaultAsync(x => x.AccessTokenHash == hash, ct); if (s is null || !s.IsAccessValid(clock.GetUtcNow())) return null;
+        if (s.IdentityType == AuthenticationIdentityType.AdministrativeUser && !await db.Tenants.AnyAsync(tenant => tenant.Id == s.TenantId && tenant.IsActive, ct)) return null;
         if (s.IdentityType == AuthenticationIdentityType.PlatformUser) { var p = await db.PlatformUsers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == s.IdentityId && x.IsActive, ct); return p is null ? null : new(s.Id, s.IdentityType, s.IdentityId, null, [], [], p.PasswordChangeRequired); }
         var u = await db.AdministrativeUsers.AsNoTracking().Include(x => x.RoleMemberships).Include(x => x.EstablishmentAccesses).SingleOrDefaultAsync(x => x.Id == s.IdentityId && x.TenantId == s.TenantId && x.IsActive, ct); return u is null ? null : new(s.Id, s.IdentityType, s.IdentityId, s.TenantId, u.RoleMemberships.Select(x => x.Role).ToArray(), u.EstablishmentAccesses.Where(x => x.IsActive).Select(x => x.EstablishmentId).ToArray(), false);
     }

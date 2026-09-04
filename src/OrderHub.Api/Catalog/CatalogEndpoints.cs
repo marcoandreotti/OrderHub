@@ -4,16 +4,36 @@ using OrderHub.Application.Abstractions.Queries;
 using OrderHub.Application.Catalog;
 using OrderHub.Application.Identity;
 using OrderHub.Contracts.Catalog;
+using OrderHub.Contracts.Administration;
 
 namespace OrderHub.Api.Catalog;
 
 internal static class CatalogEndpoints
 {
+    private static async Task<IResult> SearchAdditionalsAsync(Guid establishmentId, string? search, bool? isActive, int? page, int? pageSize, IQueryDispatcher dispatcher, CancellationToken ct)
+    {
+        var query = new SearchAdditionalsQuery(establishmentId, search, isActive, page ?? 1, pageSize ?? 20);
+        var result = await dispatcher.DispatchAsync<SearchAdditionalsQuery, AdditionalSearchResult>(query, ct);
+        return Results.Ok(new PagedResponse<AdditionalResponse>(query.Page, query.PageSize, result.Total,
+            result.Items.Select(x => new AdditionalResponse(x.Id, x.Name, x.Price, x.IsActive, x.Order)).ToArray()));
+    }
+
+    private static async Task<IResult> SearchGroupsAsync(Guid establishmentId, string? search, bool? isActive, int? page, int? pageSize, IQueryDispatcher dispatcher, CancellationToken ct)
+    {
+        var query = new SearchAdditionalGroupsQuery(establishmentId, search, isActive, page ?? 1, pageSize ?? 20);
+        var result = await dispatcher.DispatchAsync<SearchAdditionalGroupsQuery, AdditionalGroupSearchResult>(query, ct);
+        return Results.Ok(new PagedResponse<AdditionalGroupResponse>(query.Page, query.PageSize, result.Total,
+            result.Items.Select(g => new AdditionalGroupResponse(g.Id, g.Name, g.MinimumSelection, g.MaximumSelection, g.IsActive, g.Order,
+                g.Items.Select(a => new AdditionalResponse(a.Id, a.Name, a.Price, a.IsActive, a.Order)).ToArray())).ToArray()));
+    }
+
     /// <summary>Registra os endpoints administrativos e públicos do catálogo.</summary>
     public static IEndpointRouteBuilder MapCatalogEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var admin = endpoints.MapGroup("/api/admin/establishments/{establishmentId:guid}/catalog").RequireAuthorization(AdministrativePolicies.Management).WithTags("Administration - Catalog");
         admin.MapGet("/", GetAdministrativeAsync);
+        admin.MapGet("/additionals", SearchAdditionalsAsync);
+        admin.MapGet("/additional-groups", SearchGroupsAsync);
         admin.MapPost("/categories", (Guid establishmentId, UpsertCategoryRequest request, ICommandDispatcher dispatcher, CancellationToken ct) => UpsertCategoryAsync(establishmentId, null, request, dispatcher, ct));
         admin.MapPut("/categories/{id:guid}", (Guid establishmentId, Guid id, UpsertCategoryRequest request, ICommandDispatcher dispatcher, CancellationToken ct) => UpsertCategoryAsync(establishmentId, id, request, dispatcher, ct));
         admin.MapPost("/products", (Guid establishmentId, UpsertProductRequest request, ICommandDispatcher dispatcher, CancellationToken ct) => UpsertProductAsync(establishmentId, null, request, dispatcher, ct));

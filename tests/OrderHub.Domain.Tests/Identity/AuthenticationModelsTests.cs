@@ -8,6 +8,14 @@ public sealed class AuthenticationModelsTests
     private static readonly DateTimeOffset Now = new(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Resend_is_allowed_only_at_or_after_the_interval_boundary()
+    {
+        var challenge = AuthenticationChallenge.Create(AuthenticationIdentityType.PlatformUser, Guid.NewGuid(), null, "hash", "origin", Now, TimeSpan.FromMinutes(5));
+        Assert.False(challenge.CanBeReplacedAt(Now.AddSeconds(59), TimeSpan.FromMinutes(1)));
+        Assert.True(challenge.CanBeReplacedAt(Now.AddMinutes(1), TimeSpan.FromMinutes(1)));
+    }
+
+    [Fact]
     public void Tenant_public_code_is_normalized_and_validated()
     { var tenant = Tenant.Create("Grupo", " grupo-01 ", Now); Assert.Equal("GRUPO-01", tenant.PublicCode); Assert.ThrowsAny<Exception>(() => Tenant.Create("Grupo", "x", Now)); }
 

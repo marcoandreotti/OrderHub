@@ -11,6 +11,8 @@ using OrderHub.Api.Administration;
 using OrderHub.Api.Authentication;
 using Microsoft.AspNetCore.Authentication;
 using OrderHub.Infrastructure.Identity;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +30,17 @@ var authentication = builder.Services.AddAuthentication(options =>
 if (builder.Environment.IsEnvironment("Testing")) authentication.AddScheme<AuthenticationSchemeOptions, ExistingPrincipalAuthenticationHandler>(ExistingPrincipalAuthenticationHandler.SchemeName, _ => { });
 else authentication.AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, _ => { });
 builder.Services.AddProblemDetails();
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("authentication-attempts", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+    options.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(new { title = "Authentication could not be completed.", status = 429 }, cancellationToken);
+    };
+});
 builder.Services.AddAuthorization(options =>
 {
     foreach (var (policyName, roles) in AdministrativePolicies.RoleMap)
@@ -48,6 +61,7 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseMiddleware<AuthenticationSecurityMiddleware>();
 app.UseAuthorization();
 app.MapHealthChecks("/health", new HealthCheckOptions { Predicate = _ => false });
@@ -55,6 +69,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 app.MapCatalogEndpoints();
 app.MapPublicOrderingEndpoints();
 app.MapAdministrationEndpoints();
+app.MapAdministrativeUserEndpoints();
 app.MapAuthenticationEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))

@@ -98,6 +98,61 @@ public sealed class AdministrativeAuthenticationTests
         Assert.NotEqual(Guid.Empty, result.ChallengeId);
     }
 
+    [Fact]
+    public async Task Disabled_tenant_user_cannot_refresh_and_all_families_are_revoked()
+    {
+        var repository = new AuthenticationRepositoryFake();
+        var secrets = new AuthenticationSecretProtectorFake();
+        var user = AdministrativeUser.Create(Guid.NewGuid(), "Admin", new Email("admin@example.test"), "hash", AdministrativeRole.Admin, Now);
+        repository.AdministrativeUsers["TENANT"] = user;
+        user.Deactivate(Now);
+        repository.Sessions.Add(AdministrativeSession.Create(Guid.NewGuid(), AuthenticationIdentityType.AdministrativeUser, user.Id, user.TenantId,
+            secrets.Hash("access"), secrets.Hash("refresh"), secrets.Hash("csrf"), false, Now, TimeSpan.FromMinutes(5), TimeSpan.FromDays(1)));
+        var handler = new RefreshAuthenticationCommandHandler(repository, secrets, new FixedTimeProvider(Now), new AuthenticationOptions());
+        await Assert.ThrowsAsync<UnauthorizedException>(() => handler.HandleAsync(new("refresh", "csrf"), CancellationToken.None));
+        Assert.Single(repository.Sessions);
+        Assert.All(repository.Sessions, session => Assert.NotNull(session.RevokedAt));
+    }
+
+    [Fact]
+    public async Task Password_change_revokes_other_families_and_pending_challenges_but_not_other_users()
+    {
+        var repository = new AuthenticationRepositoryFake();
+        var secrets = new AuthenticationSecretProtectorFake();
+        var passwords = new PasswordHasherFake();
+        var user = PlatformUser.Bootstrap(new Email("root@example.test"), passwords.Hash("temporary-password"), Now);
+        repository.PlatformUsers.Add(user);
+        foreach (var token in new[] { "current", "other" }) repository.Sessions.Add(AdministrativeSession.Create(Guid.NewGuid(), AuthenticationIdentityType.PlatformUser,
+            user.Id, null, secrets.Hash(token), secrets.Hash(token + "-refresh"), secrets.Hash("csrf"), true, Now, TimeSpan.FromMinutes(5), TimeSpan.FromDays(1)));
+        var unrelated = AdministrativeSession.Create(Guid.NewGuid(), AuthenticationIdentityType.PlatformUser, Guid.NewGuid(), null, "a", "r", "c", true, Now, TimeSpan.FromMinutes(5), TimeSpan.FromDays(1));
+        repository.Sessions.Add(unrelated);
+        repository.Challenges.Add(AuthenticationChallenge.Create(AuthenticationIdentityType.PlatformUser, user.Id, null, "code", "origin", Now, TimeSpan.FromMinutes(5)));
+        await new ChangeTemporaryPasswordCommandHandler(repository, secrets, passwords, new FixedTimeProvider(Now))
+            .HandleAsync(new("current", "temporary-password", "definitive-password"), CancellationToken.None);
+        Assert.All(repository.Sessions.Where(session => session.IdentityId == user.Id), session => Assert.NotNull(session.RevokedAt));
+        Assert.NotNull(Assert.Single(repository.Challenges).ConsumedAt);
+        Assert.Null(unrelated.RevokedAt);
+    }
+
+    [Fact]
+    public async Task Resend_observes_cooldown_and_invalidates_previous_code()
+    {
+        var repository = new AuthenticationRepositoryFake();
+        var passwords = new PasswordHasherFake();
+        repository.PlatformUsers.Add(PlatformUser.Bootstrap(new Email("root@example.test"), passwords.Hash("password"), Now));
+        var secrets = new AuthenticationSecretProtectorFake();
+        var sender = new AuthenticationCodeSenderFake();
+        var command = new BeginAuthenticationCommand("PLATFORM", "root@example.test", "password", "origin");
+        var handler = new BeginAuthenticationCommandHandler(repository, passwords, secrets, sender, new FixedTimeProvider(Now), new AuthenticationOptions());
+        var first = await handler.HandleAsync(command, CancellationToken.None);
+        await Assert.ThrowsAsync<ConflictException>(() => handler.HandleAsync(command, CancellationToken.None));
+        var later = new BeginAuthenticationCommandHandler(repository, passwords, secrets, sender, new FixedTimeProvider(Now.AddMinutes(2)), new AuthenticationOptions());
+        await later.HandleAsync(command, CancellationToken.None);
+        Assert.NotNull(repository.Challenges.Single(item => item.Id == first.ChallengeId).ConsumedAt);
+        await Assert.ThrowsAsync<UnauthorizedException>(() => new CompleteAuthenticationCommandHandler(repository, secrets, new FixedTimeProvider(Now.AddMinutes(2)), new AuthenticationOptions())
+            .HandleAsync(new(first.ChallengeId, "123456", "origin"), CancellationToken.None));
+    }
+
     private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;
@@ -138,6 +193,22 @@ public sealed class AdministrativeAuthenticationTests
 
     private sealed class AuthenticationRepositoryFake : IAuthenticationRepository
     {
+        public Task<AdministrativeUser?> GetEligibleAdministrativeUserAsync(Guid tenantId, Guid userId, CancellationToken ct) =>
+            Task.FromResult(AdministrativeUsers.Values.SingleOrDefault(user => user.TenantId == tenantId && user.Id == userId && user.IsActive));
+        public Task RevokeIdentitySessionsAsync(AuthenticationIdentityType type, Guid identityId, DateTimeOffset now, CancellationToken ct)
+        {
+            foreach (var session in Sessions.Where(item => item.IdentityType == type && item.IdentityId == identityId)) session.Revoke(now);
+            foreach (var challenge in Challenges.Where(item => item.IdentityType == type && item.IdentityId == identityId && item.ConsumedAt == null)) challenge.Consume(now);
+            return Task.CompletedTask;
+        }
+        public Task<bool> ReplaceChallengeAsync(AuthenticationChallenge challenge, TimeSpan resendInterval, CancellationToken ct)
+        {
+            var previous = Challenges.Where(item => item.IdentityType == challenge.IdentityType && item.IdentityId == challenge.IdentityId).ToArray();
+            if (previous.Any(item => item.CreatedAt > challenge.CreatedAt - resendInterval)) return Task.FromResult(false);
+            foreach (var item in previous.Where(item => item.ConsumedAt == null)) item.Consume(challenge.CreatedAt);
+            Challenges.Add(challenge);
+            return Task.FromResult(true);
+        }
         public List<PlatformUser> PlatformUsers { get; } = [];
         public Dictionary<string, AdministrativeUser> AdministrativeUsers { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<AuthenticationChallenge> Challenges { get; } = [];

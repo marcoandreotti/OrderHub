@@ -1,4 +1,5 @@
 using OrderHub.Application.Abstractions.Commands;
+using OrderHub.Application.Abstractions.Queries;
 using OrderHub.Application.Identity.Authentication;
 using OrderHub.Contracts.Authentication;
 
@@ -8,7 +9,14 @@ internal static class AuthenticationEndpoints
 {
     internal const string AccessCookie = "oh_access"; internal const string RefreshCookie = "oh_refresh"; internal const string CsrfCookie = "oh_csrf";
     public static IEndpointRouteBuilder MapAuthenticationEndpoints(this IEndpointRouteBuilder endpoints)
-    { var group = endpoints.MapGroup("/api/auth").AllowAnonymous().WithTags("Authentication"); group.MapPost("/begin", BeginAsync); group.MapPost("/complete", CompleteAsync); group.MapPost("/refresh", RefreshAsync); group.MapPost("/logout", LogoutAsync); group.MapPost("/change-password", ChangePasswordAsync); group.MapPost("/platform-users", CreatePlatformUserAsync); group.MapPatch("/platform-users/{id:guid}/active", SetPlatformUserActiveAsync); return endpoints; }
+    { var group = endpoints.MapGroup("/api/auth").AllowAnonymous().WithTags("Authentication"); group.MapGet("/context", ContextAsync); group.MapPost("/begin", BeginAsync).RequireRateLimiting("authentication-attempts"); group.MapPost("/complete", CompleteAsync).RequireRateLimiting("authentication-attempts"); group.MapPost("/refresh", RefreshAsync); group.MapPost("/logout", LogoutAsync); group.MapPost("/change-password", ChangePasswordAsync); group.MapPost("/platform-users", CreatePlatformUserAsync); group.MapPatch("/platform-users/{id:guid}/active", SetPlatformUserActiveAsync); return endpoints; }
+    private static async Task<IResult> ContextAsync(HttpContext context, IQueryDispatcher dispatcher, CancellationToken ct)
+    {
+        var result = await dispatcher.DispatchAsync<GetAuthenticationContextQuery, AuthenticationContext>(new(Cookie(context, AccessCookie)), ct);
+        context.Response.Headers.CacheControl = "no-store";
+        return Results.Ok(new AuthenticationContextResponse(result.PasswordChangeRequired, result.IsPlatformUser,
+            result.Capabilities, result.Establishments.Select(item => new AuthenticationEstablishmentResponse(item.Id, item.Name)).ToArray()));
+    }
     private static string Origin(HttpContext c) => $"{c.Connection.RemoteIpAddress}|{c.Request.Headers.UserAgent}";
     private static async Task<IResult> BeginAsync(BeginAuthenticationRequest r, HttpContext c, ICommandDispatcher d, CancellationToken ct) { var x = await d.DispatchAsync<BeginAuthenticationCommand, AuthenticationChallengeResult>(new(r.ContextCode, r.Email, r.Password, Origin(c)), ct); return Results.Accepted(value: new BeginAuthenticationResponse(x.ChallengeId, x.ExpiresAt)); }
     private static async Task<IResult> CompleteAsync(CompleteAuthenticationRequest r, HttpContext c, ICommandDispatcher d, CancellationToken ct) { var x = await d.DispatchAsync<CompleteAuthenticationCommand, AuthenticationTokens>(new(r.ChallengeId, r.Code, Origin(c)), ct); WriteCookies(c, x); return Results.Ok(new AuthenticationResponse(x.AccessExpiresAt, x.RefreshExpiresAt, x.PasswordChangeRequired)); }

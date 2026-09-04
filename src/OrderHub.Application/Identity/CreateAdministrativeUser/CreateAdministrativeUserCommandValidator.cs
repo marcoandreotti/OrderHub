@@ -10,5 +10,6 @@ public sealed class CreateAdministrativeUserCommandValidator : AbstractValidator
         RuleFor(command => command.Email).NotEmpty().EmailAddress().MaximumLength(150);
         RuleFor(command => command.Password).NotEmpty().MinimumLength(12).MaximumLength(200);
         RuleFor(command => command.InitialRole).IsInEnum();
+        RuleFor(command => command.EstablishmentId).NotEmpty();
     }
 }

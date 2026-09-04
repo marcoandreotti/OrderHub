@@ -17,6 +17,9 @@ public interface IAuthenticationCodeSender
 
 public interface IAuthenticationRepository
 {
+    Task<AdministrativeUser?> GetEligibleAdministrativeUserAsync(Guid tenantId, Guid userId, CancellationToken cancellationToken);
+    Task RevokeIdentitySessionsAsync(AuthenticationIdentityType type, Guid identityId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<bool> ReplaceChallengeAsync(AuthenticationChallenge challenge, TimeSpan resendInterval, CancellationToken cancellationToken);
     Task<(Guid TenantId, AdministrativeUser User)?> FindAdministrativeUserAsync(string tenantCode, string normalizedEmail, CancellationToken cancellationToken);
     Task<PlatformUser?> FindPlatformUserAsync(string normalizedEmail, CancellationToken cancellationToken);
     Task<PlatformUser?> GetPlatformUserAsync(Guid id, CancellationToken cancellationToken);

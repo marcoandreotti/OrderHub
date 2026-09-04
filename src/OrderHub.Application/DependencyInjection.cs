@@ -19,6 +19,7 @@ using OrderHub.Application.Payments;
 using OrderHub.Application.Abstractions.PublicOrdering;
 using OrderHub.Application.PublicOrdering;
 using OrderHub.Application.Identity.Authentication;
+using OrderHub.Application.Identity.Management;
 
 namespace OrderHub.Application;
 
@@ -29,12 +30,24 @@ public static class DependencyInjection
         services.AddScoped<ICommandDispatcher, CommandDispatcher>();
         services.AddScoped<IQueryDispatcher, QueryDispatcher>();
         services.AddScoped<EstablishmentScopeResolver>();
+        services.AddScoped<AdministrativeUserManagement>();
+        services.AddScoped<IQueryHandler<SearchAdministrativeUsersQuery, AdministrativeUserSearchResult>, SearchAdministrativeUsersQueryHandler>();
+        services.AddScoped<IValidator<SearchAdministrativeUsersQuery>, SearchAdministrativeUsersQueryValidator>();
+        services.AddScoped<ICommandHandler<UpdateAdministrativeUserCommand>, UpdateAdministrativeUserCommandHandler>();
+        services.AddScoped<IValidator<UpdateAdministrativeUserCommand>, UpdateAdministrativeUserCommandValidator>();
+        services.AddScoped<ICommandHandler<SetAdministrativeUserActiveCommand>, SetAdministrativeUserActiveCommandHandler>();
+        services.AddScoped<IValidator<SetAdministrativeUserActiveCommand>, SetAdministrativeUserActiveCommandValidator>();
+        services.AddScoped<ICommandHandler<SetAdministrativeUserRoleCommand>, SetAdministrativeUserRoleCommandHandler>();
+        services.AddScoped<IValidator<SetAdministrativeUserRoleCommand>, SetAdministrativeUserRoleCommandValidator>();
+        services.AddScoped<ICommandHandler<SetAdministrativeUserAccessCommand>, SetAdministrativeUserAccessCommandHandler>();
+        services.AddScoped<IValidator<SetAdministrativeUserAccessCommand>, SetAdministrativeUserAccessCommandValidator>();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ICommandHandler<CreateEstablishmentCommand, Guid>, CreateEstablishmentCommandHandler>();
         services.AddScoped<IValidator<CreateEstablishmentCommand>, CreateEstablishmentCommandValidator>();
         services.AddScoped<ICommandHandler<CreateAdministrativeUserCommand, Guid>, CreateAdministrativeUserCommandHandler>();
         services.AddScoped<IValidator<CreateAdministrativeUserCommand>, CreateAdministrativeUserCommandValidator>();
         services.AddScoped<ICommandHandler<BeginAuthenticationCommand, AuthenticationChallengeResult>, BeginAuthenticationCommandHandler>();
+        services.AddScoped<IQueryHandler<GetAuthenticationContextQuery, AuthenticationContext>, GetAuthenticationContextQueryHandler>();
         services.AddScoped<ICommandHandler<CompleteAuthenticationCommand, AuthenticationTokens>, CompleteAuthenticationCommandHandler>();
         services.AddScoped<ICommandHandler<RefreshAuthenticationCommand, AuthenticationTokens>, RefreshAuthenticationCommandHandler>();
         services.AddScoped<ICommandHandler<LogoutCommand>, LogoutCommandHandler>();
@@ -49,6 +62,10 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<UpsertAdditionalCommand, Guid>, UpsertAdditionalCommandHandler>();
         services.AddScoped<ICommandHandler<UpsertAdditionalGroupCommand, Guid>, UpsertAdditionalGroupCommandHandler>();
         services.AddScoped<IQueryHandler<GetAdministrativeCatalogQuery, CatalogReadModel>, GetAdministrativeCatalogQueryHandler>();
+        services.AddScoped<IQueryHandler<SearchAdditionalsQuery, AdditionalSearchResult>, SearchAdditionalsQueryHandler>();
+        services.AddScoped<IQueryHandler<SearchAdditionalGroupsQuery, AdditionalGroupSearchResult>, SearchAdditionalGroupsQueryHandler>();
+        services.AddScoped<IValidator<SearchAdditionalsQuery>, SearchAdditionalsQueryValidator>();
+        services.AddScoped<IValidator<SearchAdditionalGroupsQuery>, SearchAdditionalGroupsQueryValidator>();
         services.AddScoped<IQueryHandler<GetPublicCatalogQuery, CatalogReadModel>, GetPublicCatalogQueryHandler>();
         services.AddScoped<IValidator<UpsertCategoryCommand>, UpsertCategoryCommandValidator>();
         services.AddScoped<IValidator<UpsertProductCommand>, UpsertProductCommandValidator>();

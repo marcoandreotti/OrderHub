@@ -42,12 +42,16 @@ public static class DependencyInjection
         services.AddScoped<IPlatformScopeGateway, PlatformScopeGateway>();
         services.AddSingleton<IPasswordHasher, AspNetPasswordHasher>();
         services.AddScoped<IAdministrativeUserRepository, AdministrativeUserRepository>();
+        services.AddScoped<IAdministrativeUserManagementRepository, AdministrativeUserManagementRepository>();
+        services.AddScoped<IAdministrativeUserManagementTransaction, AdministrativeUserManagementTransaction>();
+        services.AddScoped<IAdministrativeUserReadGateway, AdministrativeUserReadGateway>();
         services.AddSingleton(configuration.GetSection(AuthenticationOptions.SectionName).Get<AuthenticationOptions>() ?? new AuthenticationOptions());
         services.AddSingleton<IAuthenticationSecretProtector, AuthenticationSecretProtector>();
         services.AddOptions<AuthenticationEmailOptions>().Bind(configuration.GetSection(AuthenticationEmailOptions.SectionName));
         services.AddScoped<IAuthenticationCodeSender, SmtpAuthenticationCodeSender>();
         services.AddScoped<IAuthenticationRepository, AuthenticationRepository>();
         services.AddScoped<IAuthenticationSessionResolver, AuthenticationSessionResolver>();
+        services.AddScoped<IAuthenticationContextGateway, AuthenticationContextGateway>();
         services.AddOptions<PlatformBootstrapOptions>().Bind(configuration.GetSection(PlatformBootstrapOptions.SectionName));
         services.AddScoped<PlatformBootstrapper>();
         services.AddScoped<IEstablishmentAccessGateway, EstablishmentAccessGateway>();
@@ -58,6 +62,7 @@ public static class DependencyInjection
         services.AddScoped<IAdditionalRepository, AdditionalRepository>();
         services.AddScoped<IAdditionalGroupRepository, AdditionalGroupRepository>();
         services.AddScoped<ICatalogReadGateway, CatalogReadGateway>();
+        services.AddScoped<ICatalogMaintenanceReadGateway, CatalogMaintenanceReadGateway>();
         services.AddScoped<ICustomerRepository, CustomerRepository>();
         services.AddScoped<ICustomerReadGateway, CustomerReadGateway>();
         services.AddScoped<IOrderRepository, OrderRepository>();
