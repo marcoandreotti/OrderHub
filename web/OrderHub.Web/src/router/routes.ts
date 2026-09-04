@@ -2,6 +2,27 @@ import type { RouteRecordRaw } from 'vue-router'
 
 export const routes: RouteRecordRaw[] = [
   {
+    path: '/order/track/:reference',
+    component: () => import('../layouts/PublicLayout.vue'),
+    children: [
+      { path: '', component: () => import('../modules/public-ordering/TrackingPage.vue') }
+    ]
+  },
+  {
+    path: '/order/:slug/table/:tableToken',
+    component: () => import('../layouts/PublicLayout.vue'),
+    children: [
+      { path: '', component: () => import('../modules/public-ordering/PublicOrderingPage.vue') }
+    ]
+  },
+  {
+    path: '/order/:slug',
+    component: () => import('../layouts/PublicLayout.vue'),
+    children: [
+      { path: '', component: () => import('../modules/public-ordering/PublicOrderingPage.vue') }
+    ]
+  },
+  {
     path: '/login',
     component: () => import('../layouts/PublicLayout.vue'),
     children: [
