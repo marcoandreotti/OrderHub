@@ -25,6 +25,17 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       Database__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-orderhub};Username=${POSTGRES_USER:-orderhub};Password=${POSTGRES_PASSWORD:-orderhub_dev}
+      Authentication__PlatformCode: ${AUTHENTICATION_PLATFORM_CODE:-PLATFORM}
+      PlatformBootstrap__Enabled: ${PLATFORM_BOOTSTRAP_ENABLED:-false}
+      PlatformBootstrap__Email: ${PLATFORM_BOOTSTRAP_EMAIL:-}
+      PlatformBootstrap__TemporaryPassword: ${PLATFORM_BOOTSTRAP_TEMPORARY_PASSWORD:-}
+      AuthenticationEmail__Host: ${AUTHENTICATION_EMAIL_HOST:-}
+      AuthenticationEmail__Port: ${AUTHENTICATION_EMAIL_PORT:-587}
+      AuthenticationEmail__Username: ${AUTHENTICATION_EMAIL_USERNAME:-}
+      AuthenticationEmail__Password: ${AUTHENTICATION_EMAIL_PASSWORD:-}
+      AuthenticationEmail__FromAddress: ${AUTHENTICATION_EMAIL_FROM_ADDRESS:-}
+      AuthenticationEmail__EnableSsl: ${AUTHENTICATION_EMAIL_ENABLE_SSL:-true}
+      Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:9000}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:

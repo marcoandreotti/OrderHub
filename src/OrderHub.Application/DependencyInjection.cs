@@ -57,6 +57,7 @@ public static class DependencyInjection
         services.AddScoped<IValidator<BeginAuthenticationCommand>, BeginAuthenticationCommandValidator>();
         services.AddScoped<IValidator<CompleteAuthenticationCommand>, CompleteAuthenticationCommandValidator>();
         services.AddScoped<IValidator<ChangeTemporaryPasswordCommand>, ChangeTemporaryPasswordCommandValidator>();
+        services.AddScoped<IValidator<CreatePlatformUserCommand>, CreatePlatformUserCommandValidator>();
         services.AddScoped<ICommandHandler<UpsertCategoryCommand, Guid>, UpsertCategoryCommandHandler>();
         services.AddScoped<ICommandHandler<UpsertProductCommand, Guid>, UpsertProductCommandHandler>();
         services.AddScoped<ICommandHandler<UpsertAdditionalCommand, Guid>, UpsertAdditionalCommandHandler>();

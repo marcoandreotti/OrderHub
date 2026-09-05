@@ -30,6 +30,23 @@ var authentication = builder.Services.AddAuthentication(options =>
 if (builder.Environment.IsEnvironment("Testing")) authentication.AddScheme<AuthenticationSchemeOptions, ExistingPrincipalAuthenticationHandler>(ExistingPrincipalAuthenticationHandler.SchemeName, _ => { });
 else authentication.AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(SessionAuthenticationHandler.SchemeName, _ => { });
 builder.Services.AddProblemDetails();
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("web", policy =>
+    {
+        if (allowedOrigins.Length > 0)
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
+        }
+    });
+});
 builder.Services.AddRateLimiter(options =>
 {
     options.AddPolicy("authentication-attempts", context => RateLimitPartition.GetFixedWindowLimiter(
@@ -60,6 +77,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseCors("web");
 app.UseAuthentication();
 app.UseRateLimiter();
 app.UseMiddleware<AuthenticationSecurityMiddleware>();
@@ -79,7 +97,9 @@ if (app.Environment.IsEnvironment("Testing"))
         tenantId = tenantContext.GetRequiredTenantId()
     }));
 }
-else if (app.Environment.IsProduction())
+else if (app.Environment.IsProduction() ||
+         (app.Environment.IsDevelopment() &&
+          builder.Configuration.GetValue<bool>($"{PlatformBootstrapOptions.SectionName}:Enabled")))
 {
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.GetRequiredService<PlatformBootstrapper>().InitializeAsync(CancellationToken.None);

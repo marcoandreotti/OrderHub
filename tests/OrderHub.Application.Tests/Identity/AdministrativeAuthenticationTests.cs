@@ -9,6 +9,20 @@ public sealed class AdministrativeAuthenticationTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData("123456789", false)]
+    [InlineData("1234567890", true)]
+    public void Password_policy_requires_at_least_ten_characters(string password, bool expected)
+    {
+        var changeCommand = new ChangeTemporaryPasswordCommand("access", "current-password", password);
+        var createPlatformCommand = new CreatePlatformUserCommand("access", "root@example.test", password);
+        var change = new ChangeTemporaryPasswordCommandValidator().Validate(changeCommand);
+        var createPlatform = new CreatePlatformUserCommandValidator().Validate(createPlatformCommand);
+
+        Assert.Equal(expected, change.IsValid);
+        Assert.Equal(expected, createPlatform.IsValid);
+    }
+
     [Fact]
     public async Task Platform_login_creates_restricted_session_until_temporary_password_is_changed()
     {

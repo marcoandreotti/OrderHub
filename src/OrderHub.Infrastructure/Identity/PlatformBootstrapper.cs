@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Npgsql;
 using OrderHub.Application.Abstractions.Identity;
+using OrderHub.Application.Identity;
 using OrderHub.Domain.Identity;
 
 namespace OrderHub.Infrastructure.Identity;
@@ -23,7 +24,7 @@ public sealed class PlatformBootstrapper(IAuthenticationRepository repository, I
         }
 
         var value = options.Value;
-        if (string.IsNullOrWhiteSpace(value.Email) || value.TemporaryPassword.Length < 12)
+        if (string.IsNullOrWhiteSpace(value.Email) || value.TemporaryPassword.Length < PasswordPolicy.MinimumLength)
         {
             throw new InvalidOperationException("Platform bootstrap secrets are required until the first platform user is created.");
         }

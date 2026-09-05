@@ -26,7 +26,11 @@ public sealed class CompleteAuthenticationCommandValidator : AbstractValidator<C
 }
 public sealed class ChangeTemporaryPasswordCommandValidator : AbstractValidator<ChangeTemporaryPasswordCommand>
 {
-    public ChangeTemporaryPasswordCommandValidator() { RuleFor(x => x.AccessToken).NotEmpty(); RuleFor(x => x.CurrentPassword).NotEmpty(); RuleFor(x => x.NewPassword).MinimumLength(12).MaximumLength(200).NotEqual(x => x.CurrentPassword); }
+    public ChangeTemporaryPasswordCommandValidator() { RuleFor(x => x.AccessToken).NotEmpty(); RuleFor(x => x.CurrentPassword).NotEmpty(); RuleFor(x => x.NewPassword).MinimumLength(PasswordPolicy.MinimumLength).MaximumLength(PasswordPolicy.MaximumLength).NotEqual(x => x.CurrentPassword); }
+}
+public sealed class CreatePlatformUserCommandValidator : AbstractValidator<CreatePlatformUserCommand>
+{
+    public CreatePlatformUserCommandValidator() { RuleFor(x => x.AccessToken).NotEmpty(); RuleFor(x => x.Email).NotEmpty().EmailAddress().MaximumLength(150); RuleFor(x => x.TemporaryPassword).NotEmpty().MinimumLength(PasswordPolicy.MinimumLength).MaximumLength(PasswordPolicy.MaximumLength); }
 }
 
 public sealed class BeginAuthenticationCommandHandler(IAuthenticationRepository repository, IPasswordHasher passwords, IAuthenticationSecretProtector secrets, IAuthenticationCodeSender sender, TimeProvider clock, AuthenticationOptions options) : ICommandHandler<BeginAuthenticationCommand, AuthenticationChallengeResult>

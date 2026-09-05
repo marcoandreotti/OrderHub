@@ -323,7 +323,7 @@ onUnmounted(() => {
                 label="Senha inicial"
                 maxlength="200"
                 :rules="[
-                  (value) => value.length >= 12 || 'Mínimo de 12 caracteres'
+                  (value) => value.length >= 10 || 'Mínimo de 10 caracteres'
                 ]"
                 :error="!!field('password')"
                 :error-message="field('password')"

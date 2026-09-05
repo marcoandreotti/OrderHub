@@ -74,11 +74,38 @@ public sealed class AuthenticationContextApiTests
         Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
     }
 
+    [Fact]
+    public async Task Cors_preflight_allows_only_the_configured_web_origin_with_credentials()
+    {
+        await using var factory = new Factory();
+        using var client = factory.CreateClient();
+        using var allowedRequest = Preflight("http://localhost:9000");
+        using var allowedResponse = await client.SendAsync(allowedRequest);
+
+        Assert.Equal(HttpStatusCode.NoContent, allowedResponse.StatusCode);
+        Assert.Equal("http://localhost:9000", allowedResponse.Headers.GetValues("Access-Control-Allow-Origin").Single());
+        Assert.Equal("true", allowedResponse.Headers.GetValues("Access-Control-Allow-Credentials").Single());
+
+        using var deniedRequest = Preflight("http://untrusted.example");
+        using var deniedResponse = await client.SendAsync(deniedRequest);
+        Assert.False(deniedResponse.Headers.Contains("Access-Control-Allow-Origin"));
+    }
+
+    private static HttpRequestMessage Preflight(string origin)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Options, "/api/auth/begin");
+        request.Headers.Add("Origin", origin);
+        request.Headers.Add("Access-Control-Request-Method", "POST");
+        request.Headers.Add("Access-Control-Request-Headers", "content-type,x-correlation-id,x-csrf-token");
+        return request;
+    }
+
     private sealed class Factory : WebApplicationFactory<Program>
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment("Development");
+            builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:9000");
             builder.ConfigureTestServices(services =>
             {
                 services.RemoveAll<IAuthenticationSessionResolver>();

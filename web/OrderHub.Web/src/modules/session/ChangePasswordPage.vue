@@ -69,8 +69,8 @@ onUnmounted(() => {
             autocomplete="new-password"
             :rules="[
               (value) =>
-                (value.length >= 12 && value.length <= 200) ||
-                'Use de 12 a 200 caracteres',
+                (value.length >= 10 && value.length <= 200) ||
+                'Use de 10 a 200 caracteres',
               (value) =>
                 value !== currentPassword || 'Escolha uma senha diferente'
             ]"

@@ -7,6 +7,16 @@ namespace OrderHub.Application.Tests.Identity;
 public sealed class AdministrativeUserManagementValidationTests
 {
     [Theory]
+    [InlineData("123456789", false)]
+    [InlineData("1234567890", true)]
+    public void Administrative_password_policy_requires_at_least_ten_characters(string password, bool expected)
+    {
+        var command = new CreateAdministrativeUserCommand("Name", "email@example.test", password, AdministrativeRole.Admin, Guid.NewGuid());
+
+        Assert.Equal(expected, new CreateAdministrativeUserCommandValidator().Validate(command).IsValid);
+    }
+
+    [Theory]
     [InlineData(0, 20)]
     [InlineData(1, 0)]
     [InlineData(1, 101)]
