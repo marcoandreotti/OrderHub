@@ -34,6 +34,12 @@ body {
   color: var(--oh-color-primary);
   margin-left: 8px;
 }
+.operations-toolbar { gap: 12px; }
+.operations-unit { width: min(300px, 36vw); }
+@media (max-width: 700px) {
+  .operations-toolbar { flex-wrap: wrap; }
+  .operations-unit { width: 100%; order: 3; }
+}
 .admin-page {
   max-width: 1200px;
   margin: 0 auto;

@@ -69,6 +69,8 @@ public sealed record OrderReadModel(
     decimal Total,
     string? CouponCode,
     decimal CouponDiscount,
+    decimal ConfirmedAmount,
+    bool IsFullyPaid,
     IReadOnlyList<OrderItemReadModel> Items,
     IReadOnlyList<OrderHistoryReadModel> History);
 

@@ -59,9 +59,14 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/operations',
+    meta: { requiresSession: true, capability: 'order-read' },
     component: () => import('../layouts/OperationsLayout.vue'),
     children: [
-      { path: '', component: () => import('../pages/FoundationPage.vue') }
+      {
+        path: '',
+        component: () =>
+          import('../modules/operations/orders/OrdersDashboardPage.vue')
+      }
     ]
   },
   {

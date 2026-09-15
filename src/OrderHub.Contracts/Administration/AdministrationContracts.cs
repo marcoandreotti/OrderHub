@@ -9,7 +9,7 @@ public sealed record CustomerAddressResponse(Guid Id, string Label, string Stree
 
 public sealed record OrderSummaryResponse(Guid Id, long Number, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, decimal Total, DateTimeOffset CreatedAt);
 public sealed record OrderTransitionRequest(string? Note);
-public sealed record OrderDetailResponse(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<AdminOrderItemResponse> Items, IReadOnlyList<AdminOrderHistoryResponse> History);
+public sealed record OrderDetailResponse(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal ConfirmedAmount, bool IsFullyPaid, IReadOnlyList<AdminOrderItemResponse> Items, IReadOnlyList<AdminOrderHistoryResponse> History);
 public sealed record AdminOrderItemResponse(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes, IReadOnlyList<AdminOrderAdditionalResponse> Additionals);
 public sealed record AdminOrderAdditionalResponse(string Name, decimal UnitPrice, decimal Quantity);
 public sealed record AdminOrderHistoryResponse(string PreviousStatus, string NewStatus, DateTimeOffset OccurredAt, Guid? ActorId, string? Note);

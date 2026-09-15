@@ -53,4 +53,21 @@ describe('navegação com rotas lazy', () => {
     await router.push('/administration')
     expect(router.currentRoute.value.path).toBe('/access-denied')
   })
+  it('protege o painel e permite o percurso operacional da cozinha', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    installAccessGuard(router, {
+      context: {
+        passwordChangeRequired: false,
+        isPlatformUser: false,
+        capabilities: ['order-read', 'order-kitchen'],
+        establishments: [{ id: 'unit', name: 'Unidade' }]
+      },
+      hydrate: vi.fn(),
+      clear: vi.fn()
+    })
+    await router.push('/operations')
+    expect(router.currentRoute.value.path).toBe('/operations')
+    await router.push('/administration')
+    expect(router.currentRoute.value.path).toBe('/access-denied')
+  })
 })

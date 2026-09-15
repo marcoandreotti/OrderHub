@@ -30,6 +30,7 @@ export function installAccessGuard(router: Router, session: NavigationSession) {
 export function sessionLandingPath(context: SessionContext | null): string {
   if (!context) return '/login'
   if (context.passwordChangeRequired) return '/change-password'
+  if (context.capabilities.includes('order-read')) return '/operations'
   if (context.capabilities.includes('management')) return '/administration'
   if (context.capabilities.includes('customer-operations'))
     return '/administration/customers'

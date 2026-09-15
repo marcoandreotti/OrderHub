@@ -74,9 +74,7 @@ describe('autorização de navegação', () => {
     expect(accessDestination(attendant, '/change-password')).toBe(
       '/administration/customers'
     )
-    expect(sessionLandingPath({ ...context, capabilities: ['kitchen'] })).toBe(
-      '/access-denied'
-    )
+    expect(sessionLandingPath({ ...context, capabilities: ['order-read', 'order-kitchen'] })).toBe('/operations')
   })
   it('manda sessão ausente para o login', () =>
     expect(accessDestination(null, '/administration', 'management')).toBe(
