@@ -59,6 +59,7 @@ async function logout() {
           class="q-mb-lg"
         />
         <q-list>
+          <q-item v-if="session.can('administration')" clickable to="/administration/onboarding" active-class="bg-indigo-1 text-primary" class="rounded-borders"><q-item-section>Configurar unidade</q-item-section></q-item>
           <q-item
             v-if="session.can('management')"
             clickable

@@ -68,6 +68,15 @@ public sealed class AdministrativeUserManagement(
 
     public async Task RequireContinuityAsync(AdministrativeUser user, bool active, IEnumerable<AdministrativeRole> roles, CancellationToken ct, Guid? revokedEstablishmentId = null)
     {
+        var roleSet = roles.ToArray();
+        foreach (var access in user.EstablishmentAccesses.Where(access => access.IsActive))
+        {
+            if (!await repository.IsActiveEstablishmentAsync(user.TenantId, access.EstablishmentId, ct)) continue;
+            var remainsEligible = active && access.EstablishmentId != revokedEstablishmentId && roleSet.Any(role => role is AdministrativeRole.Owner or AdministrativeRole.Admin);
+            var others = await repository.CountOtherUnitAdministratorsAsync(user.TenantId, access.EstablishmentId, user.Id, ct);
+            if (!AdministrativeUserManagementRules.PreservesAdministrator(others, remainsEligible, roleSet))
+                throw new ConflictException("The establishment must retain an active administrator.");
+        }
         var counts = await repository.CountOtherAdministratorsAsync(user.TenantId, user.Id, ct);
         var hasAccess = false;
         foreach (var access in user.EstablishmentAccesses.Where(access => access.IsActive && access.EstablishmentId != revokedEstablishmentId))
@@ -120,6 +129,7 @@ public sealed class SetAdministrativeUserAccessCommandHandler(AdministrativeUser
     public Task HandleAsync(SetAdministrativeUserAccessCommand command, CancellationToken ct) => management.ExecuteAsync(command.EstablishmentId, async (scope, actor, token) =>
     {
         var user = await management.GetTargetAsync(scope.TenantId, command.UserId, token);
+        if (command.Granted && !user.IsActive) throw new ConflictException("Only active users may be associated.");
         if (command.Granted) user.GrantEstablishmentAccess(scope.EstablishmentId, scope.TenantId, time.GetUtcNow());
         else if (user.EstablishmentAccesses.Any(access => access.EstablishmentId == scope.EstablishmentId))
         {

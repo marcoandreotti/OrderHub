@@ -77,6 +77,7 @@ public sealed class CreateAdministrativeUserTests
         public Task<bool> IsActiveEstablishmentAsync(Guid tenantId, Guid establishmentId, CancellationToken ct) => Task.FromResult(true);
         public Task<bool> IsEligiblePlatformUserAsync(Guid userId, CancellationToken ct) => Task.FromResult(false);
         public Task<(int Owners, int Administrators)> CountOtherAdministratorsAsync(Guid tenantId, Guid excludedUserId, CancellationToken ct) => Task.FromResult((1, 1));
+        public Task<int> CountOtherUnitAdministratorsAsync(Guid tenantId, Guid establishmentId, Guid excludedUserId, CancellationToken cancellationToken) => Task.FromResult(1);
         public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
     }
 

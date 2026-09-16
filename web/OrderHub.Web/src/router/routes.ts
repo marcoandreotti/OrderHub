@@ -79,6 +79,11 @@ export const routes: RouteRecordRaw[] = [
         component: () => import('../modules/administration/HomePage.vue')
       },
       {
+        path: 'onboarding/:step(dados|tema|horarios|mesas|acessos|revisao)?',
+        meta: { capability: 'administration' },
+        component: () => import('../modules/administration/onboarding/OnboardingPage.vue')
+      },
+      {
         path: 'users',
         meta: { capability: 'administration' },
         component: () => import('../modules/administration/users/UsersPage.vue')

@@ -87,6 +87,7 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check 
 app.MapCatalogEndpoints();
 app.MapPublicOrderingEndpoints();
 app.MapAdministrationEndpoints();
+app.MapOnboardingEndpoints();
 app.MapAdministrativeUserEndpoints();
 app.MapAuthenticationEndpoints();
 

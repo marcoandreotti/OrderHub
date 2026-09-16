@@ -26,6 +26,22 @@ public sealed class ServiceTable : IEstablishmentScopedEntity
     public string? Description { get; private set; }
     public string QrCodeToken { get; private set; } = string.Empty;
     public bool IsActive { get; private set; }
+    public Guid? CreationIntent { get; private set; }
+
+    public void IdentifyCreation(Guid intent)
+    {
+        if (intent == Guid.Empty || CreationIntent is not null) throw new DomainException("A unique creation intent is required.");
+        CreationIntent = intent;
+    }
+
+    public void Update(string code, string? description, bool isActive)
+    {
+        var normalizedCode = NormalizeCode(code);
+        var normalizedDescription = NormalizeDescription(description);
+        Code = normalizedCode;
+        Description = normalizedDescription;
+        IsActive = isActive;
+    }
 
     public static ServiceTable Create(Guid tenantId, Guid establishmentId, string code, string? description = null) => new(tenantId, establishmentId, code, description);
 

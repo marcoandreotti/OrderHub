@@ -9,6 +9,7 @@ public interface IAdministrativeUserManagementRepository
     Task<bool> IsActiveEstablishmentAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken);
     Task<bool> IsEligiblePlatformUserAsync(Guid userId, CancellationToken cancellationToken);
     Task<(int Owners, int Administrators)> CountOtherAdministratorsAsync(Guid tenantId, Guid excludedUserId, CancellationToken cancellationToken);
+    Task<int> CountOtherUnitAdministratorsAsync(Guid tenantId, Guid establishmentId, Guid excludedUserId, CancellationToken cancellationToken);
     Task SaveAsync(CancellationToken cancellationToken);
 }
 

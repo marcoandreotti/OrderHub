@@ -24,6 +24,11 @@ public sealed class AdministrativeUserManagementRepository(OrderHubDbContext con
         return (owners, administrators);
     }
 
+    public Task<int> CountOtherUnitAdministratorsAsync(Guid tenantId, Guid establishmentId, Guid excludedUserId, CancellationToken ct) =>
+        context.AdministrativeUsers.CountAsync(user => user.TenantId == tenantId && user.Id != excludedUserId && user.IsActive
+            && user.RoleMemberships.Any(role => role.Role == AdministrativeRole.Owner || role.Role == AdministrativeRole.Admin)
+            && user.EstablishmentAccesses.Any(access => access.EstablishmentId == establishmentId && access.IsActive), ct);
+
     public async Task SaveAsync(CancellationToken ct) => await context.SaveChangesAsync(ct);
 }
 

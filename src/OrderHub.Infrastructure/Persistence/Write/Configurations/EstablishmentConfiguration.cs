@@ -24,6 +24,7 @@ internal sealed class EstablishmentConfiguration : IEntityTypeConfiguration<Esta
         builder.Property(establishment => establishment.IsActive).HasColumnName("is_active").IsRequired();
         builder.Property(establishment => establishment.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone");
         builder.Property(establishment => establishment.UpdatedAt).HasColumnName("updated_at").HasColumnType("timestamp with time zone");
+        builder.Property(establishment => establishment.OnboardingCompletedAt).HasColumnName("onboarding_completed_at");
         builder.HasIndex(establishment => establishment.Slug).IsUnique().HasDatabaseName("ux_establishment_slug");
         builder.HasAlternateKey(establishment => new { establishment.TenantId, establishment.Id });
         builder.HasOne<Tenant>().WithMany().HasForeignKey(establishment => establishment.TenantId).OnDelete(DeleteBehavior.Restrict);

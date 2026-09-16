@@ -19,6 +19,31 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
     public async Task DisposeAsync() => await database.DisposeAsync();
 
     [Fact]
+    public async Task Onboarding_migration_preserves_existing_configuration_on_upgrade_rollback_and_reapply()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20260903132436_AdministrativeAuthentication");
+        await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        var tenant = Guid.NewGuid(); var unit = Guid.NewGuid(); var table = Guid.NewGuid();
+        await connection.ExecuteAsync("""
+            insert into tenancy.tenant(id,name,is_active,created_at,updated_at,public_code) values(@Tenant,'Existing',true,now(),now(),'migration-onboarding');
+            insert into tenancy.establishment(id,tenant_id,trade_name,slug,is_active,created_at,updated_at) values(@Unit,@Tenant,'Existing','migration-onboarding',true,now(),now());
+            insert into operations.service_table(id,tenant_id,establishment_id,code,qr_code_token,is_active) values(@Table,@Tenant,@Unit,'A1','existing-opaque-token',true);
+            """, new { Tenant = tenant, Unit = unit, Table = table });
+        await context.Database.MigrateAsync();
+        Assert.False(context.Database.HasPendingModelChanges());
+        Assert.Null(await connection.ExecuteScalarAsync<DateTimeOffset?>("select onboarding_completed_at from tenancy.establishment where id=@Unit", new { Unit = unit }));
+        await connection.ExecuteAsync("update tenancy.establishment set onboarding_completed_at=now() where id=@Unit", new { Unit = unit });
+        await migrator.MigrateAsync("20260903132436_AdministrativeAuthentication");
+        Assert.Equal("existing-opaque-token", await connection.ExecuteScalarAsync<string>("select qr_code_token from operations.service_table where id=@Table", new { Table = table }));
+        await context.Database.MigrateAsync();
+        Assert.Equal("Existing", await connection.ExecuteScalarAsync<string>("select trade_name from tenancy.establishment where id=@Unit", new { Unit = unit }));
+        Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where (table_schema='tenancy' and table_name='establishment' and column_name='onboarding_completed_at') or (table_schema='operations' and table_name='service_table' and column_name='creation_intent')"));
+    }
+
+    [Fact]
     public async Task Initial_tenancy_migration_applies_and_rolls_back_on_empty_database()
     {
         var options = new DbContextOptionsBuilder<OrderHubDbContext>()
@@ -46,6 +71,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema in ('identity','operations');"));
     }
 
+
     [Fact]
     public async Task Product_catalog_migration_upgrades_rolls_back_and_reapplies()
     {
@@ -59,6 +85,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync();
         Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='catalog';"));
     }
+
 
     [Fact]
     public async Task Customer_records_migration_upgrades_rolls_back_and_reapplies()
@@ -77,6 +104,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='customers';"));
     }
 
+
     [Fact]
     public async Task Order_lifecycle_migration_upgrades_rolls_back_and_reapplies()
     {
@@ -91,6 +119,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
     }
 
+
     [Fact]
     public async Task Coupon_management_migration_upgrades_rolls_back_and_reapplies()
     {
@@ -102,6 +131,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync(); Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='promotions';"));
     }
 
+
     [Fact]
     public async Task Order_payments_migration_upgrades_rolls_back_and_reapplies()
     {
@@ -110,6 +140,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(["payment", "payment_idempotency", "payment_method"], (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='payments' order by table_name;")).ToArray());
         await migrator.MigrateAsync("20260902231354_CouponManagement"); Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='payments';")); await context.Database.MigrateAsync(); Assert.Equal(3, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='payments';"));
     }
+
 
     [Fact]
     public async Task Public_ordering_migration_upgrades_rolls_back_and_reapplies()
@@ -122,6 +153,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync();
         Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
     }
+
 
     [Fact]
     public async Task Administrative_authentication_migration_upgrades_rolls_back_and_reapplies()
@@ -141,6 +173,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         await context.Database.MigrateAsync();
         Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='identity' and table_name in ('administrative_session','authentication_challenge','platform_user');"));
     }
+
 
     [Fact]
     public async Task Concurrent_platform_bootstrap_creates_exactly_one_superuser()

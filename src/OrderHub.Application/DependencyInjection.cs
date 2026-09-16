@@ -1,3 +1,4 @@
+using OrderHub.Application.Onboarding;
 using Microsoft.Extensions.DependencyInjection;
 using OrderHub.Application.Abstractions.Commands;
 using OrderHub.Application.Abstractions.Queries;
@@ -136,6 +137,26 @@ public static class DependencyInjection
         services.AddScoped<IValidator<ConfirmPublicOrderCommand>, ConfirmPublicOrderCommandValidator>();
         services.AddScoped<IValidator<GetPublicOrderQuery>, GetPublicOrderQueryValidator>();
         services.AddScoped<IValidator<CancelPublicOrderCommand>, CancelPublicOrderCommandValidator>();
+        services.AddScoped<IQueryHandler<GetOnboardingQuery, OnboardingProgress>, OnboardingQueries>();
+        services.AddScoped<IQueryHandler<GetConfigurationQuery, ConfigurationReadModel>, OnboardingQueries>();
+        services.AddScoped<IQueryHandler<SearchTablesQuery, TableSearchResult>, OnboardingQueries>();
+        services.AddScoped<ICommandHandler<UpdateEstablishmentCommand>, UpdateEstablishmentHandler>();
+        services.AddScoped<ICommandHandler<UpdateThemeCommand>, UpdateThemeHandler>();
+        services.AddScoped<ICommandHandler<ReplaceBusinessHoursCommand>, ReplaceBusinessHoursHandler>();
+        services.AddScoped<ICommandHandler<CreateTableCommand, Guid>, CreateTableHandler>();
+        services.AddScoped<ICommandHandler<UpdateTableCommand>, UpdateTableHandler>();
+        services.AddScoped<ICommandHandler<RotateTableTokenCommand>, UpdateTableHandler>();
+        services.AddScoped<ICommandHandler<CompleteOnboardingCommand>, CompleteOnboardingHandler>();
+        services.AddScoped<IValidator<GetOnboardingQuery>, GetOnboardingValidator>();
+        services.AddScoped<IValidator<GetConfigurationQuery>, GetConfigurationValidator>();
+        services.AddScoped<IValidator<SearchTablesQuery>, SearchTablesValidator>();
+        services.AddScoped<IValidator<UpdateEstablishmentCommand>, UpdateEstablishmentValidator>();
+        services.AddScoped<IValidator<UpdateThemeCommand>, UpdateThemeValidator>();
+        services.AddScoped<IValidator<ReplaceBusinessHoursCommand>, ReplaceBusinessHoursValidator>();
+        services.AddScoped<IValidator<CreateTableCommand>, CreateTableValidator>();
+        services.AddScoped<IValidator<UpdateTableCommand>, UpdateTableValidator>();
+        services.AddScoped<IValidator<RotateTableTokenCommand>, RotateTableTokenValidator>();
+        services.AddScoped<IValidator<CompleteOnboardingCommand>, CompleteOnboardingValidator>();
         return services;
     }
 }

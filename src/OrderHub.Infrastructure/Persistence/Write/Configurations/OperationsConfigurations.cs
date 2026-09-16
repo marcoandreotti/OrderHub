@@ -16,6 +16,8 @@ internal sealed class ServiceTableConfiguration : IEntityTypeConfiguration<Servi
         builder.Property(table => table.TenantId).HasColumnName("tenant_id"); builder.Property(table => table.EstablishmentId).HasColumnName("establishment_id");
         builder.Property(table => table.Code).HasColumnName("code").HasMaxLength(30); builder.Property(table => table.Description).HasColumnName("description").HasMaxLength(100);
         builder.Property(table => table.QrCodeToken).HasColumnName("qr_code_token").HasMaxLength(100); builder.Property(table => table.IsActive).HasColumnName("is_active");
+        builder.Property(table => table.CreationIntent).HasColumnName("creation_intent");
+        builder.HasIndex(table => new { table.TenantId, table.EstablishmentId, table.CreationIntent }).IsUnique();
         builder.HasIndex(table => new { table.EstablishmentId, table.Code }).IsUnique(); builder.HasIndex(table => table.QrCodeToken).IsUnique();
         builder.HasOne<OrderHub.Domain.Tenancy.Establishment>().WithMany().HasForeignKey(table => new { table.TenantId, table.EstablishmentId }).HasPrincipalKey(establishment => new { establishment.TenantId, establishment.Id }).OnDelete(DeleteBehavior.Restrict);
     }

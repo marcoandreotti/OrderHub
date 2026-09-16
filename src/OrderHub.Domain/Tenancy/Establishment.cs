@@ -37,6 +37,15 @@ public sealed class Establishment : ITenantScopedEntity
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public DateTimeOffset? OnboardingCompletedAt { get; private set; }
+
+    public void Rename(string tradeName, DateTimeOffset now)
+    {
+        SetTradeName(tradeName);
+        UpdatedAt = now;
+    }
+
+    public void RecordOnboardingCompletion(DateTimeOffset now) => OnboardingCompletedAt ??= now;
 
     /// <summary>Cria um estabelecimento ativo, vinculado obrigatoriamente a um tenant.</summary>
     public static Establishment Create(Guid tenantId, string tradeName, Slug slug, DateTimeOffset now) =>

@@ -1,3 +1,4 @@
+using OrderHub.Application.Onboarding;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -86,6 +87,8 @@ public static class DependencyInjection
         services.AddScoped<IPublicOrderTransaction, PublicOrderTransaction>();
         services.AddHealthChecks().AddDbContextCheck<OrderHubDbContext>("postgresql", tags: ["ready"]);
 
+        services.AddScoped<IEstablishmentConfigurationRepository, EstablishmentConfigurationRepository>();
+        services.AddScoped<IOnboardingReadGateway, OnboardingReadGateway>();
         return services;
     }
 }
