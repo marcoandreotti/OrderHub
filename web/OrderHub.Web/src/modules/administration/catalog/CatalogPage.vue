@@ -313,7 +313,7 @@ onUnmounted(() => request?.abort())
         <q-btn type="submit" flat label="Pesquisar" :loading="loading" /><q-btn
           color="primary"
           label="Cadastrar"
-          :disable="!session.unitId || loading"
+          :disable="!session.unitId"
           @click="open()"
         /></div
     ></q-form>

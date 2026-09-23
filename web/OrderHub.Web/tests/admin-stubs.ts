@@ -43,6 +43,7 @@ export const adminStubs = {
     template: '<div><slot /></div>'
   },
   QTab: true,
+  QSpinner: true,
   QPage: { template: '<main><slot /></main>' },
   QCard: { template: '<section><slot /></section>' },
   QCardSection: { template: '<div><slot /></div>' },

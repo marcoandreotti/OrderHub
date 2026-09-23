@@ -86,6 +86,7 @@ function open(user: AdministrativeUser | null) {
   editor.value = true
 }
 async function save() {
+  if (busy.value) return
   busy.value = true
   editError.value = null
   try {

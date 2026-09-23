@@ -172,6 +172,25 @@ describe('fluxo de usuários', () => {
     expect(wrapper.findComponent(UserPermissions).exists()).toBe(true)
     wrapper.unmount()
   })
+  it('impede envio duplicado enquanto o cadastro está em andamento', async () => {
+    let complete!: () => void
+    vi.mocked(usersClient.create).mockImplementation(
+      () => new Promise<void>((resolve) => (complete = resolve))
+    )
+    const wrapper = mount(UsersPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Novo usuário')!
+      .trigger('click')
+    const form = wrapper.findAll('form')[1]!
+    await form.trigger('submit')
+    await form.trigger('submit')
+    expect(usersClient.create).toHaveBeenCalledTimes(1)
+    complete()
+    await flushPromises()
+    wrapper.unmount()
+  })
   it('renderiza ausência de resultados', async () => {
     vi.mocked(usersClient.search).mockResolvedValue({
       items: [],
