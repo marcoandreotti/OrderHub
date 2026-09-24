@@ -1,0 +1,4 @@
+interface:
+  display_name: "Delegacao Economica"
+  short_description: "Delega somente quando o ganho supera o custo"
+  default_prompt: "Use $token-efficient-delegation para executar esta tarefa com o menor custo de tokens adequado."

@@ -1,7 +1,9 @@
+using System.Text.Json.Serialization;
 using OrderHub.Application.Abstractions.Commands;
 using OrderHub.Application.Abstractions.Queries;
 using OrderHub.Domain.Operations;
 using OrderHub.Domain.Tenancy;
+using OrderHub.Domain.Ordering;
 
 namespace OrderHub.Application.Onboarding;
 
@@ -10,7 +12,14 @@ public sealed record ThemeInput(string? PrimaryColor = null, string? SecondaryCo
     public EstablishmentTheme ToDomain() => new(PrimaryColor, SecondaryColor, BackgroundColor, TextColor, FontFamily, LogoUrl, FaviconUrl);
 }
 public sealed record HoursInput(DayOfWeek DayOfWeek, TimeOnly OpensAt, TimeOnly ClosesAt);
-public sealed record ConfigurationReadModel(string TradeName, string Slug, ThemeInput Theme, IReadOnlyList<HoursInput> Hours);
+public sealed record ScheduleExceptionReadModel(DateOnly Date, OrderServiceType? ServiceType, bool IsOpen, TimeOnly? OpensAt, TimeOnly? ClosesAt, string? Reason);
+public sealed record ServicePauseReadModel(OrderServiceType ServiceType, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string? Reason);
+[method: JsonConstructor]
+public sealed record ConfigurationReadModel(string TradeName, string Slug, string TimeZoneId, ThemeInput Theme, IReadOnlyList<HoursInput> Hours, IReadOnlyList<ScheduleExceptionReadModel> Exceptions, IReadOnlyList<ServicePauseReadModel> Pauses)
+{
+    public ConfigurationReadModel(string tradeName, string slug, ThemeInput theme, IReadOnlyList<HoursInput> hours)
+        : this(tradeName, slug, "America/Sao_Paulo", theme, hours, [], []) { }
+}
 public sealed record TableReadModel(Guid Id, string Code, string? Description, bool IsActive, string? PublicPath);
 public sealed record TableSearchResult(IReadOnlyList<TableReadModel> Items, long TotalCount, int Page, int PageSize);
 public sealed record OnboardingProgress(bool DataReady, bool ThemeReady, bool HoursReady, bool AccessReady, int ActiveTables, DateTimeOffset? CompletedAt)
@@ -23,7 +32,7 @@ public sealed record OnboardingProgress(bool DataReady, bool ThemeReady, bool Ho
 public sealed record GetOnboardingQuery(Guid EstablishmentId) : IQuery<OnboardingProgress>;
 public sealed record GetConfigurationQuery(Guid EstablishmentId) : IQuery<ConfigurationReadModel>;
 public sealed record SearchTablesQuery(Guid EstablishmentId, int Page = 1, int PageSize = 20) : IQuery<TableSearchResult>;
-public sealed record UpdateEstablishmentCommand(Guid EstablishmentId, string TradeName, string Slug) : ICommand;
+public sealed record UpdateEstablishmentCommand(Guid EstablishmentId, string TradeName, string Slug, string TimeZoneId = "America/Sao_Paulo") : ICommand;
 public sealed record UpdateThemeCommand(Guid EstablishmentId, ThemeInput Theme) : ICommand;
 public sealed record ReplaceBusinessHoursCommand(Guid EstablishmentId, IReadOnlyList<HoursInput> Hours) : ICommand;
 public sealed record CreateTableCommand(Guid EstablishmentId, Guid IntentId, string Code, string? Description) : ICommand<Guid>;

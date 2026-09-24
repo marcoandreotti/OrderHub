@@ -100,3 +100,10 @@ Operações que alterem um aggregate do catálogo e suas coleções ou vínculos
 #### Scenario: Mesmo código em unidades diferentes
 - **WHEN** unidades distintas utilizam o mesmo código de produto
 - **THEN** o sistema SHALL permitir os cadastros mantendo isolamento entre seus catálogos
+
+### Requirement: Oferta pode ficar temporariamente indisponível
+O sistema SHALL permitir indisponibilizar produto ou opção por período ou até reativação, sem alterar seu cadastro nem seus históricos.
+
+#### Scenario: Produto temporariamente indisponível
+- **WHEN** o cardápio público é consultado durante a indisponibilidade
+- **THEN** a oferta não pode ser adicionada a novo pedido e seu estado é comunicado conforme a política da unidade

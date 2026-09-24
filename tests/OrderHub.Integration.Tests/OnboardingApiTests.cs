@@ -52,7 +52,7 @@ public sealed class OnboardingApiTests(UserManagementDatabase database) : IClass
         await Status(await client.PutAsJsonAsync(root + "/theme", new EstablishmentThemeRequest(LogoUrl: "javascript:alert(1)")), HttpStatusCode.BadRequest);
         var hours = new[] { new BusinessHoursRequest(1, new(9, 0), new(18, 0)) };
         await Status(await client.PutAsJsonAsync(root + "/business-hours", new ReplaceBusinessHoursRequest(hours)), HttpStatusCode.NoContent);
-        await Status(await client.PutAsJsonAsync(root + "/business-hours", new ReplaceBusinessHoursRequest([hours[0] with { DayOfWeek = 2 }, new(3, new(20, 0), new(10, 0))])), HttpStatusCode.UnprocessableEntity);
+        await Status(await client.PutAsJsonAsync(root + "/business-hours", new ReplaceBusinessHoursRequest([new(2, new(20, 0), new(10, 0)), new(3, new(9, 0), new(18, 0))])), HttpStatusCode.UnprocessableEntity);
         configuration = await client.GetFromJsonAsync<ConfigurationReadModel>(root + "/configuration");
         Assert.Equal(DayOfWeek.Monday, Assert.Single(configuration!.Hours).DayOfWeek);
         await Status(await client.PutAsJsonAsync(root + "/business-hours", new ReplaceBusinessHoursRequest([new(9, new(9, 0), new(18, 0))])), HttpStatusCode.BadRequest);

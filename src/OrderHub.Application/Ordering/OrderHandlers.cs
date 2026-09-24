@@ -8,6 +8,7 @@ using OrderHub.Domain.SharedKernel;
 using FluentValidation.Results;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Domain.Promotions;
+using OrderHub.Domain.Operations;
 
 namespace OrderHub.Application.Ordering;
 
@@ -54,7 +55,7 @@ public sealed class AddOrderItemCommandHandler(
         var scope = await scopeResolver.ResolveAsync(command.EstablishmentId, cancellationToken);
         var order = await repository.GetAsync(scope.TenantId, scope.EstablishmentId, command.OrderId, cancellationToken)
             ?? throw new NotFoundException("Order was not found.");
-        var offer = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, command.ProductId, command.VariationId, command.Additionals, cancellationToken)
+        var offer = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, command.ProductId, command.VariationId, command.Additionals, timeProvider.GetUtcNow(), cancellationToken)
             ?? throw new NotFoundException("Sellable offer was not found in this establishment.");
         var item = order.AddItem(offer.ProductId, offer.VariationId, offer.ProductName, offer.VariationName, offer.UnitPrice, new Quantity(command.Quantity),
             offer.Additionals.Select(x => new OrderAdditionalInput(x.AdditionalId, x.Name, x.UnitPrice, x.Quantity)).ToArray(), command.Notes, timeProvider.GetUtcNow());
@@ -70,6 +71,7 @@ public sealed class ConfirmOrderCommandHandler(
     IOrderNumberSequence sequence,
     IOrderConfirmationTransaction transaction,
     ICouponRepository coupons,
+    IOrderAvailabilityGateway availability,
     TimeProvider timeProvider) : ICommandHandler<ConfirmOrderCommand>
 {
     public async Task HandleAsync(ConfirmOrderCommand command, CancellationToken cancellationToken)
@@ -81,7 +83,7 @@ public sealed class ConfirmOrderCommandHandler(
         foreach (var item in order.Items)
         {
             var selections = item.Additionals.Select(x => new OrderAdditionalSelection(x.AdditionalId, x.Quantity.Value)).ToArray();
-            var current = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, item.ProductId, item.VariationId, selections, cancellationToken);
+            var current = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, item.ProductId, item.VariationId, selections, timeProvider.GetUtcNow(), cancellationToken);
             if (current is null || !Matches(item, current))
                 throw new ConflictException("Order offer changed or is no longer available. Recompose the order before confirming.");
         }
@@ -96,9 +98,19 @@ public sealed class ConfirmOrderCommandHandler(
 
         await transaction.ExecuteAsync(async token =>
         {
-            coupon?.Consume(order.Id, order.Subtotal, timeProvider.GetUtcNow());
+            var now = timeProvider.GetUtcNow();
+            var decision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, order.ServiceType, now, token);
+            if (!decision.IsAvailable) throw new AvailabilityConflictException(decision.Message ?? "Service is unavailable.", decision.Reason, decision.NextOpening);
+            foreach (var item in order.Items)
+            {
+                var selections = item.Additionals.Select(x => new OrderAdditionalSelection(x.AdditionalId, x.Quantity.Value)).ToArray();
+                var current = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, item.ProductId, item.VariationId, selections, now, token);
+                if (current is null || !Matches(item, current))
+                    throw new AvailabilityConflictException("Order contains unavailable or changed offers.", AvailabilityReason.OfferUnavailable, null, [item.ProductId]);
+            }
+            coupon?.Consume(order.Id, order.Subtotal, now);
             var number = await sequence.ReserveAsync(scope.TenantId, scope.EstablishmentId, token);
-            order.Confirm(number, timeProvider.GetUtcNow(), scope.UserId);
+            order.Confirm(number, now, scope.UserId);
             await repository.SaveChangesAsync(token);
         }, cancellationToken);
     }

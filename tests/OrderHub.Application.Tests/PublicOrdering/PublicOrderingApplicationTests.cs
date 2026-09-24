@@ -4,12 +4,14 @@ using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Application.Abstractions.Payments;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Application.Abstractions.PublicOrdering;
+using OrderHub.Application.Abstractions.Operations;
 using OrderHub.Application.Exceptions;
 using OrderHub.Application.PublicOrdering;
 using OrderHub.Domain.Ordering;
 using OrderHub.Domain.Payments;
 using OrderHub.Domain.Promotions;
 using OrderHub.Domain.SharedKernel;
+using OrderHub.Domain.Operations;
 
 namespace OrderHub.Application.Tests.PublicOrdering;
 
@@ -18,7 +20,7 @@ public sealed class PublicOrderingApplicationTests
     [Fact]
     public async Task Inactive_or_unknown_slug_is_not_revealed()
     {
-        var handler=new GetPublicContextQueryHandler(new ContextGateway(null));
+        var handler=new GetPublicContextQueryHandler(new ContextGateway(null),new AvailabilityGateway(),TimeProvider.System);
         await Assert.ThrowsAsync<NotFoundException>(()=>handler.HandleAsync(new("closed",null),CancellationToken.None));
     }
 
@@ -26,7 +28,7 @@ public sealed class PublicOrderingApplicationTests
     public async Task Simulation_uses_authoritative_offer_price()
     {
         var context=Scope();
-        var handler=new SimulatePublicOrderQueryHandler(new ContextGateway(context),new OfferResolver(25m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new PaymentMethodRepository(),TimeProvider.System);
+        var handler=new SimulatePublicOrderQueryHandler(new ContextGateway(context),new OfferResolver(25m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new PaymentMethodRepository(),new AvailabilityGateway(),TimeProvider.System);
         var result=await handler.HandleAsync(new("unit-a",OrderServiceType.Pickup,null,null,null,null,null,null,[new(Guid.NewGuid(),null,2,null,[])]),CancellationToken.None);
         Assert.Equal(50m,result.Total); Assert.Equal(25m,result.Items.Single().UnitPrice);
     }
@@ -53,15 +55,30 @@ public sealed class PublicOrderingApplicationTests
     {
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository(); var requests=new RequestRepository();
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),TimeProvider.System);
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","confirmation-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
         var first=await handler.HandleAsync(command,CancellationToken.None); var replay=await handler.HandleAsync(command,CancellationToken.None);
         Assert.Equal(first,replay); Assert.Equal(1,orders.AddCount);
     }
 
+    [Fact]
+    public async Task Confirmation_revalidates_availability_and_persists_nothing_for_stale_cart()
+    {
+        var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
+        var orders=new OrderRepository();
+        var unavailable=new AvailabilityGateway(new(false,AvailabilityReason.ServicePaused,"Pickup paused.",DateTimeOffset.UtcNow.AddHours(1)));
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,TimeProvider.System);
+        var command=new ConfirmPublicOrderCommand("unit-a","stale-cart-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
+
+        var exception=await Assert.ThrowsAsync<AvailabilityConflictException>(()=>handler.HandleAsync(command,CancellationToken.None));
+
+        Assert.Equal(AvailabilityReason.ServicePaused,exception.Reason);
+        Assert.Equal(0,orders.AddCount);
+    }
+
     private static PublicOrderingContext Scope()=>new(Guid.NewGuid(),Guid.NewGuid(),"Unit","unit-a","#1","#2","#3","#4","Arial",null,null,null,null,[]);
     private sealed class ContextGateway(PublicOrderingContext? value):IPublicOrderingContextGateway { public Task<PublicOrderingContext?> ResolveAsync(string normalizedSlug,string? tableToken,CancellationToken cancellationToken)=>Task.FromResult(value); }
-    private sealed class OfferResolver(decimal price):IOrderOfferResolver { public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId,Guid establishmentId,Guid productId,Guid? variationId,IReadOnlyCollection<OrderAdditionalSelection> additionals,CancellationToken cancellationToken)=>Task.FromResult<OrderOfferSnapshot?>(new(productId,variationId,"Pizza",null,new Money(price),[])); }
+    private sealed class OfferResolver(decimal price):IOrderOfferResolver { public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId,Guid establishmentId,Guid productId,Guid? variationId,IReadOnlyCollection<OrderAdditionalSelection> additionals,DateTimeOffset instant,CancellationToken cancellationToken)=>Task.FromResult<OrderOfferSnapshot?>(new(productId,variationId,"Pizza",null,new Money(price),[])); }
     private sealed class CustomerResolver:IOrderCustomerResolver { public Task<OrderCustomerSnapshot?> ResolveAsync(Guid tenantId,Guid establishmentId,Guid customerId,Guid? addressId,CancellationToken cancellationToken)=>Task.FromResult<OrderCustomerSnapshot?>(null); }
     private sealed class TableResolver:IOrderTableResolver { public Task<OrderTableSnapshot?> ResolveActiveAsync(Guid tenantId,Guid establishmentId,Guid tableId,CancellationToken cancellationToken)=>Task.FromResult<OrderTableSnapshot?>(null); }
     private sealed class CouponRepository:ICouponRepository { public Task<Coupon?> GetAsync(Guid a,Guid b,Guid c,CancellationToken d)=>Task.FromResult<Coupon?>(null); public Task<Coupon?> FindByCodeAsync(Guid a,Guid b,string c,CancellationToken d)=>Task.FromResult<Coupon?>(null); public Task AddAsync(Coupon a,CancellationToken b)=>Task.CompletedTask; public Task SaveChangesAsync(CancellationToken a)=>Task.CompletedTask; }
@@ -72,4 +89,5 @@ public sealed class PublicOrderingApplicationTests
     private sealed class Sequence:IOrderNumberSequence { private long number; public Task<long> ReserveAsync(Guid a,Guid b,CancellationToken c)=>Task.FromResult(++number); }
     private sealed class RequestRepository:IPublicOrderRequestRepository { private PublicOrderRequest? value; public Task<PublicOrderRequest?> FindAsync(Guid a,Guid b,string c,CancellationToken d)=>Task.FromResult(value?.Key==c?value:null); public Task AddAsync(PublicOrderRequest request,CancellationToken b){value=request;return Task.CompletedTask;} }
     private sealed class Transaction:IPublicOrderTransaction { public Task<T> ExecuteAsync<T>(Func<CancellationToken,Task<T>> operation,CancellationToken token)=>operation(token); }
+    private sealed class AvailabilityGateway(AvailabilityDecision? value=null) : IAvailabilityReadGateway, IOrderAvailabilityGateway { public Task<AvailabilityDecision> EvaluateAsync(Guid tenantId,Guid establishmentId,OrderServiceType serviceType,DateTimeOffset instant,CancellationToken cancellationToken)=>Task.FromResult(value??AvailabilityDecision.Available()); }
 }

@@ -40,4 +40,14 @@ public sealed class ProductTests
         Assert.Empty(product.Images); Assert.Empty(product.Variations); Assert.True(product.IsActive);
         Assert.Throws<DomainException>(() => product.Update(Category.Create(tenant, Guid.NewGuid(), "Other"), "x", "x", null, Money.Zero, false, true));
     }
+
+    [Fact]
+    public void Temporary_unavailability_is_separate_from_administrative_activation()
+    {
+        var now = new DateTimeOffset(2026, 9, 23, 12, 0, 0, TimeSpan.Zero);
+        var value = OfferUnavailability.Create(Guid.NewGuid(), Guid.NewGuid(), OfferKind.Product, Guid.NewGuid(), now, now.AddHours(2), "Sold out");
+        Assert.True(value.IsActiveAt(now.AddMinutes(1)));
+        value.Reactivate(now.AddMinutes(30));
+        Assert.False(value.IsActiveAt(now.AddMinutes(31)));
+    }
 }

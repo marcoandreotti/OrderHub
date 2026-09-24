@@ -120,6 +120,33 @@ describe('catálogo público', () => {
     expect(push).toHaveBeenCalledWith('/order/track/' + 'a'.repeat(48))
     wrapper.unmount()
   })
+
+  it('distingue pausa operacional e bloqueia produtos temporariamente indisponíveis', async () => {
+    vi.mocked(publicOrderingClient.context).mockResolvedValue({
+      ...context,
+      availability: [
+        { serviceType: 'Pickup', isAvailable: false, reason: 'ServicePaused', message: 'Pausa para organização.', nextOpening: '2026-09-24T13:00:00Z' },
+        { serviceType: 'Delivery', isAvailable: false, reason: 'OutsideBusinessHours', message: null, nextOpening: '2026-09-24T14:00:00Z' }
+      ]
+    })
+    vi.mocked(publicOrderingClient.catalog).mockResolvedValue({
+      ...catalog,
+      categories: catalog.categories.map(category => ({
+        ...category,
+        products: category.products.map(item => item.id === 'p1'
+          ? { ...item, isAvailable: false, unavailabilityReason: 'Sem estoque' }
+          : item)
+      }))
+    })
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Pausa para organização.')
+    expect(wrapper.text()).toContain('Próxima abertura:')
+    const productButton = wrapper.findAll('button').find(button => button.text().includes('Pizza'))!
+    expect(productButton.attributes('disabled')).toBeDefined()
+    expect(productButton.text()).toContain('Indisponível')
+    wrapper.unmount()
+  })
 })
 
 describe('checkout idempotente', () => {

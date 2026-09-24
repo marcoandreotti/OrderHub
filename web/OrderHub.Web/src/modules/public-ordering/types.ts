@@ -11,18 +11,33 @@ export interface PublicContext {
   establishmentName: string; slug: string; theme: PublicTheme
   table: { code: string; token: string } | null
   paymentMethods: PublicPaymentMethod[]
+  availability?: PublicServiceAvailability[]
 }
-export interface Additional { id: string; name: string; price: number; isActive: boolean; order: number }
+export interface PublicServiceAvailability {
+  serviceType: ServiceType
+  isAvailable: boolean
+  reason: string
+  message: string | null
+  nextOpening: string | null
+}
+export interface Additional {
+  id: string; name: string; price: number; isActive: boolean; order: number
+  isAvailable?: boolean; unavailabilityReason?: string | null; availableAgainAt?: string | null
+}
 export interface AdditionalGroup {
   id: string; name: string; minimumSelection: number; maximumSelection: number
   isActive: boolean; order: number; items: Additional[]
 }
-export interface ProductVariation { id: string; name: string; price: number; order: number; isActive: boolean }
+export interface ProductVariation {
+  id: string; name: string; price: number; order: number; isActive: boolean
+  isAvailable?: boolean; unavailabilityReason?: string | null; availableAgainAt?: string | null
+}
 export interface Product {
   id: string; code: string; name: string; description: string | null
   basePrice: number; isFeatured: boolean; isActive: boolean; allowsNotes: boolean
   images: { id: string; url: string; order: number; isPrincipal: boolean }[]
   variations: ProductVariation[]; additionalGroups: AdditionalGroup[]
+  isAvailable?: boolean; unavailabilityReason?: string | null; availableAgainAt?: string | null
 }
 export interface PublicCatalog {
   establishmentId: string; establishmentName: string; slug: string

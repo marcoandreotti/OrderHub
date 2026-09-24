@@ -31,6 +31,7 @@ public sealed class UpdateEstablishmentHandler(AdministrativeUserManagement mana
         var unit = await repository.GetAsync(scope.TenantId, scope.EstablishmentId, token);
         unit.Rename(command.TradeName, time.GetUtcNow());
         unit.ChangeSlug(new Slug(command.Slug), time.GetUtcNow());
+        unit.ChangeTimeZone(command.TimeZoneId, time.GetUtcNow());
         await repository.SaveAsync(token);
     }, ct);
 }
@@ -48,6 +49,7 @@ public sealed class ReplaceBusinessHoursHandler(AdministrativeUserManagement man
     public Task HandleAsync(ReplaceBusinessHoursCommand command, CancellationToken ct) => management.ExecuteAsync(command.EstablishmentId, async (scope, _, token) =>
     {
         var replacement = command.Hours.Select(h => BusinessHours.Create(scope.TenantId, scope.EstablishmentId, h.DayOfWeek, h.OpensAt, h.ClosesAt)).ToArray();
+        BusinessHours.EnsureNoOverlaps(replacement);
         var previous = await repository.GetHoursAsync(scope.TenantId, scope.EstablishmentId, token);
         repository.ReplaceHours(previous, replacement);
         await repository.SaveAsync(token);
@@ -93,7 +95,7 @@ public sealed class CompleteOnboardingHandler(AdministrativeUserManagement manag
         var unit = await repository.GetAsync(scope.TenantId, scope.EstablishmentId, token);
         var hours = await repository.GetHoursAsync(scope.TenantId, scope.EstablishmentId, token);
         var administrators = await repository.CountAdministratorsAsync(scope.TenantId, scope.EstablishmentId, token);
-        var progress = OnboardingProgress.Calculate(unit.TradeName, unit.Slug.Value, unit.IsActive, hours.Count(h => h.IsActive && h.ClosesAt > h.OpensAt), administrators, 0, unit.OnboardingCompletedAt);
+        var progress = OnboardingProgress.Calculate(unit.TradeName, unit.Slug.Value, unit.IsActive, hours.Count(h => h.IsActive && h.ClosesAt != h.OpensAt), administrators, 0, unit.OnboardingCompletedAt);
         if (!progress.IsReady) throw new ConflictException("Complete the required steps: " + string.Join(", ", progress.PendingSteps));
         unit.RecordOnboardingCompletion(time.GetUtcNow());
         await repository.SaveAsync(token);

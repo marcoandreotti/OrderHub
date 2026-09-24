@@ -21,10 +21,10 @@ public sealed class CatalogMaintenanceReadGateway(IReadConnectionFactory connect
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
         var parameters = Parameters(tenantId, query.EstablishmentId, query.Search, query.IsActive, query.Page, query.PageSize);
         var total = await connection.ExecuteScalarAsync<int>(new CommandDefinition("select count(*)::int from catalog.additional " + Filter, parameters, transaction, cancellationToken: ct));
-        var rows = await connection.QueryAsync<AdditionalReadModel>(new CommandDefinition(
+        var rows = await connection.QueryAsync<AdditionalRow>(new CommandDefinition(
             "select id Id, name Name, price Price, is_active IsActive, 0 as \"Order\" from catalog.additional " + Filter + " order by name, id limit @PageSize offset @Offset", parameters, transaction, cancellationToken: ct));
         await transaction.CommitAsync(ct);
-        return new(total, rows.ToArray());
+        return new(total, rows.Select(x => new AdditionalReadModel(x.Id, x.Name, x.Price, x.IsActive, x.Order)).ToArray());
     }
 
     public async Task<AdditionalGroupSearchResult> SearchGroupsAsync(Guid tenantId, SearchAdditionalGroupsQuery query, CancellationToken ct)
@@ -50,6 +50,7 @@ public sealed class CatalogMaintenanceReadGateway(IReadConnectionFactory connect
 
     private static object Parameters(Guid tenantId, Guid establishmentId, string? search, bool? isActive, int page, int pageSize) =>
         new { TenantId = tenantId, EstablishmentId = establishmentId, Search = string.IsNullOrWhiteSpace(search) ? null : search.Trim(), IsActive = isActive, PageSize = pageSize, Offset = (page - 1) * pageSize };
+    private sealed record AdditionalRow(Guid Id, string Name, decimal Price, bool IsActive, int Order);
     private sealed record GroupRow(Guid Id, string Name, int MinimumSelection, int MaximumSelection, bool IsActive);
     private sealed record ItemRow(Guid GroupId, Guid Id, string Name, decimal Price, bool IsActive, int Order);
 }

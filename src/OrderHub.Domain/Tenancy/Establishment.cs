@@ -24,6 +24,7 @@ public sealed class Establishment : ITenantScopedEntity
         SetTradeName(tradeName);
         Slug = slug;
         Theme = new EstablishmentTheme();
+        TimeZoneId = "America/Sao_Paulo";
         IsActive = true;
         CreatedAt = createdAt;
         UpdatedAt = createdAt;
@@ -34,6 +35,7 @@ public sealed class Establishment : ITenantScopedEntity
     public string TradeName { get; private set; } = string.Empty;
     public Slug Slug { get; private set; } = null!;
     public EstablishmentTheme Theme { get; private set; } = null!;
+    public string TimeZoneId { get; private set; } = "America/Sao_Paulo";
     public bool IsActive { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -62,6 +64,18 @@ public sealed class Establishment : ITenantScopedEntity
     public void ChangeTheme(EstablishmentTheme theme, DateTimeOffset now)
     {
         Theme = theme;
+        UpdatedAt = now;
+    }
+
+    public void ChangeTimeZone(string timeZoneId, DateTimeOffset now)
+    {
+        var normalized = timeZoneId.Trim();
+        if (normalized.Length is < 1 or > 100)
+            throw new DomainException("Time zone is invalid.");
+        try { _ = TimeZoneInfo.FindSystemTimeZoneById(normalized); }
+        catch (TimeZoneNotFoundException) { throw new DomainException("Time zone is invalid."); }
+        catch (InvalidTimeZoneException) { throw new DomainException("Time zone is invalid."); }
+        TimeZoneId = normalized;
         UpdatedAt = now;
     }
 

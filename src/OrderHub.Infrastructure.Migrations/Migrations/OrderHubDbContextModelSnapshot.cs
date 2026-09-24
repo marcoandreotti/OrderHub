@@ -201,6 +201,57 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OrderHub.Domain.Catalog.OfferUnavailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<short>("Kind")
+                        .HasColumnType("smallint")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("OfferId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_id");
+
+                    b.Property<DateTimeOffset?>("ReactivatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("reactivated_at");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("reason");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Kind", "OfferId", "StartsAt");
+
+                    b.ToTable("offer_unavailability", "catalog", t =>
+                        {
+                            t.HasCheckConstraint("ck_offer_unavailability_interval", "ends_at is null or ends_at > starts_at");
+                        });
+                });
+
             modelBuilder.Entity("OrderHub.Domain.Catalog.Product", b =>
                 {
                     b.Property<Guid>("Id")
@@ -807,7 +858,111 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
 
                     b.ToTable("business_hours", "operations", t =>
                         {
-                            t.HasCheckConstraint("ck_business_hours_interval", "closes_at > opens_at");
+                            t.HasCheckConstraint("ck_business_hours_interval", "closes_at <> opens_at");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Operations.ServicePause", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<DateTimeOffset?>("EndsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("ends_at");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("reason");
+
+                    b.Property<short>("ServiceType")
+                        .HasColumnType("smallint")
+                        .HasColumnName("service_type");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("starts_at");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "ServiceType", "StartsAt");
+
+                    b.ToTable("service_pause", "operations", t =>
+                        {
+                            t.HasCheckConstraint("ck_service_pause_interval", "ends_at is null or ends_at > starts_at");
+                        });
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Operations.ServiceScheduleException", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<TimeOnly?>("ClosesAt")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("closes_at");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<Guid>("EstablishmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("establishment_id");
+
+                    b.Property<bool>("IsOpen")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_open");
+
+                    b.Property<TimeOnly?>("OpensAt")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("opens_at");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(250)
+                        .HasColumnType("character varying(250)")
+                        .HasColumnName("reason");
+
+                    b.Property<short?>("ServiceType")
+                        .HasColumnType("smallint")
+                        .HasColumnName("service_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Date")
+                        .IsUnique()
+                        .HasFilter("service_type is null");
+
+                    b.HasIndex("TenantId", "EstablishmentId", "Date", "ServiceType")
+                        .IsUnique()
+                        .HasFilter("service_type is not null");
+
+                    b.ToTable("service_schedule_exception", "operations", t =>
+                        {
+                            t.HasCheckConstraint("ck_service_schedule_exception_interval", "(is_open and opens_at is not null and closes_at is not null and opens_at <> closes_at) or (not is_open and opens_at is null and closes_at is null)");
                         });
                 });
 
@@ -1576,6 +1731,14 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("tenant_id");
 
+                    b.Property<string>("TimeZoneId")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasDefaultValue("America/Sao_Paulo")
+                        .HasColumnName("time_zone_id");
+
                     b.Property<string>("TradeName")
                         .IsRequired()
                         .HasMaxLength(150)
@@ -1777,6 +1940,16 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("OrderHub.Domain.Catalog.OfferUnavailability", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("OrderHub.Domain.Catalog.Product", b =>
                 {
                     b.HasOne("OrderHub.Domain.Catalog.Category", null)
@@ -1928,6 +2101,26 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                 });
 
             modelBuilder.Entity("OrderHub.Domain.Operations.BusinessHours", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Operations.ServicePause", b =>
+                {
+                    b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId", "EstablishmentId")
+                        .HasPrincipalKey("TenantId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("OrderHub.Domain.Operations.ServiceScheduleException", b =>
                 {
                     b.HasOne("OrderHub.Domain.Tenancy.Establishment", null)
                         .WithMany()

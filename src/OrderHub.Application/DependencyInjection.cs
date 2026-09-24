@@ -21,6 +21,7 @@ using OrderHub.Application.Abstractions.PublicOrdering;
 using OrderHub.Application.PublicOrdering;
 using OrderHub.Application.Identity.Authentication;
 using OrderHub.Application.Identity.Management;
+using OrderHub.Application.Availability;
 
 namespace OrderHub.Application;
 
@@ -157,6 +158,16 @@ public static class DependencyInjection
         services.AddScoped<IValidator<UpdateTableCommand>, UpdateTableValidator>();
         services.AddScoped<IValidator<RotateTableTokenCommand>, RotateTableTokenValidator>();
         services.AddScoped<IValidator<CompleteOnboardingCommand>, CompleteOnboardingValidator>();
+        services.AddScoped<ICommandHandler<ReplaceScheduleExceptionsCommand>, ReplaceScheduleExceptionsHandler>();
+        services.AddScoped<ICommandHandler<PauseServiceCommand>, PauseServiceHandler>();
+        services.AddScoped<ICommandHandler<ResumeServiceCommand>, PauseServiceHandler>();
+        services.AddScoped<ICommandHandler<SetOfferUnavailabilityCommand>, OfferAvailabilityHandler>();
+        services.AddScoped<ICommandHandler<ReactivateOfferCommand>, OfferAvailabilityHandler>();
+        services.AddScoped<IValidator<ReplaceScheduleExceptionsCommand>, ReplaceScheduleExceptionsValidator>();
+        services.AddScoped<IValidator<PauseServiceCommand>, PauseServiceValidator>();
+        services.AddScoped<IValidator<ResumeServiceCommand>, ResumeServiceValidator>();
+        services.AddScoped<IValidator<SetOfferUnavailabilityCommand>, SetOfferUnavailabilityValidator>();
+        services.AddScoped<IValidator<ReactivateOfferCommand>, ReactivateOfferValidator>();
         return services;
     }
 }

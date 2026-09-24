@@ -16,10 +16,13 @@ public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> option
     public DbSet<OrderHub.Domain.Identity.AdministrativeSession> AdministrativeSessions => Set<OrderHub.Domain.Identity.AdministrativeSession>();
     public DbSet<OrderHub.Domain.Operations.ServiceTable> ServiceTables => Set<OrderHub.Domain.Operations.ServiceTable>();
     public DbSet<OrderHub.Domain.Operations.BusinessHours> BusinessHours => Set<OrderHub.Domain.Operations.BusinessHours>();
+    public DbSet<OrderHub.Domain.Operations.ServiceScheduleException> ServiceScheduleExceptions => Set<OrderHub.Domain.Operations.ServiceScheduleException>();
+    public DbSet<OrderHub.Domain.Operations.ServicePause> ServicePauses => Set<OrderHub.Domain.Operations.ServicePause>();
     public DbSet<OrderHub.Domain.Catalog.Category> Categories => Set<OrderHub.Domain.Catalog.Category>();
     public DbSet<OrderHub.Domain.Catalog.Product> Products => Set<OrderHub.Domain.Catalog.Product>();
     public DbSet<OrderHub.Domain.Catalog.Additional> Additionals => Set<OrderHub.Domain.Catalog.Additional>();
     public DbSet<OrderHub.Domain.Catalog.AdditionalGroup> AdditionalGroups => Set<OrderHub.Domain.Catalog.AdditionalGroup>();
+    public DbSet<OrderHub.Domain.Catalog.OfferUnavailability> OfferUnavailabilities => Set<OrderHub.Domain.Catalog.OfferUnavailability>();
     public DbSet<OrderHub.Domain.Customers.Customer> Customers => Set<OrderHub.Domain.Customers.Customer>();
     public DbSet<OrderHub.Domain.Ordering.Order> Orders => Set<OrderHub.Domain.Ordering.Order>();
     public DbSet<OrderHub.Domain.Promotions.Coupon> Coupons => Set<OrderHub.Domain.Promotions.Coupon>();

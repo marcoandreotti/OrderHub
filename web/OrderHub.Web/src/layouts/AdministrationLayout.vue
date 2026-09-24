@@ -71,6 +71,14 @@ async function logout() {
           <q-item
             v-if="session.can('administration')"
             clickable
+            to="/administration/availability"
+            active-class="bg-indigo-1 text-primary"
+            class="rounded-borders"
+            ><q-item-section>Disponibilidade</q-item-section></q-item
+          >
+          <q-item
+            v-if="session.can('administration')"
+            clickable
             to="/administration/users"
             active-class="bg-indigo-1 text-primary"
             class="rounded-borders"

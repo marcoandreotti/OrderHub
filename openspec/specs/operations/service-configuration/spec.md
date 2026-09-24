@@ -48,3 +48,10 @@ O sistema SHALL gerar ou fornecer os dados para um QR Code contendo somente a UR
 #### Scenario: Conteúdo do QR Code
 - **WHEN** um QR Code é obtido para uma mesa ativa
 - **THEN** seu conteúdo pode ser compartilhado publicamente sem revelar identificadores internos
+
+### Requirement: Disponibilidade combina agenda, exceções e pausas
+A unidade SHALL configurar exceções por data e pausas temporárias por modalidade, e a decisão vigente MUST prevalecer sobre a grade semanal de forma determinística.
+
+#### Scenario: Pausa durante horário regular
+- **WHEN** uma modalidade é pausada manualmente durante intervalo aberto
+- **THEN** novos pedidos dessa modalidade são recusados até o fim ou cancelamento da pausa

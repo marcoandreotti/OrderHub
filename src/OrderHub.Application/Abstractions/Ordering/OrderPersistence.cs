@@ -1,4 +1,5 @@
 using OrderHub.Domain.Ordering;
+using OrderHub.Domain.Operations;
 using OrderHub.Domain.SharedKernel;
 
 namespace OrderHub.Application.Abstractions.Ordering;
@@ -28,7 +29,13 @@ public interface IOrderOfferResolver
         Guid productId,
         Guid? variationId,
         IReadOnlyCollection<OrderAdditionalSelection> additionals,
+        DateTimeOffset instant,
         CancellationToken cancellationToken);
+}
+
+public interface IOrderAvailabilityGateway
+{
+    Task<AvailabilityDecision> EvaluateAsync(Guid tenantId, Guid establishmentId, OrderServiceType serviceType, DateTimeOffset instant, CancellationToken cancellationToken);
 }
 
 public interface IOrderCustomerResolver

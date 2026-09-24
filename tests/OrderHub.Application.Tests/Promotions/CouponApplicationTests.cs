@@ -7,6 +7,7 @@ using OrderHub.Application.Tenancy;
 using OrderHub.Domain.Ordering;
 using OrderHub.Domain.Promotions;
 using OrderHub.Domain.SharedKernel;
+using OrderHub.Domain.Operations;
 
 namespace OrderHub.Application.Tests.Promotions;
 
@@ -39,7 +40,7 @@ public sealed class CouponApplicationTests
     {
         var order = Draft(); var coupon = Coupon.Create(TenantId, EstablishmentId, "SAVE", null, CouponDiscountType.FixedAmount, 5, Money.Zero, Now.AddDays(-1), Now.AddDays(1), 1, Now);
         order.ApplyCoupon(coupon.Id, coupon.Code, coupon.Evaluate(order.Subtotal, Now).Discount, Now); var transaction = new Transaction();
-        var handler = new ConfirmOrderCommandHandler(Resolver(), new Orders(order), new Offers(), new Sequence(), transaction, new Coupons(coupon), new Clock());
+        var handler = new ConfirmOrderCommandHandler(Resolver(), new Orders(order), new Offers(), new Sequence(), transaction, new Coupons(coupon), new AvailableGateway(), new Clock());
         await handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None);
         Assert.True(transaction.Executed); Assert.Equal(1, coupon.UsedCount); Assert.Equal(order.Id, Assert.Single(coupon.Uses).OrderId); Assert.Equal(OrderStatus.Confirmed, order.Status);
     }
@@ -58,7 +59,8 @@ public sealed class CouponApplicationTests
     private sealed class Clock : TimeProvider { public override DateTimeOffset GetUtcNow() => Now; }
     private sealed class Coupons(Coupon? value = null) : ICouponRepository { public Coupon? Value { get; private set; } = value; public Task<Coupon?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => Task.FromResult(Value is { } coupon && coupon.Id == id && coupon.TenantId == tenantId && coupon.EstablishmentId == establishmentId ? coupon : null); public Task<Coupon?> FindByCodeAsync(Guid tenantId, Guid establishmentId, string normalizedCode, CancellationToken cancellationToken) => Task.FromResult(Value is { } coupon && coupon.Code == normalizedCode && coupon.TenantId == tenantId && coupon.EstablishmentId == establishmentId ? coupon : null); public Task AddAsync(Coupon coupon, CancellationToken cancellationToken) { Value = coupon; return Task.CompletedTask; } public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask; }
     private sealed class Orders(Order value) : IOrderRepository { public Task<Order?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => Task.FromResult<Order?>(value.TenantId == tenantId && value.EstablishmentId == establishmentId && value.Id == id ? value : null); public Task AddAsync(Order order, CancellationToken cancellationToken) => Task.CompletedTask; public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask; }
-    private sealed class Offers : IOrderOfferResolver { public static readonly Guid ProductId = Guid.NewGuid(); public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, CancellationToken cancellationToken) => Task.FromResult<OrderOfferSnapshot?>(new(ProductId, null, "Produto", null, new Money(20), [])); }
+    private sealed class Offers : IOrderOfferResolver { public static readonly Guid ProductId = Guid.NewGuid(); public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, DateTimeOffset instant, CancellationToken cancellationToken) => Task.FromResult<OrderOfferSnapshot?>(new(ProductId, null, "Produto", null, new Money(20), [])); }
     private sealed class Sequence : IOrderNumberSequence { public Task<long> ReserveAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken) => Task.FromResult(1L); }
     private sealed class Transaction : IOrderConfirmationTransaction { public bool Executed { get; private set; } public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken) { Executed = true; await operation(cancellationToken); } }
+    private sealed class AvailableGateway : IOrderAvailabilityGateway { public Task<AvailabilityDecision> EvaluateAsync(Guid tenantId, Guid establishmentId, OrderServiceType serviceType, DateTimeOffset instant, CancellationToken cancellationToken) => Task.FromResult(AvailabilityDecision.Available()); }
 }

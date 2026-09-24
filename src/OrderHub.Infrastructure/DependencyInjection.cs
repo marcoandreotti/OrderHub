@@ -89,6 +89,10 @@ public static class DependencyInjection
 
         services.AddScoped<IEstablishmentConfigurationRepository, EstablishmentConfigurationRepository>();
         services.AddScoped<IOnboardingReadGateway, OnboardingReadGateway>();
+        services.AddScoped<IAvailabilityRepository, AvailabilityRepository>();
+        services.AddScoped<IOfferAvailabilityRepository, OfferAvailabilityRepository>();
+        services.AddScoped<IAvailabilityReadGateway, AvailabilityReadGateway>();
+        services.AddScoped<IOrderAvailabilityGateway, OrderAvailabilityGateway>();
         return services;
     }
 }

@@ -24,6 +24,29 @@ internal sealed class CategoryConfiguration : IEntityTypeConfiguration<Category>
     }
 }
 
+internal sealed class OfferUnavailabilityConfiguration : IEntityTypeConfiguration<OfferUnavailability>
+{
+    public void Configure(EntityTypeBuilder<OfferUnavailability> builder)
+    {
+        builder.ToTable("offer_unavailability", DatabaseSchemas.Catalog, table =>
+            table.HasCheckConstraint("ck_offer_unavailability_interval", "ends_at is null or ends_at > starts_at"));
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id");
+        builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id");
+        builder.Property(x => x.Kind).HasColumnName("kind").HasConversion<short>();
+        builder.Property(x => x.OfferId).HasColumnName("offer_id");
+        builder.Property(x => x.StartsAt).HasColumnName("starts_at");
+        builder.Property(x => x.EndsAt).HasColumnName("ends_at");
+        builder.Property(x => x.ReactivatedAt).HasColumnName("reactivated_at");
+        builder.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(250);
+        builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.Kind, x.OfferId, x.StartsAt });
+        builder.HasOne<OrderHub.Domain.Tenancy.Establishment>().WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.EstablishmentId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 /// <summary>
 /// Classe de configuração para a entidade Product, definindo mapeamentos e restrições de banco de dados usando o Entity Framework Core.
 /// </summary>

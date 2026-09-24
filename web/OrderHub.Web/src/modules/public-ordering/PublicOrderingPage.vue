@@ -54,11 +54,30 @@ const money = (value: number) => new Intl.NumberFormat('pt-BR', {
 const sortedCategories = computed(() => [...(catalog.value?.categories ?? [])]
   .filter(category => category.isActive)
   .sort((a, b) => a.order - b.order))
-const serviceOptions = computed(() => context.value?.table
-  ? [{ label: 'Nesta mesa', value: 'Table' }, { label: 'Retirada', value: 'Pickup' }, { label: 'Entrega', value: 'Delivery' }]
-  : [{ label: 'Retirada', value: 'Pickup' }, { label: 'Entrega', value: 'Delivery' }])
+const availableServices = computed(() => context.value?.availability ?? [])
+const selectedServiceAvailability = computed(() =>
+  availableServices.value.find(item => item.serviceType === checkout.serviceType))
+const serviceOptions = computed(() => {
+  const options = context.value?.table
+    ? [{ label: 'Nesta mesa', value: 'Table' as ServiceType }, { label: 'Retirada', value: 'Pickup' as ServiceType }, { label: 'Entrega', value: 'Delivery' as ServiceType }]
+    : [{ label: 'Retirada', value: 'Pickup' as ServiceType }, { label: 'Entrega', value: 'Delivery' as ServiceType }]
+  return options.map(option => ({
+    ...option,
+    disable: availableServices.value.find(item => item.serviceType === option.value)?.isAvailable === false
+  }))
+})
 const activeMethods = computed(() => context.value?.paymentMethods ?? [])
-const canCheckout = computed(() => cart.state.items.length > 0)
+const canCheckout = computed(() => cart.state.items.length > 0 &&
+  selectedServiceAvailability.value?.isAvailable !== false)
+const formatOpening = (value: string | null | undefined) => value
+  ? new Date(value).toLocaleString('pt-BR')
+  : null
+const availabilityMessage = (reason: string) => ({
+  CalendarException: 'A unidade está fechada excepcionalmente.',
+  ServicePaused: 'Esta modalidade está temporariamente pausada.',
+  OutsideBusinessHours: 'Estamos fora do horário de atendimento.',
+  EstablishmentInactive: 'A unidade não está recebendo pedidos.'
+}[reason] ?? 'Esta modalidade não está disponível agora.')
 
 async function load() {
   controller?.abort()
@@ -75,15 +94,21 @@ async function load() {
     context.value = resolvedContext
     catalog.value = resolvedCatalog
     hydrateCartFromCatalog(resolvedCatalog)
-    checkout.serviceType = resolvedContext.table ? 'Table' : 'Pickup'
+    const preferred = resolvedContext.table ? 'Table' : 'Pickup'
+    checkout.serviceType = resolvedContext.availability?.find(item =>
+      item.serviceType === preferred && item.isAvailable)?.serviceType ??
+      resolvedContext.availability?.find(item => item.isAvailable &&
+        (resolvedContext.table || item.serviceType !== 'Table'))?.serviceType ?? preferred
     checkout.paymentMethodId = resolvedContext.paymentMethods[0]?.id ?? ''
     applyPublicTheme(resolvedContext)
   } catch (failure) { error.value = failure } finally { loading.value = false }
 }
 function openProduct(product: Product) {
+  if (product.isAvailable === false) return
   selected.value = product
   quantity.value = 1
-  variationId.value = product.variations.filter(x => x.isActive).sort((a, b) => a.order - b.order)[0]?.id ?? null
+  variationId.value = product.variations.filter(x => x.isActive && x.isAvailable !== false)
+    .sort((a, b) => a.order - b.order)[0]?.id ?? null
   notes.value = ''
   compositionError.value = ''
   Object.keys(selections).forEach(key => delete selections[key])
@@ -97,7 +122,7 @@ function toggle(groupId: string, additionalId: string, maximum: number) {
 }
 function addProduct() {
   const product = selected.value
-  if (!product) return
+  if (!product || product.isAvailable === false) return
   const invalid = product.additionalGroups.filter(group => group.isActive).find(group => {
     const count = selections[group.id]?.length ?? 0
     return count < group.minimumSelection || count > group.maximumSelection
@@ -111,6 +136,10 @@ function addProduct() {
   const additionals = product.additionalGroups.flatMap(group =>
     group.items.filter(item => selections[group.id]?.includes(item.id))
   )
+  if (variation?.isAvailable === false || additionals.some(item => item.isAvailable === false)) {
+    compositionError.value = 'Uma opção selecionada ficou indisponível. Revise a composição.'
+    return
+  }
   cart.add({
     key: crypto.randomUUID(), productId: product.id, variationId: variation?.id ?? null,
     productName: product.name, variationName: variation?.name ?? null,
@@ -235,16 +264,24 @@ onBeforeUnmount(() => controller?.abort())
       <ProblemBanner :error="error">
         <q-btn v-if="step !== 'catalog'" flat label="Recalcular" @click="simulate" />
       </ProblemBanner>
+      <q-banner v-if="selectedServiceAvailability?.isAvailable === false" class="bg-orange-1 text-dark q-mb-md" role="status">
+        <strong>{{ selectedServiceAvailability.message || availabilityMessage(selectedServiceAvailability.reason) }}</strong>
+        <span v-if="selectedServiceAvailability.nextOpening">
+          Próxima abertura: {{ formatOpening(selectedServiceAvailability.nextOpening) }}.
+        </span>
+      </q-banner>
 
       <main v-if="step === 'catalog'" aria-label="Cardápio">
         <section v-for="category in sortedCategories" :key="category.id" class="category">
           <h2>{{ category.name }}</h2><p v-if="category.description">{{ category.description }}</p>
           <div class="product-grid">
             <button v-for="product in category.products.filter(x => x.isActive)" :key="product.id"
-              class="product-card" type="button" @click="openProduct(product)">
+              class="product-card" type="button" :disabled="product.isAvailable === false"
+              @click="openProduct(product)">
               <img v-if="product.images[0]" :src="product.images.slice().sort((a,b) => a.order-b.order)[0]!.url" alt="">
               <span><strong>{{ product.name }}</strong><small>{{ product.description }}</small>
-                <b>A partir de {{ money(product.basePrice) }}</b></span>
+                <b v-if="product.isAvailable !== false">A partir de {{ money(product.basePrice) }}</b>
+                <b v-else>Indisponível<span v-if="product.unavailabilityReason"> · {{ product.unavailabilityReason }}</span></b></span>
             </button>
           </div>
         </section>
@@ -306,7 +343,7 @@ onBeforeUnmount(() => controller?.abort())
           <div v-if="simulation" class="grand-total">Total {{ money(simulation.total) }}</div>
           <div class="flow-actions"><q-btn flat label="Voltar ao carrinho" @click="step = 'cart'" />
             <q-btn type="submit" label="Confirmar pedido" color="primary"
-              :loading="submitting" :disable="submitting" /></div>
+              :loading="submitting" :disable="submitting || !canCheckout" /></div>
         </q-form>
       </main>
 
@@ -326,16 +363,17 @@ onBeforeUnmount(() => controller?.abort())
         <q-card-section>
           <fieldset v-if="selected.variations.filter(x => x.isActive).length"><legend>Escolha uma opção</legend>
             <label v-for="variation in selected.variations.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="variation.id">
-              <input v-model="variationId" type="radio" :value="variation.id"> {{ variation.name }} — {{ money(variation.price) }}
+              <input v-model="variationId" type="radio" :value="variation.id" :disabled="variation.isAvailable === false">
+              {{ variation.name }} — {{ money(variation.price) }}<small v-if="variation.isAvailable === false"> · indisponível</small>
             </label>
           </fieldset>
           <fieldset v-for="group in selected.additionalGroups.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="group.id">
             <legend>{{ group.name }} ({{ group.minimumSelection }}–{{ group.maximumSelection }})</legend>
             <label v-for="item in group.items.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="item.id">
               <input type="checkbox" :checked="selections[group.id]?.includes(item.id)"
-                :disabled="!selections[group.id]?.includes(item.id) && (selections[group.id]?.length ?? 0) >= group.maximumSelection"
+                :disabled="item.isAvailable === false || (!selections[group.id]?.includes(item.id) && (selections[group.id]?.length ?? 0) >= group.maximumSelection)"
                 @change="toggle(group.id, item.id, group.maximumSelection)">
-              {{ item.name }} <span>+ {{ money(item.price) }}</span>
+              {{ item.name }} <span>+ {{ money(item.price) }}</span><small v-if="item.isAvailable === false"> · indisponível</small>
             </label>
           </fieldset>
           <q-input v-if="selected.allowsNotes" v-model="notes" label="Observações" type="textarea" />

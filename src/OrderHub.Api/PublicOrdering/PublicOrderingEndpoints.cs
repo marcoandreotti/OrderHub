@@ -24,7 +24,7 @@ internal static class PublicOrderingEndpoints
     }
 
     private static async Task<IResult> GetContextAsync(string slug,string? tableToken,IQueryDispatcher dispatcher,CancellationToken ct)
-    { var x=await dispatcher.DispatchAsync<GetPublicContextQuery,PublicOrderingContext>(new(slug,tableToken),ct); return Results.Ok(new PublicContextResponse(x.EstablishmentName,x.Slug,new(x.PrimaryColor,x.SecondaryColor,x.BackgroundColor,x.TextColor,x.FontFamily,x.LogoUrl),x.TableId is null?null:new(x.TableCode!,x.TableToken!),x.PaymentMethods.Select(m=>new PublicPaymentMethodResponse(m.Id,m.Code,m.Name,m.IsOnline,m.AllowsChange)).ToArray())); }
+    { var x=await dispatcher.DispatchAsync<GetPublicContextQuery,PublicOrderingContext>(new(slug,tableToken),ct); return Results.Ok(new PublicContextResponse(x.EstablishmentName,x.Slug,new(x.PrimaryColor,x.SecondaryColor,x.BackgroundColor,x.TextColor,x.FontFamily,x.LogoUrl),x.TableId is null?null:new(x.TableCode!,x.TableToken!),x.PaymentMethods.Select(m=>new PublicPaymentMethodResponse(m.Id,m.Code,m.Name,m.IsOnline,m.AllowsChange)).ToArray(),x.Availability.Select(a=>new PublicServiceAvailabilityResponse(a.ServiceType.ToString(),a.IsAvailable,a.Reason.ToString(),a.Message,a.NextOpening)).ToArray())); }
 
     private static async Task<IResult> UpsertCustomerAsync(string slug,PublicCustomerRequest request,ICommandDispatcher dispatcher,CancellationToken ct)
     { var x=await dispatcher.DispatchAsync<UpsertPublicCustomerCommand,PublicCustomerResult>(new(slug,request.Name,request.Phone,request.Email,Map(request.Address)),ct); return Results.Ok(new PublicCustomerResponse(x.CustomerId,x.AddressId)); }

@@ -16,7 +16,7 @@ public sealed class SearchTablesValidator : AbstractValidator<SearchTablesQuery>
 }
 public sealed class UpdateEstablishmentValidator : AbstractValidator<UpdateEstablishmentCommand>
 {
-    public UpdateEstablishmentValidator() { RuleFor(x => x.EstablishmentId).NotEmpty(); RuleFor(x => x.TradeName).NotEmpty().MaximumLength(150); RuleFor(x => x.Slug).NotEmpty().MaximumLength(100).Matches("^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$"); }
+    public UpdateEstablishmentValidator() { RuleFor(x => x.EstablishmentId).NotEmpty(); RuleFor(x => x.TradeName).NotEmpty().MaximumLength(150); RuleFor(x => x.Slug).NotEmpty().MaximumLength(100).Matches("^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$"); RuleFor(x => x.TimeZoneId).NotEmpty().MaximumLength(100); }
 }
 public sealed class ThemeInputValidator : AbstractValidator<ThemeInput>
 {

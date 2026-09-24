@@ -61,7 +61,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
             ["establishment", "establishment_theme", "tenant"],
             tablesAfterUp.Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(6, await connection.ExecuteScalarAsync<int>("select count(*) from identity.administrative_role;"));
-        Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations';"));
+        Assert.Equal(4, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations';"));
 
         var migrator = context.Database.GetService<IMigrator>();
         await migrator.MigrateAsync(Migration.InitialDatabase);
@@ -78,7 +78,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
         await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>();
         await context.Database.MigrateAsync(); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
-        var expected = new[] { "additional", "additional_group", "additional_group_item", "category", "product", "product_additional_group", "product_image", "product_variation" };
+        var expected = new[] { "additional", "additional_group", "additional_group_item", "category", "offer_unavailability", "product", "product_additional_group", "product_image", "product_variation" };
         Assert.Equal(expected, (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='catalog' order by table_name;")).ToArray());
         await migrator.MigrateAsync("20260820120132_IdentityOperations");
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='catalog';"));
@@ -172,6 +172,33 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='tenancy' and table_name='tenant' and column_name='public_code';"));
         await context.Database.MigrateAsync();
         Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='identity' and table_name in ('administrative_session','authentication_challenge','platform_user');"));
+    }
+
+    [Fact]
+    public async Task Business_hours_availability_migration_preserves_existing_hours_and_rolls_back()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20260915233908_EstablishmentOnboarding");
+        await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        var tenant = Guid.NewGuid(); var unit = Guid.NewGuid(); var hours = Guid.NewGuid();
+        await connection.ExecuteAsync("""
+            insert into tenancy.tenant(id,name,is_active,created_at,updated_at,public_code) values(@Tenant,'Existing',true,now(),now(),'availability-migration');
+            insert into tenancy.establishment(id,tenant_id,trade_name,slug,is_active,created_at,updated_at) values(@Unit,@Tenant,'Existing','availability-migration',true,now(),now());
+            insert into operations.business_hours(id,tenant_id,establishment_id,day_of_week,opens_at,closes_at,is_active) values(@Hours,@Tenant,@Unit,1,'10:00','20:00',true);
+            """, new { Tenant = tenant, Unit = unit, Hours = hours });
+
+        await context.Database.MigrateAsync();
+        Assert.Equal("America/Sao_Paulo", await connection.ExecuteScalarAsync<string>("select time_zone_id from tenancy.establishment where id=@Unit", new { Unit = unit }));
+        Assert.Equal(3, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where (table_schema='operations' and table_name in ('service_pause','service_schedule_exception')) or (table_schema='catalog' and table_name='offer_unavailability');"));
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from operations.business_hours where id=@Hours", new { Hours = hours }));
+
+        await migrator.MigrateAsync("20260915233908_EstablishmentOnboarding");
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='tenancy' and table_name='establishment' and column_name='time_zone_id';"));
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from operations.business_hours where id=@Hours", new { Hours = hours }));
+        await context.Database.MigrateAsync();
+        Assert.False(context.Database.HasPendingModelChanges());
     }
 
 

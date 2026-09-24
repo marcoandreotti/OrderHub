@@ -5,11 +5,13 @@ public sealed record PublicContextResponse(
     string Slug,
     PublicThemeResponse Theme,
     PublicTableResponse? Table,
-    IReadOnlyList<PublicPaymentMethodResponse> PaymentMethods);
+    IReadOnlyList<PublicPaymentMethodResponse> PaymentMethods,
+    IReadOnlyList<PublicServiceAvailabilityResponse> Availability);
 
 public sealed record PublicThemeResponse(string PrimaryColor, string SecondaryColor, string BackgroundColor, string TextColor, string FontFamily, string? LogoUrl);
 public sealed record PublicTableResponse(string Code, string Token);
 public sealed record PublicPaymentMethodResponse(Guid Id, string Code, string Name, bool IsOnline, bool AllowsChange);
+public sealed record PublicServiceAvailabilityResponse(string ServiceType, bool IsAvailable, string Reason, string? Message, DateTimeOffset? NextOpening);
 
 public sealed record PublicCustomerRequest(string Name, string Phone, string? Email, PublicAddressRequest? Address);
 public sealed record PublicAddressRequest(string Label, string Street, string Number, string? Complement, string Neighborhood, string City, string State, string PostalCode);

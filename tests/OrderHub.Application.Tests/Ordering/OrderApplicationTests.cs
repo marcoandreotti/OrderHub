@@ -7,6 +7,7 @@ using OrderHub.Domain.Ordering;
 using OrderHub.Domain.SharedKernel;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Domain.Promotions;
+using OrderHub.Domain.Operations;
 
 namespace OrderHub.Application.Tests.Ordering;
 
@@ -44,7 +45,7 @@ public sealed class OrderApplicationTests
     public async Task Confirmation_revalidates_offer_and_reserves_number_inside_transaction()
     {
         var order = DraftWithItem(); var repository = new Repository(order); var transaction = new Transaction();
-        var handler = new ConfirmOrderCommandHandler(Resolver(), repository, new OfferResolver(), new Sequence(), transaction, new CouponRepository(), new Clock());
+        var handler = new ConfirmOrderCommandHandler(Resolver(), repository, new OfferResolver(), new Sequence(), transaction, new CouponRepository(), new AvailableGateway(), new Clock());
 
         await handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None);
 
@@ -55,7 +56,7 @@ public sealed class OrderApplicationTests
     public async Task Confirmation_rejects_offer_changed_before_reserving_number()
     {
         var order = DraftWithItem(); var sequence = new Sequence();
-        var handler = new ConfirmOrderCommandHandler(Resolver(), new Repository(order), new OfferResolver(new Money(11)), sequence, new Transaction(), new CouponRepository(), new Clock());
+        var handler = new ConfirmOrderCommandHandler(Resolver(), new Repository(order), new OfferResolver(new Money(11)), sequence, new Transaction(), new CouponRepository(), new AvailableGateway(), new Clock());
 
         await Assert.ThrowsAsync<ConflictException>(() => handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None));
         Assert.False(sequence.Called); Assert.Equal(OrderStatus.Draft, order.Status);
@@ -99,7 +100,7 @@ public sealed class OrderApplicationTests
     private sealed class Repository(Order? value = null) : IOrderRepository
     { public Order? Value { get; private set; } = value; public bool Saved { get; private set; } public Task<Order?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => Task.FromResult(Value is { } order && order.TenantId == tenantId && order.EstablishmentId == establishmentId && order.Id == id ? order : null); public Task AddAsync(Order order, CancellationToken cancellationToken) { Value = order; return Task.CompletedTask; } public Task SaveChangesAsync(CancellationToken cancellationToken) { Saved = true; return Task.CompletedTask; } }
     private sealed class OfferResolver(Money? price = null) : IOrderOfferResolver
-    { public static readonly Guid ProductId = Guid.Parse("44444444-4444-4444-4444-444444444444"); public CancellationToken Token { get; private set; } public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, CancellationToken cancellationToken) { Token = cancellationToken; return Task.FromResult<OrderOfferSnapshot?>(tenantId == TenantId && establishmentId == EstablishmentId && productId == ProductId ? new(ProductId, null, "Produto", null, price ?? new Money(10), []) : null); } }
+    { public static readonly Guid ProductId = Guid.Parse("44444444-4444-4444-4444-444444444444"); public CancellationToken Token { get; private set; } public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, DateTimeOffset instant, CancellationToken cancellationToken) { Token = cancellationToken; return Task.FromResult<OrderOfferSnapshot?>(tenantId == TenantId && establishmentId == EstablishmentId && productId == ProductId ? new(ProductId, null, "Produto", null, price ?? new Money(10), []) : null); } }
     private sealed class CustomerResolver : IOrderCustomerResolver
     { public static readonly Guid CustomerId = Guid.Parse("55555555-5555-5555-5555-555555555555"); public Guid TenantId { get; private set; } public Task<OrderCustomerSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid customerId, Guid? addressId, CancellationToken cancellationToken) { TenantId = tenantId; return Task.FromResult<OrderCustomerSnapshot?>(new(CustomerId, "Maria", "11999998888", null, null)); } }
     private sealed class TableResolver : IOrderTableResolver
@@ -112,4 +113,6 @@ public sealed class OrderApplicationTests
     { public Guid TenantId { get; private set; } public Guid EstablishmentId { get; private set; } public Task<OrderReadModel?> GetAsync(Guid tenantId, Guid establishmentId, Guid orderId, CancellationToken cancellationToken) { TenantId = tenantId; EstablishmentId = establishmentId; return Task.FromResult<OrderReadModel?>(new(orderId, null, null, OrderServiceType.Pickup, OrderStatus.Draft, null, null, null, null, 0, 0, 0, 0, null, 0, 0, false, [], [])); } public Task<OrderSearchResult> SearchAsync(Guid tenantId, Guid establishmentId, DateTimeOffset? from, DateTimeOffset? to, OrderStatus? status, long? number, OrderServiceType? serviceType, int page, int pageSize, CancellationToken cancellationToken)=>Task.FromResult(new OrderSearchResult(0,[])); }
     private sealed class CouponRepository : ICouponRepository
     { public Task<Coupon?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => Task.FromResult<Coupon?>(null); public Task<Coupon?> FindByCodeAsync(Guid tenantId, Guid establishmentId, string normalizedCode, CancellationToken cancellationToken) => Task.FromResult<Coupon?>(null); public Task AddAsync(Coupon coupon, CancellationToken cancellationToken) => Task.CompletedTask; public Task SaveChangesAsync(CancellationToken cancellationToken) => Task.CompletedTask; }
+    private sealed class AvailableGateway : IOrderAvailabilityGateway
+    { public Task<AvailabilityDecision> EvaluateAsync(Guid tenantId, Guid establishmentId, OrderServiceType serviceType, DateTimeOffset instant, CancellationToken cancellationToken) => Task.FromResult(AvailabilityDecision.Available()); }
 }

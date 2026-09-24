@@ -30,6 +30,7 @@ internal sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Gl
             ApplicationValidationException => (StatusCodes.Status400BadRequest, "Validation failed"),
             NotFoundException => (StatusCodes.Status404NotFound, "Resource not found"),
             ConflictException => (StatusCodes.Status409Conflict, "Conflict"),
+            AvailabilityConflictException => (StatusCodes.Status409Conflict, "Availability conflict"),
             UnauthorizedException => (StatusCodes.Status401Unauthorized, "Unauthorized"),
             ForbiddenException => (StatusCodes.Status403Forbidden, "Forbidden"),
             DomainException => (StatusCodes.Status422UnprocessableEntity, "Domain rule violation"),
@@ -56,6 +57,12 @@ internal sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Gl
         if (exception is ApplicationValidationException validationException)
         {
             problem.Extensions["errors"] = validationException.Errors;
+        }
+        if (exception is AvailabilityConflictException availabilityException)
+        {
+            problem.Extensions["reason"] = availabilityException.Reason.ToString();
+            problem.Extensions["nextOpening"] = availabilityException.NextOpening;
+            problem.Extensions["affectedOfferIds"] = availabilityException.AffectedOfferIds;
         }
 
         context.Response.StatusCode = status;

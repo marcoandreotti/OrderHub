@@ -11,7 +11,7 @@ namespace OrderHub.Infrastructure.Persistence.Read;
 /// </summary>
 public sealed class OrderOfferResolver(IReadConnectionFactory connectionFactory) : IOrderOfferResolver
 {
-    public async Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, CancellationToken cancellationToken)
+    public async Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId, Guid establishmentId, Guid productId, Guid? variationId, IReadOnlyCollection<OrderAdditionalSelection> additionals, DateTimeOffset instant, CancellationToken cancellationToken)
     {
         const string offerSql = """
             select p.id as ProductId, p.name as ProductName, v.id as VariationId, v.name as VariationName,
@@ -19,10 +19,18 @@ public sealed class OrderOfferResolver(IReadConnectionFactory connectionFactory)
             from catalog.product p
             left join catalog.product_variation v on v.product_id = p.id and v.id = @VariationId and v.is_active
             where p.tenant_id = @TenantId and p.establishment_id = @EstablishmentId and p.id = @ProductId and p.is_active
+              and not exists (
+                  select 1 from catalog.offer_unavailability u
+                  where u.tenant_id=p.tenant_id and u.establishment_id=p.establishment_id and u.kind=0 and u.offer_id=p.id
+                    and u.reactivated_at is null and u.starts_at<=@Instant and (u.ends_at is null or u.ends_at>@Instant))
+              and (@VariationId is null or not exists (
+                  select 1 from catalog.offer_unavailability u
+                  where u.tenant_id=p.tenant_id and u.establishment_id=p.establishment_id and u.kind=1 and u.offer_id=@VariationId
+                    and u.reactivated_at is null and u.starts_at<=@Instant and (u.ends_at is null or u.ends_at>@Instant)))
               and ((@VariationId is null and not exists (select 1 from catalog.product_variation pv where pv.product_id = p.id and pv.is_active)) or v.id is not null);
             """;
         await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
-        var row = await connection.QuerySingleOrDefaultAsync<OfferRow>(new CommandDefinition(offerSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId, VariationId = variationId }, cancellationToken: cancellationToken));
+        var row = await connection.QuerySingleOrDefaultAsync<OfferRow>(new CommandDefinition(offerSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId, VariationId = variationId, Instant = instant }, cancellationToken: cancellationToken));
         if (row is null) return null;
 
         var ids = additionals.Select(x => x.AdditionalId).Distinct().ToArray();
@@ -50,9 +58,13 @@ public sealed class OrderOfferResolver(IReadConnectionFactory connectionFactory)
                 join catalog.additional_group_item gi on gi.tenant_id = a.tenant_id and gi.establishment_id = a.establishment_id and gi.additional_id = a.id
                 join catalog.additional_group g on g.tenant_id = gi.tenant_id and g.establishment_id = gi.establishment_id and g.id = gi.group_id and g.is_active
                 join catalog.product_additional_group pg on pg.tenant_id = g.tenant_id and pg.establishment_id = g.establishment_id and pg.group_id = g.id and pg.product_id = @ProductId
-                where a.tenant_id = @TenantId and a.establishment_id = @EstablishmentId and a.id = any(@Ids) and a.is_active;
+                where a.tenant_id = @TenantId and a.establishment_id = @EstablishmentId and a.id = any(@Ids) and a.is_active
+                  and not exists (
+                      select 1 from catalog.offer_unavailability u
+                      where u.tenant_id=a.tenant_id and u.establishment_id=a.establishment_id and u.kind=2 and u.offer_id=a.id
+                        and u.reactivated_at is null and u.starts_at<=@Instant and (u.ends_at is null or u.ends_at>@Instant));
                 """;
-            var additionalRows = (await connection.QueryAsync<AdditionalRow>(new CommandDefinition(additionalSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId, Ids = ids }, cancellationToken: cancellationToken))).ToDictionary(x => x.AdditionalId);
+            var additionalRows = (await connection.QueryAsync<AdditionalRow>(new CommandDefinition(additionalSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId, Ids = ids, Instant = instant }, cancellationToken: cancellationToken))).ToDictionary(x => x.AdditionalId);
             if (additionalRows.Count != ids.Length) return null;
             snapshots = additionals.Select(selection => new OrderAdditionalSnapshot(selection.AdditionalId, additionalRows[selection.AdditionalId].Name, new Money(additionalRows[selection.AdditionalId].UnitPrice), new Quantity(selection.Quantity))).ToArray();
         }

@@ -95,6 +95,12 @@ export const routes: RouteRecordRaw[] = [
           import('../modules/administration/catalog/CatalogPage.vue')
       },
       {
+        path: 'availability',
+        meta: { capability: 'administration' },
+        component: () =>
+          import('../modules/administration/availability/AvailabilityPage.vue')
+      },
+      {
         path: 'customers',
         meta: { capability: 'customer-operations' },
         component: () =>

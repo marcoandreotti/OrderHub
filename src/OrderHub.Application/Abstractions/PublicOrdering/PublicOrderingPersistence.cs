@@ -1,5 +1,6 @@
 using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Domain.Ordering;
+using OrderHub.Domain.Operations;
 
 namespace OrderHub.Application.Abstractions.PublicOrdering;
 
@@ -24,7 +25,11 @@ public interface IPublicOrderTransaction
     Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken);
 }
 
-public sealed record PublicOrderingContext(Guid TenantId, Guid EstablishmentId, string EstablishmentName, string Slug, string PrimaryColor, string SecondaryColor, string BackgroundColor, string TextColor, string FontFamily, string? LogoUrl, Guid? TableId, string? TableCode, string? TableToken, IReadOnlyList<PublicPaymentMethod> PaymentMethods);
+public sealed record PublicOrderingContext(Guid TenantId, Guid EstablishmentId, string EstablishmentName, string Slug, string PrimaryColor, string SecondaryColor, string BackgroundColor, string TextColor, string FontFamily, string? LogoUrl, Guid? TableId, string? TableCode, string? TableToken, IReadOnlyList<PublicPaymentMethod> PaymentMethods)
+{
+    public IReadOnlyList<PublicServiceAvailability> Availability { get; init; } = [];
+}
+public sealed record PublicServiceAvailability(OrderServiceType ServiceType, bool IsAvailable, AvailabilityReason Reason, string? Message, DateTimeOffset? NextOpening);
 public sealed record PublicPaymentMethod(Guid Id, string Code, string Name, bool IsOnline, bool AllowsChange);
 public sealed record PublicOrderLocation(Guid TenantId, Guid EstablishmentId, Guid OrderId);
 public sealed record PublicOrderLine(Guid ProductId, Guid? VariationId, decimal Quantity, string? Notes, IReadOnlyCollection<OrderAdditionalSelection> Additionals);

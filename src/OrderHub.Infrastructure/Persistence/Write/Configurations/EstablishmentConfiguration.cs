@@ -15,6 +15,7 @@ internal sealed class EstablishmentConfiguration : IEntityTypeConfiguration<Esta
         builder.HasKey(establishment => establishment.Id).HasName("pk_establishment");
         builder.Property(establishment => establishment.Id).HasColumnName("id").ValueGeneratedNever();
         builder.Property(establishment => establishment.TenantId).HasColumnName("tenant_id").IsRequired();
+        builder.Property(establishment => establishment.TimeZoneId).HasColumnName("time_zone_id").HasMaxLength(100).HasDefaultValue("America/Sao_Paulo").IsRequired();
         builder.Property(establishment => establishment.TradeName).HasColumnName("trade_name").HasMaxLength(150).IsRequired();
         builder.Property(establishment => establishment.Slug)
             .HasColumnName("slug")

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderHub.Domain.Operations;
+using OrderHub.Domain.Catalog;
+using OrderHub.Domain.Ordering;
 using OrderHub.Domain.Tenancy;
 using OrderHub.Infrastructure.Persistence;
 using OrderHub.Infrastructure.Persistence.Read;
@@ -31,5 +33,25 @@ public sealed class OperationsPersistenceTests : IAsyncLifetime
         Assert.Null(await gateway.ResolveTableAsync("ops-second", table.QrCodeToken, CancellationToken.None));
         Assert.True(await gateway.IsOpenAsync(tenant.Id, first.Id, DayOfWeek.Monday, new TimeOnly(12, 0), CancellationToken.None));
         Assert.False(await gateway.IsOpenAsync(tenant.Id, second.Id, DayOfWeek.Monday, new TimeOnly(12, 0), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Availability_records_are_tenant_and_establishment_scoped()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString()).Options;
+        await using var context = new OrderHubDbContext(options); await context.Database.EnsureCreatedAsync();
+        var now = DateTimeOffset.UtcNow; var tenant = Tenant.Create("Tenant", now);
+        var first = Establishment.Create(tenant.Id, "First", new Slug("availability-first"), now);
+        var second = Establishment.Create(tenant.Id, "Second", new Slug("availability-second"), now);
+        var exception = ServiceScheduleException.CreateClosed(tenant.Id, first.Id, DateOnly.FromDateTime(now.UtcDateTime), OrderServiceType.Pickup, "Holiday");
+        var pause = ServicePause.Create(tenant.Id, first.Id, OrderServiceType.Delivery, now, now.AddHours(1), "Capacity");
+        var unavailable = OfferUnavailability.Create(tenant.Id, first.Id, OfferKind.Product, Guid.NewGuid(), now, null, "Sold out");
+        context.AddRange(tenant, first, second, exception, pause, unavailable); await context.SaveChangesAsync();
+
+        var availability = new AvailabilityRepository(context);
+        Assert.Single(await availability.GetExceptionsAsync(tenant.Id, first.Id, CancellationToken.None));
+        Assert.Empty(await availability.GetExceptionsAsync(tenant.Id, second.Id, CancellationToken.None));
+        Assert.NotNull(await availability.GetActivePauseAsync(tenant.Id, first.Id, OrderServiceType.Delivery, now.AddMinutes(1), CancellationToken.None));
+        Assert.Equal(first.Id, (await context.OfferUnavailabilities.SingleAsync()).EstablishmentId);
     }
 }

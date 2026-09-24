@@ -47,6 +47,31 @@ describe('carrinho público versionado', () => {
     expect(usePublicCart().state.items).toHaveLength(0)
     expect(localStorage.getItem('orderhub.public-cart.unit')).toBeNull()
   })
+
+  it('preserva a intenção e sinaliza item que ficou indisponível', () => {
+    localStorage.setItem('orderhub.public-cart.unit', JSON.stringify({
+      version: 1, slug: 'unit', items: [{
+        key: 'line', productId: 'product', variationId: null,
+        quantity: 1, notes: null, additionals: []
+      }]
+    }))
+    loadCart('unit')
+    hydrateCartFromCatalog({
+      establishmentId: 'ignored', establishmentName: 'Unit', slug: 'unit',
+      categories: [{
+        id: 'category', parentId: null, name: 'Pizzas', description: null,
+        order: 0, imageUrl: null, isActive: true,
+        products: [{
+          id: 'product', code: 'P', name: 'Pizza', description: null,
+          basePrice: 20, isFeatured: false, isActive: true, allowsNotes: true,
+          isAvailable: false, unavailabilityReason: 'Sem estoque',
+          images: [], variations: [], additionalGroups: []
+        }]
+      }]
+    })
+    expect(usePublicCart().state.items[0]?.productName).toBe('Pizza (indisponível)')
+    expect(usePublicCart().state.items).toHaveLength(1)
+  })
 })
 
 describe('cliente HTTP público', () => {

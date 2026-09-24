@@ -54,7 +54,7 @@ export function hydrateCartFromCatalog(catalog: PublicCatalog) {
     if (!product) return
     const variation = product.variations.find(candidate => candidate.id === line.variationId)
     const additionals = product.additionalGroups.flatMap(group => group.items)
-    line.productName = product.name
+    line.productName = product.name + (product.isAvailable === false ? ' (indisponível)' : '')
     line.variationName = variation?.name ?? null
     line.displayedUnitPrice = (variation?.price ?? product.basePrice) +
       line.additionals.reduce((sum, selected) => {

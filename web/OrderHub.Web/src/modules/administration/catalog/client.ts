@@ -11,6 +11,9 @@ export interface Additional {
   price: number
   isActive: boolean
   order: number
+  isAvailable?: boolean
+  unavailabilityReason?: string | null
+  availableAgainAt?: string | null
 }
 export interface Group {
   id: string
@@ -32,12 +35,19 @@ export interface Product {
   allowsNotes: boolean
   images: { url: string; order: number; isPrincipal: boolean }[]
   variations: {
+    id?: string
     name: string
     price: number
     order: number
     isActive: boolean
+    isAvailable?: boolean
+    unavailabilityReason?: string | null
+    availableAgainAt?: string | null
   }[]
   additionalGroups: Group[]
+  isAvailable?: boolean
+  unavailabilityReason?: string | null
+  availableAgainAt?: string | null
 }
 export interface Category {
   id: string
