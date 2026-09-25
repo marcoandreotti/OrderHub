@@ -32,6 +32,7 @@ public sealed class Additional : IEstablishmentScopedEntity
     public void Deactivate() => IsActive = false;
 }
 
+// Classe que representa um grupo de adicionais, com limites de seleção obrigatória ou opcional, dentro do escopo de um único estabelecimento.
 public sealed class AdditionalGroup : IEstablishmentScopedEntity
 {
     private readonly List<AdditionalGroupItem> items = [];
@@ -77,6 +78,7 @@ public sealed class AdditionalGroup : IEstablishmentScopedEntity
     { if (selectedCount < MinimumSelection || selectedCount > MaximumSelection) throw new DomainException("Additional selection is outside the allowed range."); }
 }
 
+// Classe que representa a associação de um adicional a um grupo, com uma ordem de exibição, dentro do escopo de um único estabelecimento.
 public sealed class AdditionalGroupItem
 {
     private AdditionalGroupItem()

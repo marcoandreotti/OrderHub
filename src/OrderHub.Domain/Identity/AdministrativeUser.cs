@@ -22,6 +22,7 @@ public sealed class AdministrativeUser : ITenantScopedEntity
         Email email,
         string passwordHash,
         AdministrativeRole initialRole,
+        bool passwordChangeRequired,
         DateTimeOffset createdAt)
     {
         if (tenantId == Guid.Empty || string.IsNullOrWhiteSpace(passwordHash))
@@ -35,6 +36,7 @@ public sealed class AdministrativeUser : ITenantScopedEntity
         Email = email;
         NormalizedEmail = email.NormalizedValue;
         PasswordHash = passwordHash;
+        PasswordChangeRequired = passwordChangeRequired;
         roleMemberships.Add(new AdministrativeUserRole(id, initialRole));
         IsActive = true;
         CreatedAt = createdAt;
@@ -47,6 +49,7 @@ public sealed class AdministrativeUser : ITenantScopedEntity
     public Email Email { get; private set; } = null!;
     public string NormalizedEmail { get; private set; } = string.Empty;
     public string PasswordHash { get; private set; } = string.Empty;
+    public bool PasswordChangeRequired { get; private set; }
     public bool IsActive { get; private set; }
     public DateTimeOffset? LastAccessAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
@@ -62,7 +65,28 @@ public sealed class AdministrativeUser : ITenantScopedEntity
         string passwordHash,
         AdministrativeRole initialRole,
         DateTimeOffset now) =>
-        new(Guid.NewGuid(), tenantId, name, email, passwordHash, initialRole, now);
+        new(Guid.NewGuid(), tenantId, name, email, passwordHash, initialRole, false, now);
+
+    /// <summary>Cria o primeiro Owner provisionado com troca obrigatória de senha.</summary>
+    public static AdministrativeUser CreateProvisioned(
+        Guid tenantId,
+        string name,
+        Email email,
+        string passwordHash,
+        DateTimeOffset now) =>
+        new(Guid.NewGuid(), tenantId, name, email, passwordHash, AdministrativeRole.Owner, true, now);
+
+    public void ChangePassword(string passwordHash, DateTimeOffset now)
+    {
+        if (string.IsNullOrWhiteSpace(passwordHash))
+        {
+            throw new DomainException("Password hash is required.");
+        }
+
+        PasswordHash = passwordHash;
+        PasswordChangeRequired = false;
+        UpdatedAt = now;
+    }
 
     /// <summary>Indica se o usuário está ativo e possui o papel administrativo informado.</summary>
     public bool HasRole(AdministrativeRole role) => IsActive && roleMemberships.Any(item => item.Role == role);

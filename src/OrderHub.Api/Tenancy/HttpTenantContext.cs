@@ -3,6 +3,8 @@ using OrderHub.Application.Exceptions;
 
 namespace OrderHub.Api.Tenancy;
 
+// Essa classe é responsável por fornecer informações sobre o contexto do inquilino (tenant) e do usuário autenticado a partir do contexto HTTP atual.
+// Ela implementa a interface ITenantContext, que define métodos e propriedades para acessar o ID do inquilino e do usuário, bem como verificar se o usuário é um usuário da plataforma.
 internal sealed class HttpTenantContext(IHttpContextAccessor httpContextAccessor) : ITenantContext
 {
     private const string TenantClaim = "tenant_id";

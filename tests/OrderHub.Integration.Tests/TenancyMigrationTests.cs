@@ -58,7 +58,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         var tablesAfterUp = await connection.QueryAsync<string>(
             "select table_name from information_schema.tables where table_schema = 'tenancy';");
         Assert.Equal(
-            ["establishment", "establishment_theme", "tenant"],
+            ["establishment", "establishment_theme", "platform_provisioning_intent", "tenant"],
             tablesAfterUp.Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(6, await connection.ExecuteScalarAsync<int>("select count(*) from identity.administrative_role;"));
         Assert.Equal(4, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations';"));

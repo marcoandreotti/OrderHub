@@ -58,6 +58,17 @@ export const routes: RouteRecordRaw[] = [
     ]
   },
   {
+    path: '/platform',
+    meta: { requiresSession: true, platformOnly: true },
+    component: () => import('../layouts/PlatformLayout.vue'),
+    children: [
+      {
+        path: '',
+        component: () => import('../modules/platform/PlatformTenantsPage.vue')
+      }
+    ]
+  },
+  {
     path: '/operations',
     meta: { requiresSession: true, capability: 'order-read' },
     component: () => import('../layouts/OperationsLayout.vue'),

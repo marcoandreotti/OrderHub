@@ -23,6 +23,7 @@ internal sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Gl
         }
     }
 
+    // Método para escrever detalhes do problema na resposta HTTP com base na exceção capturada.
     private async Task WriteProblemDetailsAsync(HttpContext context, Exception exception)
     {
         var (status, title) = exception switch

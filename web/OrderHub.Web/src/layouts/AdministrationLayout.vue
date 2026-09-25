@@ -14,6 +14,10 @@ watch(
     document.getElementById('admin-content')?.focus()
   }
 )
+async function returnToPlatform() {
+  session.clear()
+  await router.push('/platform')
+}
 async function logout() {
   try {
     await session.logout()
@@ -59,6 +63,14 @@ async function logout() {
           class="q-mb-lg"
         />
         <q-list>
+          <q-item
+            v-if="session.context?.isPlatformUser"
+            clickable
+            @click="returnToPlatform"
+            class="rounded-borders"
+          >
+            <q-item-section>Voltar à plataforma</q-item-section>
+          </q-item>
           <q-item v-if="session.can('administration')" clickable to="/administration/onboarding" active-class="bg-indigo-1 text-primary" class="rounded-borders"><q-item-section>Configurar unidade</q-item-section></q-item>
           <q-item
             v-if="session.can('management')"

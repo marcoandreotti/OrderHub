@@ -20,7 +20,8 @@ export function installAccessGuard(router: Router, session: NavigationSession) {
       accessDestination(
         session.context,
         to.path,
-        to.meta.capability as string | undefined
+        to.meta.capability as string | undefined,
+        to.meta.platformOnly as boolean | undefined
       ) ?? true
     )
   })
@@ -30,6 +31,7 @@ export function installAccessGuard(router: Router, session: NavigationSession) {
 export function sessionLandingPath(context: SessionContext | null): string {
   if (!context) return '/login'
   if (context.passwordChangeRequired) return '/change-password'
+  if (context.isPlatformUser) return '/platform'
   if (context.capabilities.includes('order-read')) return '/operations'
   if (context.capabilities.includes('management')) return '/administration'
   if (context.capabilities.includes('customer-operations'))
@@ -40,13 +42,15 @@ export function sessionLandingPath(context: SessionContext | null): string {
 export function accessDestination(
   context: SessionContext | null,
   path: string,
-  capability?: string
+  capability?: string,
+  platformOnly?: boolean
 ): string | undefined {
   if (!context) return '/login'
   if (context.passwordChangeRequired && path !== '/change-password')
     return '/change-password'
   if (!context.passwordChangeRequired && path === '/change-password')
     return sessionLandingPath(context)
+  if (platformOnly && !context.isPlatformUser) return '/access-denied'
   if (capability && !context.capabilities.includes(capability))
     return '/access-denied'
 }

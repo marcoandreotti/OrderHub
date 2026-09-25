@@ -9,6 +9,7 @@ using OrderHub.Api.Catalog;
 using OrderHub.Api.PublicOrdering;
 using OrderHub.Api.Administration;
 using OrderHub.Api.Authentication;
+using OrderHub.Api.Platform;
 using Microsoft.AspNetCore.Authentication;
 using OrderHub.Infrastructure.Identity;
 using System.Threading.RateLimiting;
@@ -18,6 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddPlatformProvisioning();
 builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
@@ -90,6 +92,7 @@ app.MapAdministrationEndpoints();
 app.MapOnboardingEndpoints();
 app.MapAdministrativeUserEndpoints();
 app.MapAuthenticationEndpoints();
+app.MapPlatformProvisioningEndpoints();
 
 if (app.Environment.IsEnvironment("Testing"))
 {

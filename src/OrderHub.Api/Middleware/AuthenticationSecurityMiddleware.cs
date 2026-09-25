@@ -2,6 +2,9 @@ using OrderHub.Api.Authentication;
 
 namespace OrderHub.Api.Middleware;
 
+// Esse middleware é responsável por verificar se o usuário autenticado precisa alterar a senha e se a solicitação é mutável (POST, PUT, PATCH, DELETE).
+// Se o usuário precisar alterar a senha e estiver tentando acessar um endpoint que não seja permitido, ele retornará um status 403 Forbidden.
+// Além disso, ele verifica se a solicitação mutável possui um token CSRF válido.
 internal sealed class AuthenticationSecurityMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(HttpContext context)
