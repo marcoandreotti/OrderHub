@@ -5,7 +5,9 @@ RUN npm ci --ignore-scripts
 COPY web/OrderHub.Web/ ./
 RUN npm run postinstall
 ARG VITE_API_BASE_URL=http://localhost:8080
+ARG VITE_REALTIME_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_REALTIME_BASE_URL=$VITE_REALTIME_BASE_URL
 RUN npm run build
 
 FROM nginx:1.29-alpine

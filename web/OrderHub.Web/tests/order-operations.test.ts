@@ -6,6 +6,11 @@ import { ApiError } from '../src/http/client'
 import { availableActions } from '../src/modules/operations/orders/actions'
 import { orderOperationsClient } from '../src/modules/operations/orders/client'
 import { PollingCoordinator } from '../src/modules/operations/orders/polling'
+import {
+  OrderRealtimeCoordinator,
+  type OrderUpdatedMessageV1,
+  type RealtimeConnection
+} from '../src/modules/operations/orders/realtime'
 import { useOrderOperationsStore } from '../src/modules/operations/orders/store'
 import type { OrderDetail, OrderSummary } from '../src/modules/operations/orders/types'
 import OrdersDashboardPage from '../src/modules/operations/orders/OrdersDashboardPage.vue'
@@ -160,6 +165,67 @@ describe('polling controlado', () => {
   })
 })
 
+describe('tempo real com reconciliação', () => {
+  it('reconcilia antes de declarar a reconexão sincronizada', async () => {
+    const connection = new FakeRealtimeConnection()
+    let finish!: () => void
+    const refresh = vi.fn(() => Promise.resolve())
+    const fallback = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      refresh
+    }
+    const states: string[] = []
+    const realtime = new OrderRealtimeCoordinator(
+      connection,
+      fallback,
+      (state) => states.push(state)
+    )
+
+    await realtime.start('unit-a')
+    expect(connection.invocations).toEqual([['SubscribeAsync', 'unit-a']])
+    connection.reconnecting()
+    refresh.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+    connection.reconnected()
+    await Promise.resolve()
+
+    expect(states.at(-1)).toBe('reconnecting')
+    finish()
+    await flushPromises()
+    expect(states.at(-1)).toBe('connected')
+    expect(fallback.stop).toHaveBeenCalled()
+  })
+
+  it('reage somente a eventos v1 da unidade atual e usa a reconciliação sem sobrepor polling', async () => {
+    const connection = new FakeRealtimeConnection()
+    const fallback = {
+      start: vi.fn(),
+      stop: vi.fn(),
+      refresh: vi.fn().mockResolvedValue(undefined)
+    }
+    const realtime = new OrderRealtimeCoordinator(connection, fallback, vi.fn())
+    await realtime.start('unit-a')
+    fallback.refresh.mockClear()
+
+    connection.message({
+      version: 1,
+      orderId: '1',
+      changeType: 'StatusChanged',
+      establishmentId: 'unit-b',
+      occurredAt: '2026-09-25T12:00:00Z'
+    })
+    connection.message({
+      version: 1,
+      orderId: '1',
+      changeType: 'StatusChanged',
+      establishmentId: 'unit-a',
+      occurredAt: '2026-09-25T12:00:00Z'
+    })
+
+    expect(fallback.refresh).toHaveBeenCalledOnce()
+  })
+})
+
 describe('componente acessível', () => {
   it('usa cartão acionável por teclado e move o foco para o detalhe aberto', async () => {
     const pinia = createPinia()
@@ -215,3 +281,28 @@ describe('componente acessível', () => {
     wrapper.unmount()
   })
 })
+
+class FakeRealtimeConnection implements RealtimeConnection {
+  readonly invocations: unknown[][] = []
+  private messageHandler: (message: OrderUpdatedMessageV1) => void = () => undefined
+  private reconnectingHandler: () => void = () => undefined
+  private reconnectedHandler: () => void = () => undefined
+  private closeHandler: () => void = () => undefined
+
+  start() { return Promise.resolve() }
+  stop() { return Promise.resolve() }
+  invoke(methodName: string, ...args: unknown[]) {
+    this.invocations.push([methodName, ...args])
+    return Promise.resolve()
+  }
+  on(_methodName: string, handler: (message: OrderUpdatedMessageV1) => void) {
+    this.messageHandler = handler
+  }
+  onreconnecting(handler: () => void) { this.reconnectingHandler = handler }
+  onreconnected(handler: () => void) { this.reconnectedHandler = handler }
+  onclose(handler: () => void) { this.closeHandler = handler }
+  message(value: OrderUpdatedMessageV1) { this.messageHandler(value) }
+  reconnecting() { this.reconnectingHandler() }
+  reconnected() { this.reconnectedHandler() }
+  close() { this.closeHandler() }
+}

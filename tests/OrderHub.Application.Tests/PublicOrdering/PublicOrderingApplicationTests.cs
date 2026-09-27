@@ -55,7 +55,7 @@ public sealed class PublicOrderingApplicationTests
     {
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository(); var requests=new RequestRepository();
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),TimeProvider.System);
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),new Publisher(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","confirmation-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
         var first=await handler.HandleAsync(command,CancellationToken.None); var replay=await handler.HandleAsync(command,CancellationToken.None);
         Assert.Equal(first,replay); Assert.Equal(1,orders.AddCount);
@@ -67,7 +67,7 @@ public sealed class PublicOrderingApplicationTests
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository();
         var unavailable=new AvailabilityGateway(new(false,AvailabilityReason.ServicePaused,"Pickup paused.",DateTimeOffset.UtcNow.AddHours(1)));
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,TimeProvider.System);
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,new Publisher(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","stale-cart-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
 
         var exception=await Assert.ThrowsAsync<AvailabilityConflictException>(()=>handler.HandleAsync(command,CancellationToken.None));
@@ -90,4 +90,5 @@ public sealed class PublicOrderingApplicationTests
     private sealed class RequestRepository:IPublicOrderRequestRepository { private PublicOrderRequest? value; public Task<PublicOrderRequest?> FindAsync(Guid a,Guid b,string c,CancellationToken d)=>Task.FromResult(value?.Key==c?value:null); public Task AddAsync(PublicOrderRequest request,CancellationToken b){value=request;return Task.CompletedTask;} }
     private sealed class Transaction:IPublicOrderTransaction { public Task<T> ExecuteAsync<T>(Func<CancellationToken,Task<T>> operation,CancellationToken token)=>operation(token); }
     private sealed class AvailabilityGateway(AvailabilityDecision? value=null) : IAvailabilityReadGateway, IOrderAvailabilityGateway { public Task<AvailabilityDecision> EvaluateAsync(Guid tenantId,Guid establishmentId,OrderServiceType serviceType,DateTimeOffset instant,CancellationToken cancellationToken)=>Task.FromResult(value??AvailabilityDecision.Available()); }
+    private sealed class Publisher : IOrderUpdatePublisher { public Task PublishAsync(Guid tenantId, OrderUpdateSignal signal, CancellationToken cancellationToken) => Task.CompletedTask; }
 }

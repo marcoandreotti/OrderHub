@@ -1,5 +1,7 @@
 # OrderHub
 
+Documentação operacional: [notificações de pedidos em tempo real](docs/realtime-order-notifications.md).
+
 Fundação do monólito modular SaaS Multi-Tenant para gestão de pedidos de estabelecimentos de alimentação.
 
 ## Pré-requisitos

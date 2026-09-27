@@ -40,7 +40,7 @@ public sealed class CouponApplicationTests
     {
         var order = Draft(); var coupon = Coupon.Create(TenantId, EstablishmentId, "SAVE", null, CouponDiscountType.FixedAmount, 5, Money.Zero, Now.AddDays(-1), Now.AddDays(1), 1, Now);
         order.ApplyCoupon(coupon.Id, coupon.Code, coupon.Evaluate(order.Subtotal, Now).Discount, Now); var transaction = new Transaction();
-        var handler = new ConfirmOrderCommandHandler(Resolver(), new Orders(order), new Offers(), new Sequence(), transaction, new Coupons(coupon), new AvailableGateway(), new Clock());
+        var handler = new ConfirmOrderCommandHandler(Resolver(), new Orders(order), new Offers(), new Sequence(), transaction, new Coupons(coupon), new AvailableGateway(), new Publisher(), new Clock());
         await handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None);
         Assert.True(transaction.Executed); Assert.Equal(1, coupon.UsedCount); Assert.Equal(order.Id, Assert.Single(coupon.Uses).OrderId); Assert.Equal(OrderStatus.Confirmed, order.Status);
     }
@@ -63,4 +63,5 @@ public sealed class CouponApplicationTests
     private sealed class Sequence : IOrderNumberSequence { public Task<long> ReserveAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken) => Task.FromResult(1L); }
     private sealed class Transaction : IOrderConfirmationTransaction { public bool Executed { get; private set; } public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken) { Executed = true; await operation(cancellationToken); } }
     private sealed class AvailableGateway : IOrderAvailabilityGateway { public Task<AvailabilityDecision> EvaluateAsync(Guid tenantId, Guid establishmentId, OrderServiceType serviceType, DateTimeOffset instant, CancellationToken cancellationToken) => Task.FromResult(AvailabilityDecision.Available()); }
+    private sealed class Publisher : IOrderUpdatePublisher { public Task PublishAsync(Guid tenantId, OrderUpdateSignal signal, CancellationToken cancellationToken) => Task.CompletedTask; }
 }

@@ -45,30 +45,46 @@ public sealed class OrderApplicationTests
     public async Task Confirmation_revalidates_offer_and_reserves_number_inside_transaction()
     {
         var order = DraftWithItem(); var repository = new Repository(order); var transaction = new Transaction();
-        var handler = new ConfirmOrderCommandHandler(Resolver(), repository, new OfferResolver(), new Sequence(), transaction, new CouponRepository(), new AvailableGateway(), new Clock());
+        var publisher = new Publisher();
+        var handler = new ConfirmOrderCommandHandler(Resolver(), repository, new OfferResolver(), new Sequence(), transaction, new CouponRepository(), new AvailableGateway(), publisher, new Clock());
 
         await handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None);
 
         Assert.True(transaction.Executed); Assert.Equal(7, order.Number); Assert.True(repository.Saved); Assert.Equal(UserId, order.History.Last().ActorId);
+        Assert.Equal(order.Id, Assert.Single(publisher.Signals).OrderId);
     }
 
     [Fact]
     public async Task Confirmation_rejects_offer_changed_before_reserving_number()
     {
         var order = DraftWithItem(); var sequence = new Sequence();
-        var handler = new ConfirmOrderCommandHandler(Resolver(), new Repository(order), new OfferResolver(new Money(11)), sequence, new Transaction(), new CouponRepository(), new AvailableGateway(), new Clock());
+        var publisher = new Publisher();
+        var handler = new ConfirmOrderCommandHandler(Resolver(), new Repository(order), new OfferResolver(new Money(11)), sequence, new Transaction(), new CouponRepository(), new AvailableGateway(), publisher, new Clock());
 
         await Assert.ThrowsAsync<ConflictException>(() => handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None));
-        Assert.False(sequence.Called); Assert.Equal(OrderStatus.Draft, order.Status);
+        Assert.False(sequence.Called); Assert.Equal(OrderStatus.Draft, order.Status); Assert.Empty(publisher.Signals);
+    }
+
+    [Fact]
+    public async Task Confirmation_does_not_publish_when_transaction_rolls_back()
+    {
+        var order = DraftWithItem(); var publisher = new Publisher();
+        var handler = new ConfirmOrderCommandHandler(Resolver(), new Repository(order), new OfferResolver(), new Sequence(), new Transaction(failAfterOperation: true), new CouponRepository(), new AvailableGateway(), publisher, new Clock());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(new(EstablishmentId, order.Id), CancellationToken.None));
+
+        Assert.Empty(publisher.Signals);
     }
 
     [Fact]
     public async Task Administrative_transition_records_authenticated_actor()
     {
         var order=DraftWithItem();order.Confirm(1,Clock.Now);var repository=new Repository(order);
-        var handler=new TransitionOrderCommandHandler(Resolver(),repository,new Clock());
+        var publisher = new Publisher();
+        var handler=new TransitionOrderCommandHandler(Resolver(),repository,publisher,new Clock());
         await handler.HandleAsync(new(EstablishmentId,order.Id,OrderStatus.Preparing),CancellationToken.None);
         Assert.Equal(UserId,order.History.Last().ActorId);Assert.True(repository.Saved);
+        Assert.Equal(OrderUpdateKind.StatusChanged, Assert.Single(publisher.Signals).ChangeType);
     }
 
     [Fact]
@@ -107,8 +123,10 @@ public sealed class OrderApplicationTests
     { public static readonly Guid TableId = Guid.Parse("66666666-6666-6666-6666-666666666666"); public Guid EstablishmentId { get; private set; } public Task<OrderTableSnapshot?> ResolveActiveAsync(Guid tenantId, Guid establishmentId, Guid tableId, CancellationToken cancellationToken) { EstablishmentId = establishmentId; return Task.FromResult<OrderTableSnapshot?>(new(TableId, "01")); } }
     private sealed class Sequence : IOrderNumberSequence
     { public bool Called { get; private set; } public Task<long> ReserveAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken) { Called = true; return Task.FromResult(7L); } }
-    private sealed class Transaction : IOrderConfirmationTransaction
-    { public bool Executed { get; private set; } public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken) { Executed = true; await operation(cancellationToken); } }
+    private sealed class Transaction(bool failAfterOperation = false) : IOrderConfirmationTransaction
+    { public bool Executed { get; private set; } public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken) { Executed = true; await operation(cancellationToken); if (failAfterOperation) throw new InvalidOperationException("Transaction rolled back."); } }
+    private sealed class Publisher : IOrderUpdatePublisher
+    { public List<OrderUpdateSignal> Signals { get; } = []; public Task PublishAsync(Guid tenantId, OrderUpdateSignal signal, CancellationToken cancellationToken) { Assert.Equal(TenantId, tenantId); Signals.Add(signal); return Task.CompletedTask; } }
     private sealed class ReadGateway : IOrderReadGateway
     { public Guid TenantId { get; private set; } public Guid EstablishmentId { get; private set; } public Task<OrderReadModel?> GetAsync(Guid tenantId, Guid establishmentId, Guid orderId, CancellationToken cancellationToken) { TenantId = tenantId; EstablishmentId = establishmentId; return Task.FromResult<OrderReadModel?>(new(orderId, null, null, OrderServiceType.Pickup, OrderStatus.Draft, null, null, null, null, 0, 0, 0, 0, null, 0, 0, false, [], [])); } public Task<OrderSearchResult> SearchAsync(Guid tenantId, Guid establishmentId, DateTimeOffset? from, DateTimeOffset? to, OrderStatus? status, long? number, OrderServiceType? serviceType, int page, int pageSize, CancellationToken cancellationToken)=>Task.FromResult(new OrderSearchResult(0,[])); }
     private sealed class CouponRepository : ICouponRepository

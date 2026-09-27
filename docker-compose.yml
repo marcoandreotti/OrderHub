@@ -36,6 +36,9 @@ services:
       AuthenticationEmail__FromAddress: ${AUTHENTICATION_EMAIL_FROM_ADDRESS:-}
       AuthenticationEmail__EnableSsl: ${AUTHENTICATION_EMAIL_ENABLE_SSL:-true}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:9000}
+      RealtimeOrders__ClientTimeoutSeconds: ${REALTIME_CLIENT_TIMEOUT_SECONDS:-30}
+      RealtimeOrders__KeepAliveSeconds: ${REALTIME_KEEP_ALIVE_SECONDS:-15}
+      RealtimeOrders__MaximumReceiveMessageBytes: ${REALTIME_MAX_MESSAGE_BYTES:-32768}
     ports:
       - "${API_PORT:-8080}:8080"
     depends_on:
@@ -54,6 +57,7 @@ services:
       dockerfile: docker/web/Dockerfile
       args:
         VITE_API_BASE_URL: http://localhost:${API_PORT:-8080}
+        VITE_REALTIME_BASE_URL: ${REALTIME_BASE_URL:-http://localhost:8080}
     ports:
       - "${WEB_PORT:-9000}:80"
     depends_on:

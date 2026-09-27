@@ -73,7 +73,7 @@ public sealed class SimulatePublicOrderQueryHandler(IPublicOrderingContextGatewa
     }
 }
 
-public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGateway contexts, IOrderOfferResolver offers, IOrderCustomerResolver customers, IOrderTableResolver tables, ICouponRepository coupons, IPaymentMethodRepository paymentMethods, IPaymentRepository payments, IOrderRepository orders, IOrderNumberSequence sequence, IPublicOrderRequestRepository requests, IPublicOrderTransaction transaction, IOrderAvailabilityGateway availability, TimeProvider timeProvider) : ICommandHandler<ConfirmPublicOrderCommand, PublicConfirmation>
+public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGateway contexts, IOrderOfferResolver offers, IOrderCustomerResolver customers, IOrderTableResolver tables, ICouponRepository coupons, IPaymentMethodRepository paymentMethods, IPaymentRepository payments, IOrderRepository orders, IOrderNumberSequence sequence, IPublicOrderRequestRepository requests, IPublicOrderTransaction transaction, IOrderAvailabilityGateway availability, IOrderUpdatePublisher updatePublisher, TimeProvider timeProvider) : ICommandHandler<ConfirmPublicOrderCommand, PublicConfirmation>
 {
     public async Task<PublicConfirmation> HandleAsync(ConfirmPublicOrderCommand command, CancellationToken cancellationToken)
     {
@@ -81,7 +81,8 @@ public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGatew
         var hash = Hash(command);
         var previous = await requests.FindAsync(scope.TenantId, scope.EstablishmentId, command.IdempotencyKey.Trim(), cancellationToken);
         if (previous is not null) return await ReplayAsync(previous, hash, scope, cancellationToken);
-        return await transaction.ExecuteAsync(async token =>
+        OrderUpdateSignal? signal = null;
+        var result = await transaction.ExecuteAsync(async token =>
         {
             previous = await requests.FindAsync(scope.TenantId, scope.EstablishmentId, command.IdempotencyKey.Trim(), token);
             if (previous is not null) return await ReplayAsync(previous, hash, scope, token);
@@ -98,8 +99,12 @@ public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGatew
             if (coupon is not null) await coupons.SaveChangesAsync(token);
             await payments.AddAsync(Domain.Payments.Payment.Create(scope.TenantId, scope.EstablishmentId, order.Id, method, order.Total, command.ReceivedAmount is null ? null : new Money(command.ReceivedAmount.Value), now), token);
             await requests.AddAsync(PublicOrderRequest.Create(scope.TenantId, scope.EstablishmentId, command.IdempotencyKey, hash, order.Id, now), token);
+            signal = new OrderUpdateSignal(scope.EstablishmentId, order.Id, OrderUpdateKind.Confirmed, now);
             return new PublicConfirmation(order.PublicReference!, order.Number!.Value, order.Status, order.Total.Amount);
         }, cancellationToken);
+        if (signal is not null)
+            await updatePublisher.PublishAsync(scope.TenantId, signal, cancellationToken);
+        return result;
     }
 
     private async Task<PublicConfirmation> ReplayAsync(PublicOrderRequest request, string hash, PublicOrderingContext scope, CancellationToken token)
@@ -123,10 +128,10 @@ public sealed class GetPublicOrderQueryHandler(IPublicOrderLocator locator, IOrd
     { var location = await locator.FindAsync(query.Reference, cancellationToken) ?? throw new NotFoundException("Order was not found."); return await orders.GetAsync(location.TenantId, location.EstablishmentId, location.OrderId, cancellationToken) ?? throw new NotFoundException("Order was not found."); }
 }
 
-public sealed class CancelPublicOrderCommandHandler(IPublicOrderLocator locator, IOrderRepository orders, TimeProvider timeProvider) : ICommandHandler<CancelPublicOrderCommand>
+public sealed class CancelPublicOrderCommandHandler(IPublicOrderLocator locator, IOrderRepository orders, IOrderUpdatePublisher updatePublisher, TimeProvider timeProvider) : ICommandHandler<CancelPublicOrderCommand>
 {
     public async Task HandleAsync(CancelPublicOrderCommand command, CancellationToken cancellationToken)
-    { var location = await locator.FindAsync(command.Reference, cancellationToken) ?? throw new NotFoundException("Order was not found."); var order = await orders.GetAsync(location.TenantId, location.EstablishmentId, location.OrderId, cancellationToken) ?? throw new NotFoundException("Order was not found."); if(order.Status!=OrderStatus.Confirmed) throw new Domain.Exceptions.DomainException("Order can no longer be cancelled by the customer."); order.Cancel(timeProvider.GetUtcNow(), null, command.Reason); await orders.SaveChangesAsync(cancellationToken); }
+    { var location = await locator.FindAsync(command.Reference, cancellationToken) ?? throw new NotFoundException("Order was not found."); var order = await orders.GetAsync(location.TenantId, location.EstablishmentId, location.OrderId, cancellationToken) ?? throw new NotFoundException("Order was not found."); if(order.Status!=OrderStatus.Confirmed) throw new Domain.Exceptions.DomainException("Order can no longer be cancelled by the customer."); var now = timeProvider.GetUtcNow(); order.Cancel(now, null, command.Reason); await orders.SaveChangesAsync(cancellationToken); await updatePublisher.PublishAsync(location.TenantId, new OrderUpdateSignal(location.EstablishmentId, order.Id, OrderUpdateKind.StatusChanged, now), cancellationToken); }
 }
 
 internal static class PublicOrderComposer

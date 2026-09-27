@@ -4,6 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../../session/store'
 import { availableActions, serviceLabels, statusLabels, type OrderAction } from './actions'
 import { PollingCoordinator } from './polling'
+import {
+  createOrderRealtimeConnection,
+  OrderRealtimeCoordinator,
+  type OrderRealtimeState
+} from './realtime'
 import { useOrderOperationsStore } from './store'
 import type { OrderFilters, OrderServiceType, OrderStatus, OrderSummary } from './types'
 
@@ -21,6 +26,7 @@ const pendingAction = ref<OrderAction | null>(null)
 const note = ref('')
 const actionBusy = ref(false)
 const detailPanel = ref<HTMLElement | null>(null)
+const realtimeState = ref<OrderRealtimeState>('disconnected')
 
 const filters = computed<OrderFilters>(() => ({
   status: status.value,
@@ -55,6 +61,13 @@ const poller = new PollingCoordinator(
     visibility: document
   }
 )
+const realtime = new OrderRealtimeCoordinator(
+  createOrderRealtimeConnection(),
+  poller,
+  (state) => {
+    realtimeState.value = state
+  }
+)
 
 watch([status, serviceType, search], () => {
   const query: Record<string, string> = {}
@@ -65,9 +78,17 @@ watch([status, serviceType, search], () => {
   void poller.refresh(true)
 })
 
-onMounted(() => poller.start())
+watch(
+  () => session.unitId,
+  (unit) => {
+    store.reset(unit)
+    void realtime.start(unit)
+  }
+)
+
+onMounted(() => void realtime.start(session.unitId))
 onBeforeUnmount(() => {
-  poller.stop()
+  void realtime.stop()
   store.reset()
 })
 
@@ -143,7 +164,7 @@ function elapsed(value: string) {
         <p class="text-overline text-primary q-mb-xs">CENTRAL OPERACIONAL</p>
         <h1 class="text-h4 q-my-none">Pedidos em andamento</h1>
         <p class="text-grey-7 q-mb-none">
-          Atualização automática a cada {{ Math.round(interval / 1000) }} segundos
+          Tempo real com reconciliação autoritativa e fallback automático
         </p>
       </div>
       <q-btn
@@ -167,7 +188,16 @@ function elapsed(value: string) {
         <q-btn flat no-caps label="Tentar novamente" @click="poller.refresh(true)" />
       </template>
     </q-banner>
+    <q-banner
+      v-if="session.unitId && realtimeState !== 'connected'"
+      class="bg-blue-1 text-primary q-mb-md"
+      aria-live="polite"
+    >
+      <strong>{{ realtimeState === 'reconnecting' ? 'Reconectando ao tempo real.' : 'Canal em tempo real indisponível.' }}</strong>
+      Os dados permanecem visíveis e o painel está usando atualização periódica sem sobreposição.
+    </q-banner>
     <p class="sync-status" aria-live="polite">
+      <span v-if="realtimeState === 'connected'">● Tempo real conectado. </span>
       <span v-if="store.lastSuccessAt">✓ Última sincronização: {{ time(store.lastSuccessAt) }}</span>
       <span v-else>Sincronização ainda não concluída.</span>
     </p>

@@ -72,6 +72,7 @@ public sealed class ConfirmOrderCommandHandler(
     IOrderConfirmationTransaction transaction,
     ICouponRepository coupons,
     IOrderAvailabilityGateway availability,
+    IOrderUpdatePublisher updatePublisher,
     TimeProvider timeProvider) : ICommandHandler<ConfirmOrderCommand>
 {
     public async Task HandleAsync(ConfirmOrderCommand command, CancellationToken cancellationToken)
@@ -113,6 +114,10 @@ public sealed class ConfirmOrderCommandHandler(
             order.Confirm(number, now, scope.UserId);
             await repository.SaveChangesAsync(token);
         }, cancellationToken);
+        await updatePublisher.PublishAsync(
+            scope.TenantId,
+            new OrderUpdateSignal(scope.EstablishmentId, order.Id, OrderUpdateKind.Confirmed, order.UpdatedAt),
+            cancellationToken);
     }
 
     private static bool Matches(OrderItem item, OrderOfferSnapshot current) =>
@@ -124,6 +129,7 @@ public sealed class ConfirmOrderCommandHandler(
 public sealed class TransitionOrderCommandHandler(
     EstablishmentScopeResolver scopeResolver,
     IOrderRepository repository,
+    IOrderUpdatePublisher updatePublisher,
     TimeProvider timeProvider) : ICommandHandler<TransitionOrderCommand>
 {
     public async Task HandleAsync(TransitionOrderCommand command, CancellationToken cancellationToken)
@@ -143,6 +149,10 @@ public sealed class TransitionOrderCommandHandler(
             default: throw new ValidationException([new ValidationFailure(nameof(command.NewStatus), "Requested order status is not an operational transition.")]);
         }
         await repository.SaveChangesAsync(cancellationToken);
+        await updatePublisher.PublishAsync(
+            scope.TenantId,
+            new OrderUpdateSignal(scope.EstablishmentId, order.Id, OrderUpdateKind.StatusChanged, now),
+            cancellationToken);
     }
 }
 

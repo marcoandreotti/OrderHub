@@ -54,6 +54,23 @@ public interface IOrderReadGateway
     Task<OrderSearchResult> SearchAsync(Guid tenantId, Guid establishmentId, DateTimeOffset? from, DateTimeOffset? to, OrderStatus? status, long? number, OrderServiceType? serviceType, int page, int pageSize, CancellationToken cancellationToken);
 }
 
+public interface IOrderUpdatePublisher
+{
+    Task PublishAsync(Guid tenantId, OrderUpdateSignal signal, CancellationToken cancellationToken);
+}
+
+public enum OrderUpdateKind
+{
+    Confirmed,
+    StatusChanged
+}
+
+public sealed record OrderUpdateSignal(
+    Guid EstablishmentId,
+    Guid OrderId,
+    OrderUpdateKind ChangeType,
+    DateTimeOffset OccurredAt);
+
 public sealed record OrderAdditionalSelection(Guid AdditionalId, decimal Quantity);
 public sealed record OrderAdditionalSnapshot(Guid AdditionalId, string Name, Money UnitPrice, Quantity Quantity);
 public sealed record OrderOfferSnapshot(Guid ProductId, Guid? VariationId, string ProductName, string? VariationName, Money UnitPrice, IReadOnlyList<OrderAdditionalSnapshot> Additionals);

@@ -14,6 +14,8 @@ using Microsoft.AspNetCore.Authentication;
 using OrderHub.Infrastructure.Identity;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using OrderHub.Api.Realtime;
+using OrderHub.Application.Abstractions.Ordering;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +26,18 @@ builder.Services.AddHealthChecks();
 builder.Services.AddOpenApi();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, HttpTenantContext>();
+builder.Services.AddSingleton<OrderUpdateSubscriptions>();
+builder.Services.AddSingleton<OrderRealtimeTelemetry>();
+builder.Services.AddScoped<IOrderUpdatePublisher, SignalROrderUpdatePublisher>();
+builder.Services.AddSignalR(options =>
+{
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue("RealtimeOrders:ClientTimeoutSeconds", 30));
+    options.KeepAliveInterval = TimeSpan.FromSeconds(
+        builder.Configuration.GetValue("RealtimeOrders:KeepAliveSeconds", 15));
+    options.MaximumReceiveMessageSize = builder.Configuration.GetValue<long?>(
+        "RealtimeOrders:MaximumReceiveMessageBytes") ?? 32 * 1024;
+});
 var authentication = builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = builder.Environment.IsEnvironment("Testing") ? ExistingPrincipalAuthenticationHandler.SchemeName : SessionAuthenticationHandler.SchemeName;
@@ -93,6 +107,8 @@ app.MapOnboardingEndpoints();
 app.MapAdministrativeUserEndpoints();
 app.MapAuthenticationEndpoints();
 app.MapPlatformProvisioningEndpoints();
+app.MapHub<OrderUpdatesHub>("/hubs/order-updates")
+    .RequireAuthorization(AdministrativePolicies.OrderRead);
 
 if (app.Environment.IsEnvironment("Testing"))
 {

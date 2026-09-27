@@ -11,6 +11,7 @@
     "postinstall": "quasar prepare"
   },
   "dependencies": {
+    "@microsoft/signalr": "^10.0.11",
     "@quasar/extras": "^2.0.4",
     "axios": "^1.19.0",
     "pinia": "^3.0.4",
