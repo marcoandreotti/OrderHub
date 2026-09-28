@@ -54,6 +54,7 @@ async function logout() {
           label="Cozinha"
           to="/operations/kitchen"
         />
+        <q-btn v-if="session.can('order-delivery')" flat no-caps label="Entregas" to="/operations/delivery" />
         <q-btn
           flat
           no-caps

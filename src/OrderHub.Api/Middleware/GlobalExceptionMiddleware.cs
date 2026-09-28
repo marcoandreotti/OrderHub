@@ -65,6 +65,11 @@ internal sealed class GlobalExceptionMiddleware(RequestDelegate next, ILogger<Gl
             problem.Extensions["nextOpening"] = availabilityException.NextOpening;
             problem.Extensions["affectedOfferIds"] = availabilityException.AffectedOfferIds;
         }
+        if (exception is DeliveryQuoteConflictException deliveryQuoteException)
+        {
+            problem.Extensions["currentDeliveryFee"] = deliveryQuoteException.CurrentFee;
+            problem.Extensions["currentTotal"] = deliveryQuoteException.CurrentTotal;
+        }
 
         context.Response.StatusCode = status;
         context.Response.ContentType = "application/problem+json";

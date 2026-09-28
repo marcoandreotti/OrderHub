@@ -25,6 +25,7 @@ public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> option
     public DbSet<OrderHub.Domain.Catalog.OfferUnavailability> OfferUnavailabilities => Set<OrderHub.Domain.Catalog.OfferUnavailability>();
     public DbSet<OrderHub.Domain.Customers.Customer> Customers => Set<OrderHub.Domain.Customers.Customer>();
     public DbSet<OrderHub.Domain.Ordering.Order> Orders => Set<OrderHub.Domain.Ordering.Order>();
+    public DbSet<OrderHub.Domain.Delivery.DeliveryRegion> DeliveryRegions => Set<OrderHub.Domain.Delivery.DeliveryRegion>();
     public DbSet<OrderHub.Domain.Promotions.Coupon> Coupons => Set<OrderHub.Domain.Promotions.Coupon>();
     public DbSet<OrderHub.Domain.Payments.PaymentMethod> PaymentMethods => Set<OrderHub.Domain.Payments.PaymentMethod>();
     public DbSet<OrderHub.Domain.Payments.Payment> Payments => Set<OrderHub.Domain.Payments.Payment>();

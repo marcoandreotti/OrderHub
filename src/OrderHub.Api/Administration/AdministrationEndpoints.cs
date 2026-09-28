@@ -8,6 +8,8 @@ using OrderHub.Application.Customers;
 using OrderHub.Application.Identity;
 using OrderHub.Application.Ordering;
 using OrderHub.Application.Payments;
+using OrderHub.Application.Delivery;
+using OrderHub.Application.Abstractions.Delivery;
 using OrderHub.Application.Promotions;
 using OrderHub.Contracts.Administration;
 using OrderHub.Domain.Ordering;
@@ -21,8 +23,21 @@ internal static class AdministrationEndpoints
     public static IEndpointRouteBuilder MapAdministrationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var root=endpoints.MapGroup("/api/admin/establishments/{establishmentId:guid}").WithTags("Administration");
-        MapCustomers(root); MapOrders(root); MapCoupons(root); MapPayments(root);
+        MapCustomers(root); MapOrders(root); MapCoupons(root); MapPayments(root); MapDelivery(root);
         return endpoints;
+    }
+
+    private static void MapDelivery(RouteGroupBuilder root)
+    {
+        var group = root.MapGroup("/delivery-regions").RequireAuthorization(AdministrativePolicies.Management);
+        group.MapGet("", async (Guid establishmentId, IQueryDispatcher dispatcher, CancellationToken ct) =>
+            Results.Ok(await dispatcher.DispatchAsync<ListDeliveryRegionsQuery, IReadOnlyList<DeliveryRegionReadModel>>(new(establishmentId), ct)));
+        group.MapPost("", async (Guid establishmentId, DeliveryRegionUpsertRequest request, ICommandDispatcher dispatcher, CancellationToken ct) =>
+            Results.Ok(new { id = await dispatcher.DispatchAsync<UpsertDeliveryRegionCommand, Guid>(new(establishmentId, null, request.Name, request.PostalCodeFrom, request.PostalCodeTo, request.Fee, request.EstimatedMinutes), ct) }));
+        group.MapPut("/{regionId:guid}", async (Guid establishmentId, Guid regionId, DeliveryRegionUpsertRequest request, ICommandDispatcher dispatcher, CancellationToken ct) =>
+            Results.Ok(new { id = await dispatcher.DispatchAsync<UpsertDeliveryRegionCommand, Guid>(new(establishmentId, regionId, request.Name, request.PostalCodeFrom, request.PostalCodeTo, request.Fee, request.EstimatedMinutes), ct) }));
+        group.MapPatch("/{regionId:guid}/active", async (Guid establishmentId, Guid regionId, DeliveryRegionActiveRequest request, ICommandDispatcher dispatcher, CancellationToken ct) =>
+        { await dispatcher.DispatchAsync(new SetDeliveryRegionActiveCommand(establishmentId, regionId, request.IsActive), ct); return Results.NoContent(); });
     }
 
     private static void MapCustomers(RouteGroupBuilder root)
@@ -92,7 +107,7 @@ internal static class AdministrationEndpoints
     private static async Task<IResult> FailPaymentAsync(Guid establishmentId,Guid paymentId,ICommandDispatcher d,CancellationToken ct){await d.DispatchAsync(new FailPaymentCommand(establishmentId,paymentId),ct);return Results.NoContent();}
     private static async Task<IResult> CancelPaymentAsync(Guid establishmentId,Guid paymentId,ICommandDispatcher d,CancellationToken ct){await d.DispatchAsync(new CancelPaymentCommand(establishmentId,paymentId),ct);return Results.NoContent();}
     private static CustomerResponse Map(CustomerReadModel c)=>new(c.Id,c.Name,c.Phone,c.Email,c.Addresses.Select(a=>new CustomerAddressResponse(a.Id,a.Label,a.Street,a.Number,a.Complement,a.Neighborhood,a.City,a.State,a.PostalCode,a.IsPrimary)).ToArray());
-    private static OrderDetailResponse Map(OrderReadModel o)=>new(o.Id,o.Number,o.PublicReference,o.ServiceType.ToString(),o.Status.ToString(),o.CustomerName,o.CustomerPhone,o.TableCode,o.Subtotal,o.Discount,o.Fees,o.Total,o.CouponCode,o.ConfirmedAmount,o.IsFullyPaid,o.Items.Select(i=>new AdminOrderItemResponse(i.Id,i.ProductName,i.VariationName,i.UnitPrice,i.Quantity,i.Total,i.Notes,i.Additionals.Select(a=>new AdminOrderAdditionalResponse(a.Name,a.UnitPrice,a.Quantity)).ToArray())).ToArray(),o.History.Select(h=>new AdminOrderHistoryResponse(h.PreviousStatus.ToString(),h.NewStatus.ToString(),h.OccurredAt,h.ActorId,h.Note)).ToArray());
+    private static OrderDetailResponse Map(OrderReadModel o)=>new(o.Id,o.Number,o.PublicReference,o.ServiceType.ToString(),o.Status.ToString(),o.CustomerName,o.CustomerPhone,o.TableCode,o.Subtotal,o.Discount,o.Fees,o.Total,o.CouponCode,o.ConfirmedAmount,o.IsFullyPaid,o.Items.Select(i=>new AdminOrderItemResponse(i.Id,i.ProductName,i.VariationName,i.UnitPrice,i.Quantity,i.Total,i.Notes,i.Additionals.Select(a=>new AdminOrderAdditionalResponse(a.Name,a.UnitPrice,a.Quantity)).ToArray())).ToArray(),o.History.Select(h=>new AdminOrderHistoryResponse(h.PreviousStatus.ToString(),h.NewStatus.ToString(),h.OccurredAt,h.ActorId,h.Note)).ToArray(),o.DeliveryAddress is null ? null : new AdminDeliveryAddressResponse(o.DeliveryAddress.Street,o.DeliveryAddress.Number,o.DeliveryAddress.Complement,o.DeliveryAddress.Neighborhood,o.DeliveryAddress.City,o.DeliveryAddress.State,o.DeliveryAddress.PostalCode),o.DeliveryRegionId,o.DeliveryRegionName,o.DeliveryFee,o.DeliveryEstimatedMinutes);
     private static KitchenTicketResponse Map(KitchenTicketReadModel ticket)=>new(ticket.Id,ticket.Number,ticket.ServiceType.ToString(),ticket.Status.ToString(),ticket.CustomerName,ticket.TableCode,ticket.ConfirmedAt,ticket.PreparationStartedAt,ticket.Action.ToString(),ticket.Items.Select(item=>new KitchenItemResponse(item.Id,item.ProductName,item.VariationName,item.Quantity,item.Notes,item.Additionals.Select(additional=>new KitchenAdditionalResponse(additional.Name,additional.Quantity)).ToArray())).ToArray());
     private static OrderPaymentsResponse Map(OrderPaymentsReadModel o)=>new(o.OrderId,o.DueAmount,o.ConfirmedAmount,o.IsFullyCovered,o.OperationalStatus,o.Payments.Select(p=>new PaymentResponse(p.Id,p.MethodCode,p.MethodName,p.Amount,p.ReceivedAmount,p.Change,p.Status.ToString(),p.ExternalId,p.CreatedAt,p.ConfirmedAt)).ToArray());
 }

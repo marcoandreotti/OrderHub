@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProblemBanner from '../../components/ProblemBanner.vue'
+import { ApiError } from '../../http/client'
 import { publicOrderingClient } from './client'
 import { hydrateCartFromCatalog, loadCart, orderItems, receiptStorage, usePublicCart } from './cart'
 import { applyPublicTheme } from './theme'
@@ -204,7 +205,12 @@ async function confirm() {
     const finalSimulation = await publicOrderingClient.simulate(slug.value, {
       ...request(null), customerId, customerAddressId
     })
-    if (simulation.value && simulation.value.total !== finalSimulation.total) {
+    const deliveryQuoteChanged = checkout.serviceType === 'Delivery' && simulation.value && (
+      simulation.value.deliveryRegionId !== finalSimulation.deliveryRegionId ||
+      simulation.value.deliveryFee !== finalSimulation.deliveryFee ||
+      simulation.value.deliveryEstimatedMinutes !== finalSimulation.deliveryEstimatedMinutes
+    )
+    if (simulation.value && (simulation.value.total !== finalSimulation.total || deliveryQuoteChanged)) {
       simulation.value = finalSimulation
       priceChanged.value = true
       error.value = new Error('O total mudou. Confira os valores atualizados e confirme novamente.')
@@ -215,14 +221,22 @@ async function confirm() {
     const result = await publicOrderingClient.confirm(slug.value, {
       ...request(null), customerId, customerAddressId,
       paymentMethodId: checkout.paymentMethodId,
-      receivedAmount: checkout.receivedAmount
+      receivedAmount: checkout.receivedAmount,
+      deliveryRegionId: finalSimulation.deliveryRegionId,
+      expectedDeliveryFee: finalSimulation.deliveryFee,
+      expectedDeliveryEstimatedMinutes: finalSimulation.deliveryEstimatedMinutes,
+      deliveryQuoteIssuedAt: finalSimulation.deliveryQuoteIssuedAt
     }, idempotencyKey.value)
     confirmation.value = result
     receiptStorage.save(slug.value, result.reference)
     cart.clear()
     step.value = 'receipt'
     idempotencyKey.value = undefined
-  } catch (failure) { error.value = failure } finally { submitting.value = false }
+  } catch (failure) {
+    error.value = failure instanceof ApiError && typeof failure.problem.currentTotal === 'number'
+      ? new Error(`${failure.message} Total atualizado: ${money(failure.problem.currentTotal)}.`)
+      : failure
+  } finally { submitting.value = false }
 }
 function editIntent() {
   idempotencyKey.value = undefined
@@ -305,6 +319,12 @@ onBeforeUnmount(() => controller?.abort())
           <span>Subtotal <b>{{ money(simulation.subtotal) }}</b></span>
           <span>Desconto <b>− {{ money(simulation.discount) }}</b></span>
           <span>Taxas <b>{{ money(simulation.fees) }}</b></span>
+          <span v-if="checkout.serviceType === 'Delivery' && simulation.deliveryEstimatedMinutes">
+            Entrega estimada <b>{{ simulation.deliveryEstimatedMinutes }} min</b>
+          </span>
+          <span v-if="checkout.serviceType === 'Delivery' && simulation.deliveryRegionName" class="text-grey-7">
+            Cobertura: {{ simulation.deliveryRegionName }}
+          </span>
           <span class="grand-total">Total atualizado <b>{{ money(simulation.total) }}</b></span>
           <p v-if="priceChanged" role="alert">O total mudou. Confira os valores atualizados antes de confirmar.</p>
         </div>

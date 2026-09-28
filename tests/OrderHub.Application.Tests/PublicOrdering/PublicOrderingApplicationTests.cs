@@ -5,6 +5,7 @@ using OrderHub.Application.Abstractions.Payments;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Application.Abstractions.PublicOrdering;
 using OrderHub.Application.Abstractions.Operations;
+using OrderHub.Application.Abstractions.Delivery;
 using OrderHub.Application.Exceptions;
 using OrderHub.Application.PublicOrdering;
 using OrderHub.Domain.Ordering;
@@ -12,6 +13,7 @@ using OrderHub.Domain.Payments;
 using OrderHub.Domain.Promotions;
 using OrderHub.Domain.SharedKernel;
 using OrderHub.Domain.Operations;
+using OrderHub.Domain.Delivery;
 
 namespace OrderHub.Application.Tests.PublicOrdering;
 
@@ -28,9 +30,39 @@ public sealed class PublicOrderingApplicationTests
     public async Task Simulation_uses_authoritative_offer_price()
     {
         var context=Scope();
-        var handler=new SimulatePublicOrderQueryHandler(new ContextGateway(context),new OfferResolver(25m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new PaymentMethodRepository(),new AvailabilityGateway(),TimeProvider.System);
+        var handler=new SimulatePublicOrderQueryHandler(new ContextGateway(context),new OfferResolver(25m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new PaymentMethodRepository(),new AvailabilityGateway(),new DeliveryGateway(),TimeProvider.System);
         var result=await handler.HandleAsync(new("unit-a",OrderServiceType.Pickup,null,null,null,null,null,null,[new(Guid.NewGuid(),null,2,null,[])]),CancellationToken.None);
         Assert.Equal(50m,result.Total); Assert.Equal(25m,result.Items.Single().UnitPrice);
+    }
+
+    [Fact]
+    public async Task Delivery_simulation_uses_server_region_fee_and_estimate()
+    {
+        var scope = Scope();
+        var quote = new DeliveryQuote(Guid.NewGuid(), "Centro", new Money(7.50m), 35);
+        var handler = new SimulatePublicOrderQueryHandler(new ContextGateway(scope), new OfferResolver(25m), new CustomerResolver(), new TableResolver(), new CouponRepository(), new PaymentMethodRepository(), new AvailabilityGateway(), new DeliveryGateway(quote), TimeProvider.System);
+        var address = new PublicAddress("Casa", "Rua A", "1", null, "Centro", "São Paulo", "SP", "01000-000");
+
+        var result = await handler.HandleAsync(new("unit-a", OrderServiceType.Delivery, null, null, null, address, null, null, [new(Guid.NewGuid(), null, 2, null, [])]), CancellationToken.None);
+
+        Assert.Equal(57.50m, result.Total);
+        Assert.Equal(7.50m, result.DeliveryFee);
+        Assert.Equal("Centro", result.DeliveryRegionName);
+        Assert.Equal(35, result.DeliveryEstimatedMinutes);
+        Assert.NotNull(result.DeliveryQuoteIssuedAt);
+    }
+
+    [Fact]
+    public async Task Delivery_simulation_rejects_addresses_outside_coverage_without_exposing_policy()
+    {
+        var scope = Scope();
+        var handler = new SimulatePublicOrderQueryHandler(new ContextGateway(scope), new OfferResolver(25m), new CustomerResolver(), new TableResolver(), new CouponRepository(), new PaymentMethodRepository(), new AvailabilityGateway(), new DeliveryGateway(), TimeProvider.System);
+        var address = new PublicAddress("Casa", "Rua A", "1", null, "Centro", "São Paulo", "SP", "01000-000");
+
+        var exception = await Assert.ThrowsAsync<ConflictException>(() => handler.HandleAsync(
+            new("unit-a", OrderServiceType.Delivery, null, null, null, address, null, null, [new(Guid.NewGuid(), null, 1, null, [])]), CancellationToken.None));
+
+        Assert.Equal("Delivery is unavailable for this address.", exception.Message);
     }
 
     [Fact]
@@ -55,10 +87,28 @@ public sealed class PublicOrderingApplicationTests
     {
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository(); var requests=new RequestRepository();
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),new Publisher(),TimeProvider.System);
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),new DeliveryGateway(),new Publisher(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","confirmation-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
         var first=await handler.HandleAsync(command,CancellationToken.None); var replay=await handler.HandleAsync(command,CancellationToken.None);
         Assert.Equal(first,replay); Assert.Equal(1,orders.AddCount);
+    }
+
+    [Fact]
+    public async Task Delivery_confirmation_rejects_changed_quote_and_returns_authoritative_total()
+    {
+        var scope = Scope();
+        var method = PaymentMethod.Create(scope.TenantId, scope.EstablishmentId, "PIX", "Pix", true, false, DateTimeOffset.UtcNow);
+        var regionId = Guid.NewGuid();
+        var quote = new DeliveryQuote(regionId, "Centro", new Money(7.50m), 35);
+        var handler = new ConfirmPublicOrderCommandHandler(new ContextGateway(scope), new OfferResolver(20m), new CustomerResolver(), new TableResolver(), new CouponRepository(), new ActivePaymentMethodRepository(method), new PaymentRepository(), new OrderRepository(), new Sequence(), new RequestRepository(), new Transaction(), new AvailabilityGateway(), new DeliveryGateway(quote), new Publisher(), TimeProvider.System);
+        var address = new PublicAddress("Casa", "Rua A", "1", null, "Centro", "São Paulo", "SP", "01000-000");
+        var command = new ConfirmPublicOrderCommand("unit-a", "delivery-quote-key-123", OrderServiceType.Delivery, null, null, null, address, null, method.Id, null,
+            [new(Guid.NewGuid(), null, 1, null, [])], regionId, 3m, 35, DateTimeOffset.UtcNow);
+
+        var exception = await Assert.ThrowsAsync<DeliveryQuoteConflictException>(() => handler.HandleAsync(command, CancellationToken.None));
+
+        Assert.Equal(7.50m, exception.CurrentFee);
+        Assert.Equal(27.50m, exception.CurrentTotal);
     }
 
     [Fact]
@@ -67,7 +117,7 @@ public sealed class PublicOrderingApplicationTests
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository();
         var unavailable=new AvailabilityGateway(new(false,AvailabilityReason.ServicePaused,"Pickup paused.",DateTimeOffset.UtcNow.AddHours(1)));
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,new Publisher(),TimeProvider.System);
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,new DeliveryGateway(),new Publisher(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","stale-cart-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
 
         var exception=await Assert.ThrowsAsync<AvailabilityConflictException>(()=>handler.HandleAsync(command,CancellationToken.None));
@@ -85,10 +135,15 @@ public sealed class PublicOrderingApplicationTests
     private sealed class PaymentMethodRepository:IPaymentMethodRepository { public Task<PaymentMethod?> GetAsync(Guid a,Guid b,Guid c,CancellationToken d)=>Task.FromResult<PaymentMethod?>(null); public Task<bool> CodeExistsAsync(Guid a,Guid b,string c,Guid? d,CancellationToken e)=>Task.FromResult(false); public Task AddAsync(PaymentMethod a,CancellationToken b)=>Task.CompletedTask; public Task SaveChangesAsync(CancellationToken a)=>Task.CompletedTask; }
     private sealed class ActivePaymentMethodRepository(PaymentMethod method):IPaymentMethodRepository { public Task<PaymentMethod?> GetAsync(Guid a,Guid b,Guid c,CancellationToken d)=>Task.FromResult<PaymentMethod?>(c==method.Id?method:null); public Task<bool> CodeExistsAsync(Guid a,Guid b,string c,Guid? d,CancellationToken e)=>Task.FromResult(false); public Task AddAsync(PaymentMethod a,CancellationToken b)=>Task.CompletedTask; public Task SaveChangesAsync(CancellationToken a)=>Task.CompletedTask; }
     private sealed class PaymentRepository:IPaymentRepository { public Task<Payment?> GetAsync(Guid a,Guid b,Guid c,CancellationToken d)=>Task.FromResult<Payment?>(null); public Task AddAsync(Payment a,CancellationToken b)=>Task.CompletedTask; public Task SaveChangesAsync(CancellationToken a)=>Task.CompletedTask; }
-    private sealed class OrderRepository:IOrderRepository { private readonly Dictionary<Guid,Order> values=[]; public int AddCount{get;private set;} public Task<Order?> GetAsync(Guid a,Guid b,Guid id,CancellationToken d)=>Task.FromResult(values.GetValueOrDefault(id)); public Task AddAsync(Order order,CancellationToken b){values.Add(order.Id,order);AddCount++;return Task.CompletedTask;} public Task SaveChangesAsync(CancellationToken a)=>Task.CompletedTask; }
+    private sealed class OrderRepository:IOrderRepository { private readonly Dictionary<Guid,Order> values=[]; public int AddCount{get;private set;} public Order? LastOrder => values.Values.SingleOrDefault(); public Task<Order?> GetAsync(Guid a,Guid b,Guid id,CancellationToken d)=>Task.FromResult(values.GetValueOrDefault(id)); public Task AddAsync(Order order,CancellationToken b){values.Add(order.Id,order);AddCount++;return Task.CompletedTask;} public Task SaveChangesAsync(CancellationToken a)=>Task.CompletedTask; }
     private sealed class Sequence:IOrderNumberSequence { private long number; public Task<long> ReserveAsync(Guid a,Guid b,CancellationToken c)=>Task.FromResult(++number); }
     private sealed class RequestRepository:IPublicOrderRequestRepository { private PublicOrderRequest? value; public Task<PublicOrderRequest?> FindAsync(Guid a,Guid b,string c,CancellationToken d)=>Task.FromResult(value?.Key==c?value:null); public Task AddAsync(PublicOrderRequest request,CancellationToken b){value=request;return Task.CompletedTask;} }
     private sealed class Transaction:IPublicOrderTransaction { public Task<T> ExecuteAsync<T>(Func<CancellationToken,Task<T>> operation,CancellationToken token)=>operation(token); }
     private sealed class AvailabilityGateway(AvailabilityDecision? value=null) : IAvailabilityReadGateway, IOrderAvailabilityGateway { public Task<AvailabilityDecision> EvaluateAsync(Guid tenantId,Guid establishmentId,OrderServiceType serviceType,DateTimeOffset instant,CancellationToken cancellationToken)=>Task.FromResult(value??AvailabilityDecision.Available()); }
     private sealed class Publisher : IOrderUpdatePublisher { public Task PublishAsync(Guid tenantId, OrderUpdateSignal signal, CancellationToken cancellationToken) => Task.CompletedTask; }
+    private sealed class DeliveryGateway(DeliveryQuote? quote = null) : IDeliveryReadGateway
+    {
+        public Task<IReadOnlyList<DeliveryRegionReadModel>> ListAsync(Guid tenantId, Guid establishmentId, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<DeliveryRegionReadModel>>([]);
+        public Task<DeliveryQuote?> FindQuoteAsync(Guid tenantId, Guid establishmentId, string normalizedPostalCode, CancellationToken cancellationToken) => Task.FromResult(quote);
+    }
 }

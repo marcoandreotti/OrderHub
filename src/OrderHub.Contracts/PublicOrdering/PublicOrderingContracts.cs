@@ -20,12 +20,14 @@ public sealed record PublicCustomerResponse(Guid CustomerId, Guid? AddressId);
 public sealed record PublicOrderItemRequest(Guid ProductId, Guid? VariationId, decimal Quantity, string? Notes, IReadOnlyList<PublicOrderAdditionalRequest> Additionals);
 public sealed record PublicOrderAdditionalRequest(Guid AdditionalId, decimal Quantity);
 public sealed record PublicOrderSimulationRequest(string ServiceType, Guid? CustomerId, Guid? CustomerAddressId, string? TableToken, PublicAddressRequest? DeliveryAddress, string? CouponCode, Guid? PaymentMethodId, IReadOnlyList<PublicOrderItemRequest> Items);
-public sealed record PublicOrderSimulationResponse(decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<PublicOrderItemResponse> Items);
+public sealed record PublicOrderSimulationResponse(decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<PublicOrderItemResponse> Items,
+    Guid? DeliveryRegionId = null, string? DeliveryRegionName = null, decimal? DeliveryFee = null, int? DeliveryEstimatedMinutes = null, DateTimeOffset? DeliveryQuoteIssuedAt = null);
 public sealed record PublicOrderItemResponse(string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, IReadOnlyList<PublicOrderAdditionalResponse> Additionals);
 public sealed record PublicOrderAdditionalResponse(string Name, decimal UnitPrice, decimal Quantity);
 
-public sealed record PublicOrderConfirmationRequest(string ServiceType, Guid? CustomerId, Guid? CustomerAddressId, string? TableToken, PublicAddressRequest? DeliveryAddress, string? CouponCode, Guid PaymentMethodId, decimal? ReceivedAmount, IReadOnlyList<PublicOrderItemRequest> Items);
+public sealed record PublicOrderConfirmationRequest(string ServiceType, Guid? CustomerId, Guid? CustomerAddressId, string? TableToken, PublicAddressRequest? DeliveryAddress, string? CouponCode, Guid PaymentMethodId, decimal? ReceivedAmount, IReadOnlyList<PublicOrderItemRequest> Items,
+    Guid? DeliveryRegionId = null, decimal? ExpectedDeliveryFee = null, int? ExpectedDeliveryEstimatedMinutes = null, DateTimeOffset? DeliveryQuoteIssuedAt = null);
 public sealed record PublicOrderConfirmationResponse(string Reference, long Number, string Status, decimal Total);
-public sealed record PublicOrderTrackingResponse(string Reference, long Number, string ServiceType, string Status, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<PublicOrderItemResponse> Items, IReadOnlyList<PublicOrderHistoryResponse> History);
+public sealed record PublicOrderTrackingResponse(string Reference, long Number, string ServiceType, string Status, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<PublicOrderItemResponse> Items, IReadOnlyList<PublicOrderHistoryResponse> History, string? DeliveryRegionName = null, decimal DeliveryFee = 0, int? DeliveryEstimatedMinutes = null);
 public sealed record PublicOrderHistoryResponse(string Status, DateTimeOffset OccurredAt, string? Note);
 public sealed record PublicOrderCancellationRequest(string? Reason);

@@ -88,6 +88,7 @@ async function logout() {
             class="rounded-borders"
             ><q-item-section>Disponibilidade</q-item-section></q-item
           >
+          <q-item v-if="session.can('management')" clickable to="/administration/delivery-regions" active-class="bg-indigo-1 text-primary" class="rounded-borders"><q-item-section>Regiões de entrega</q-item-section></q-item>
           <q-item
             v-if="session.can('administration')"
             clickable

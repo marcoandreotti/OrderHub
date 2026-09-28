@@ -10,6 +10,8 @@ export interface ProblemDetails {
   detail?: string
   traceId?: string
   errors?: Record<string, string[]>
+  currentDeliveryFee?: number
+  currentTotal?: number
 }
 export class ApiError extends Error {
   constructor(public readonly problem: ProblemDetails) {

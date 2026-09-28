@@ -121,3 +121,10 @@ A API SHALL fornecer listagem e detalhe por período, status, número e tipo de 
 #### Scenario: Cozinha inicia preparação
 - **WHEN** um usuário autorizado da cozinha solicitar preparação de pedido em estado compatível
 - **THEN** o sistema SHALL aplicar a transição e registrar o ator no histórico
+
+### Requirement: Pedido preserva snapshot da entrega contratada
+Pedido de entrega confirmado MUST preservar endereço normalizado, região ou regra aplicada, taxa e estimativa usadas no total, independentemente de alterações posteriores.
+
+#### Scenario: Política muda após confirmação
+- **WHEN** taxa ou cobertura é alterada
+- **THEN** o pedido histórico mantém os valores e dados de entrega confirmados

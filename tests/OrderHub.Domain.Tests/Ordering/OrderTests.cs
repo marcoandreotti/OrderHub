@@ -1,6 +1,7 @@
 using OrderHub.Domain.Exceptions;
 using OrderHub.Domain.Ordering;
 using OrderHub.Domain.SharedKernel;
+using OrderHub.Domain.Delivery;
 
 namespace OrderHub.Domain.Tests.Ordering;
 
@@ -73,6 +74,21 @@ public sealed class OrderTests
         order.Dispatch(Now, actor);
         order.Complete(Now, actor);
         Assert.Throws<DomainException>(() => order.Cancel(Now, actor));
+    }
+
+    [Fact]
+    public void Delivery_policy_is_snapshotted_and_does_not_change_with_later_policy_edits()
+    {
+        var order = Create(OrderServiceType.Delivery);
+        order.AddItem(Guid.NewGuid(), null, "Item", null, new Money(20), new Quantity(1), [], null, Now);
+        var regionId = Guid.NewGuid();
+        order.ApplyDeliveryQuote(new DeliveryQuote(regionId, "Centro", new Money(6.50m), 35), Now);
+
+        Assert.Equal(regionId, order.DeliveryRegionId);
+        Assert.Equal("Centro", order.DeliveryRegionName);
+        Assert.Equal(6.50m, order.DeliveryFee.Amount);
+        Assert.Equal(35, order.DeliveryEstimatedMinutes);
+        Assert.Equal(26.50m, order.Total.Amount);
     }
 
     [Fact]

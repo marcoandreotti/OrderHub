@@ -25,6 +25,10 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30);
         builder.Property(x => x.CustomerId).HasColumnName("customer_id"); builder.Property(x => x.CustomerName).HasColumnName("customer_name").HasMaxLength(150); builder.Property(x => x.CustomerPhone).HasColumnName("customer_phone").HasMaxLength(30);
         builder.Property(x => x.TableId).HasColumnName("table_id");
+        builder.Property(x => x.DeliveryRegionId).HasColumnName("delivery_region_id");
+        builder.Property(x => x.DeliveryRegionName).HasColumnName("delivery_region_name").HasMaxLength(100);
+        Money(builder.Property(x => x.DeliveryFee), "delivery_fee");
+        builder.Property(x => x.DeliveryEstimatedMinutes).HasColumnName("delivery_estimated_minutes");
         Money(builder.Property(x => x.Subtotal), "subtotal"); Money(builder.Property(x => x.Discount), "discount"); Money(builder.Property(x => x.Fees), "fees"); Money(builder.Property(x => x.Total), "total");
         builder.Property(x => x.CouponId).HasColumnName("coupon_id"); builder.Property(x => x.CouponCode).HasColumnName("coupon_code").HasMaxLength(40);
         builder.Property(x => x.Version).HasColumnName("version").IsConcurrencyToken(); builder.Property(x => x.CreatedAt).HasColumnName("created_at"); builder.Property(x => x.UpdatedAt).HasColumnName("updated_at");

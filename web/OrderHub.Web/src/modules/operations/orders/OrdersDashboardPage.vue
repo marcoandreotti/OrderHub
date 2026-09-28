@@ -20,7 +20,7 @@ const statusOptions = Object.entries(statusLabels).map(([value, label]) => ({ va
 const serviceOptions = Object.entries(serviceLabels).map(([value, label]) => ({ value, label }))
 const stateOrder: OrderStatus[] = ['Confirmed', 'Preparing', 'Ready', 'OutForDelivery', 'Completed', 'Cancelled', 'Rejected']
 const status = ref<OrderStatus | undefined>(parseStatus(route.query.status))
-const serviceType = ref<OrderServiceType | undefined>(parseService(route.query.serviceType))
+const serviceType = ref<OrderServiceType | undefined>(parseService(route.query.serviceType) ?? (route.path.endsWith('/delivery') ? 'Delivery' : undefined))
 const search = ref<string | null>(typeof route.query.search === 'string' ? route.query.search : '')
 const pendingAction = ref<OrderAction | null>(null)
 const note = ref('')
@@ -76,6 +76,11 @@ watch([status, serviceType, search], () => {
   if (search.value?.trim()) query.search = search.value.trim()
   void router.replace({ query })
   void poller.refresh(true)
+})
+
+watch(() => route.path, (path) => {
+  if (path.endsWith('/delivery')) serviceType.value = 'Delivery'
+  else if (serviceType.value === 'Delivery') serviceType.value = undefined
 })
 
 watch(
@@ -162,7 +167,7 @@ function elapsed(value: string) {
     <header class="operations-heading">
       <div>
         <p class="text-overline text-primary q-mb-xs">CENTRAL OPERACIONAL</p>
-        <h1 class="text-h4 q-my-none">Pedidos em andamento</h1>
+        <h1 class="text-h4 q-my-none">{{ route.path.endsWith('/delivery') ? 'Entregas em andamento' : 'Pedidos em andamento' }}</h1>
         <p class="text-grey-7 q-mb-none">
           Tempo real com reconciliação autoritativa e fallback automático
         </p>
@@ -294,6 +299,12 @@ function elapsed(value: string) {
           <div><dt>Pagamento</dt><dd>{{ selected.isFullyPaid ? '✓ Pago' : '◷ Pendente' }}</dd></div>
           <div><dt>Confirmado</dt><dd>{{ money(selected.confirmedAmount) }} de {{ money(selected.total) }}</dd></div>
         </dl>
+        <section v-if="selected.serviceType === 'Delivery' && selected.deliveryAddress" class="q-mb-md" aria-label="Endereço de entrega">
+          <h3 class="text-subtitle1">Destino da entrega</h3>
+          <address>{{ selected.deliveryAddress.street }}, {{ selected.deliveryAddress.number }}<span v-if="selected.deliveryAddress.complement"> · {{ selected.deliveryAddress.complement }}</span><br>
+            {{ selected.deliveryAddress.neighborhood }} · {{ selected.deliveryAddress.city }}/{{ selected.deliveryAddress.state }} · CEP {{ selected.deliveryAddress.postalCode }}</address>
+          <small v-if="selected.deliveryRegionName">{{ selected.deliveryRegionName }} · {{ money(selected.deliveryFee) }} · estimativa {{ selected.deliveryEstimatedMinutes }} min</small>
+        </section>
 
         <h3>Itens</h3>
         <ul class="detail-items">

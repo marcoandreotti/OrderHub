@@ -40,3 +40,10 @@ A API MUST avaliar unidade, modalidade, instante e composição ao consultar ofe
 #### Scenario: Disponibilidade muda antes da confirmação
 - **WHEN** a modalidade ou oferta se torna indisponível após entrar no carrinho
 - **THEN** a confirmação é rejeitada sem persistir pedido parcial e informa os itens afetados
+
+### Requirement: Fluxo público cota e confirma entrega autoritativamente
+A API SHALL cotar endereço e MUST recalcular sua elegibilidade e taxa ao confirmar, rejeitando cota expirada ou incompatível.
+
+#### Scenario: Taxa muda entre cotação e confirmação
+- **WHEN** a política vigente produz valor diferente
+- **THEN** a API não confirma silenciosamente e retorna o total autoritativo atualizado

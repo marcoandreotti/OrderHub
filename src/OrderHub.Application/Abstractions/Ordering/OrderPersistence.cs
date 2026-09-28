@@ -96,7 +96,11 @@ public sealed record OrderReadModel(
     decimal ConfirmedAmount,
     bool IsFullyPaid,
     IReadOnlyList<OrderItemReadModel> Items,
-    IReadOnlyList<OrderHistoryReadModel> History);
+    IReadOnlyList<OrderHistoryReadModel> History,
+    Guid? DeliveryRegionId = null,
+    string? DeliveryRegionName = null,
+    decimal DeliveryFee = 0,
+    int? DeliveryEstimatedMinutes = null);
 
 public sealed record OrderItemReadModel(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes, IReadOnlyList<OrderAdditionalReadModel> Additionals);
 public sealed record OrderAdditionalReadModel(string Name, decimal UnitPrice, decimal Quantity);

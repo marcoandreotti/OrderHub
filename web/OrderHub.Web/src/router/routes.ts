@@ -84,6 +84,11 @@ export const routes: RouteRecordRaw[] = [
         component: () =>
           import('../modules/operations/kitchen/KitchenDisplayPage.vue')
       }
+      ,{
+        path: 'delivery',
+        meta: { capability: 'order-delivery' },
+        component: () => import('../modules/operations/orders/OrdersDashboardPage.vue')
+      }
     ]
   },
   {
@@ -116,6 +121,11 @@ export const routes: RouteRecordRaw[] = [
         meta: { capability: 'administration' },
         component: () =>
           import('../modules/administration/availability/AvailabilityPage.vue')
+      },
+      {
+        path: 'delivery-regions',
+        meta: { capability: 'management' },
+        component: () => import('../modules/administration/delivery/DeliveryRegionsPage.vue')
       },
       {
         path: 'customers',

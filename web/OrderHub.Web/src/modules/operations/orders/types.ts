@@ -63,6 +63,11 @@ export interface OrderDetail {
   isFullyPaid: boolean
   items: OrderItem[]
   history: OrderHistory[]
+  deliveryAddress?: { street: string; number: string; complement: string | null; neighborhood: string; city: string; state: string; postalCode: string } | null
+  deliveryRegionId?: string | null
+  deliveryRegionName?: string | null
+  deliveryFee?: number
+  deliveryEstimatedMinutes?: number | null
 }
 
 export interface OrderPage {

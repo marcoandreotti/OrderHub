@@ -43,7 +43,9 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
                    o.customer_name as CustomerName, o.customer_phone as CustomerPhone, t.code as TableCode,
                    o.delivery_street as DeliveryStreet, o.delivery_number as DeliveryNumber, o.delivery_complement as DeliveryComplement,
                    o.delivery_neighborhood as DeliveryNeighborhood, o.delivery_city as DeliveryCity, o.delivery_state as DeliveryState,
-                   o.delivery_postal_code as DeliveryPostalCode, o.subtotal, o.discount, o.fees, o.total,
+                   o.delivery_postal_code as DeliveryPostalCode, o.delivery_region_id as DeliveryRegionId,
+                   o.delivery_region_name as DeliveryRegionName, o.delivery_fee as DeliveryFee,
+                   o.delivery_estimated_minutes as DeliveryEstimatedMinutes, o.subtotal, o.discount, o.fees, o.total,
                    o.coupon_code as CouponCode, case when o.coupon_code is null then 0 else o.discount end as CouponDiscount,
                    coalesce((
                        select sum(p.amount)
@@ -83,10 +85,11 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
             order.Subtotal, order.Discount, order.Fees, order.Total, order.CouponCode, order.CouponDiscount,
             order.ConfirmedAmount, order.ConfirmedAmount >= order.Total,
             items.Select(item => new OrderItemReadModel(item.Id, item.ProductName, item.VariationName, item.UnitPrice, item.Quantity, item.Total, item.Notes, additionals[item.Id].Select(a => new OrderAdditionalReadModel(a.Name, a.UnitPrice, a.Quantity)).ToArray())).ToArray(),
-            history.Select(item => new OrderHistoryReadModel(Enum.Parse<OrderStatus>(item.PreviousStatus), Enum.Parse<OrderStatus>(item.NewStatus), item.OccurredAt, item.ActorId, item.Note)).ToArray());
+            history.Select(item => new OrderHistoryReadModel(Enum.Parse<OrderStatus>(item.PreviousStatus), Enum.Parse<OrderStatus>(item.NewStatus), item.OccurredAt, item.ActorId, item.Note)).ToArray(),
+            order.DeliveryRegionId, order.DeliveryRegionName, order.DeliveryFee, order.DeliveryEstimatedMinutes);
     }
 
-    private sealed record OrderRow(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, string? DeliveryStreet, string? DeliveryNumber, string? DeliveryComplement, string? DeliveryNeighborhood, string? DeliveryCity, string? DeliveryState, string? DeliveryPostalCode, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal CouponDiscount, decimal ConfirmedAmount);
+    private sealed record OrderRow(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, string? DeliveryStreet, string? DeliveryNumber, string? DeliveryComplement, string? DeliveryNeighborhood, string? DeliveryCity, string? DeliveryState, string? DeliveryPostalCode, Guid? DeliveryRegionId, string? DeliveryRegionName, decimal DeliveryFee, int? DeliveryEstimatedMinutes, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal CouponDiscount, decimal ConfirmedAmount);
     private sealed record ItemRow(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes);
     private sealed record AdditionalRow(Guid OrderItemId, string Name, decimal UnitPrice, decimal Quantity);
 

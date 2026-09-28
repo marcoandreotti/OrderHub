@@ -31,6 +31,10 @@ public sealed class ConfirmPublicOrderCommandValidator : AbstractValidator<Confi
         RuleFor(x => x.IdempotencyKey).NotEmpty().MinimumLength(8).MaximumLength(100);
         RuleFor(x => x.PaymentMethodId).NotEmpty();
         RuleFor(x => x.ReceivedAmount).GreaterThan(0).When(x => x.ReceivedAmount is not null);
+        RuleFor(x => x.DeliveryRegionId).NotEmpty().When(x => x.ServiceType == OrderServiceType.Delivery);
+        RuleFor(x => x.ExpectedDeliveryFee).NotNull().GreaterThanOrEqualTo(0).When(x => x.ServiceType == OrderServiceType.Delivery);
+        RuleFor(x => x.ExpectedDeliveryEstimatedMinutes).NotNull().InclusiveBetween(1, 1440).When(x => x.ServiceType == OrderServiceType.Delivery);
+        RuleFor(x => x.DeliveryQuoteIssuedAt).NotNull().When(x => x.ServiceType == OrderServiceType.Delivery);
     }
 }
 

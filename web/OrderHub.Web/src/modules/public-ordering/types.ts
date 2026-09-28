@@ -67,13 +67,19 @@ export interface SimulatedItem {
 export interface Simulation {
   subtotal: number; discount: number; fees: number; total: number
   couponCode: string | null; items: SimulatedItem[]
+  deliveryRegionId?: string | null; deliveryRegionName?: string | null; deliveryFee?: number | null
+  deliveryEstimatedMinutes?: number | null; deliveryQuoteIssuedAt?: string | null
 }
 export interface ConfirmationRequest extends Omit<SimulationRequest, 'paymentMethodId'> {
   paymentMethodId: string; receivedAmount: number | null
+  deliveryRegionId?: string | null; expectedDeliveryFee?: number | null
+  expectedDeliveryEstimatedMinutes?: number | null; deliveryQuoteIssuedAt?: string | null
 }
 export interface Confirmation { reference: string; number: number; status: string; total: number }
 export interface Tracking extends Confirmation {
   serviceType: ServiceType; subtotal: number; discount: number; fees: number
   couponCode: string | null; items: SimulatedItem[]
+  deliveryRegionName?: string | null; deliveryFee?: number
+  deliveryEstimatedMinutes?: number | null
   history: { status: string; occurredAt: string; note: string | null }[]
 }

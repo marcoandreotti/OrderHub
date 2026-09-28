@@ -22,6 +22,8 @@ using OrderHub.Application.PublicOrdering;
 using OrderHub.Application.Identity.Authentication;
 using OrderHub.Application.Identity.Management;
 using OrderHub.Application.Availability;
+using OrderHub.Application.Delivery;
+using OrderHub.Application.Abstractions.Delivery;
 
 namespace OrderHub.Application;
 
@@ -170,6 +172,12 @@ public static class DependencyInjection
         services.AddScoped<IValidator<ResumeServiceCommand>, ResumeServiceValidator>();
         services.AddScoped<IValidator<SetOfferUnavailabilityCommand>, SetOfferUnavailabilityValidator>();
         services.AddScoped<IValidator<ReactivateOfferCommand>, ReactivateOfferValidator>();
+        services.AddScoped<ICommandHandler<UpsertDeliveryRegionCommand, Guid>, UpsertDeliveryRegionHandler>();
+        services.AddScoped<ICommandHandler<SetDeliveryRegionActiveCommand>, SetDeliveryRegionActiveHandler>();
+        services.AddScoped<IQueryHandler<ListDeliveryRegionsQuery, IReadOnlyList<DeliveryRegionReadModel>>, ListDeliveryRegionsHandler>();
+        services.AddScoped<IValidator<UpsertDeliveryRegionCommand>, UpsertDeliveryRegionValidator>();
+        services.AddScoped<IValidator<SetDeliveryRegionActiveCommand>, SetDeliveryRegionActiveValidator>();
+        services.AddScoped<IValidator<ListDeliveryRegionsQuery>, ListDeliveryRegionsValidator>();
         return services;
     }
 }

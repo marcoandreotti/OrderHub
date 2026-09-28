@@ -65,6 +65,10 @@ onBeforeUnmount(() => { clearTimeout(timer); document.removeEventListener('visib
         <p class="eyebrow">Pedido nº {{ order.number }}</p>
         <h2>{{ statusLabel[order.status] ?? order.status }}</h2>
         <p>Total <strong>{{ money(order.total) }}</strong></p>
+        <p v-if="order.serviceType === 'Delivery' && order.deliveryEstimatedMinutes">
+          Previsão de entrega: <strong>{{ order.deliveryEstimatedMinutes }} min</strong>
+          <span v-if="order.deliveryRegionName"> · {{ order.deliveryRegionName }}</span>
+        </p>
         <ol class="timeline" aria-label="Histórico do pedido">
           <li v-for="event in order.history" :key="event.occurredAt + event.status">
             <strong>{{ statusLabel[event.status] ?? event.status }}</strong>

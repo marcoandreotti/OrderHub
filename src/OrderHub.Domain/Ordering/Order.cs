@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using OrderHub.Domain.Exceptions;
 using OrderHub.Domain.SharedKernel;
+using OrderHub.Domain.Delivery;
 
 namespace OrderHub.Domain.Ordering;
 
@@ -87,6 +88,10 @@ public sealed class Order : IEstablishmentScopedEntity
     public string? CustomerPhone { get; private set; }
     public Guid? TableId { get; private set; }
     public DeliveryAddressSnapshot? DeliveryAddress { get; private set; }
+    public Guid? DeliveryRegionId { get; private set; }
+    public string? DeliveryRegionName { get; private set; }
+    public Money DeliveryFee { get; private set; }
+    public int? DeliveryEstimatedMinutes { get; private set; }
     public Money Subtotal { get; private set; }
     public Money Discount { get; private set; }
     public Money Fees { get; private set; }
@@ -153,6 +158,21 @@ public sealed class Order : IEstablishmentScopedEntity
         Fees = fees;
         Recalculate();
         Touch(now);
+    }
+
+    /// <summary>Stores the server-calculated delivery policy snapshot on a delivery draft.</summary>
+    public void ApplyDeliveryQuote(DeliveryQuote quote, DateTimeOffset now)
+    {
+        EnsureDraft();
+        if (ServiceType != OrderServiceType.Delivery || DeliveryAddress is null)
+            throw new DomainException("A delivery quote requires a delivery address.");
+        if (quote.RegionId == Guid.Empty || quote.EstimatedMinutes < 1)
+            throw new DomainException("Delivery quote is invalid.");
+        DeliveryRegionId = quote.RegionId;
+        DeliveryRegionName = quote.RegionName;
+        DeliveryFee = quote.Fee;
+        DeliveryEstimatedMinutes = quote.EstimatedMinutes;
+        SetAdjustments(Discount, quote.Fee, now);
     }
 
     /// <summary>Aplica ao rascunho o snapshot do desconto calculado pelo cupom.</summary>
