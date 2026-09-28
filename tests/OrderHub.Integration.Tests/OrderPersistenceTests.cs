@@ -64,5 +64,92 @@ public sealed class OrderPersistenceTests : IAsyncLifetime
         Assert.Equal(Enumerable.Range(1, 8).Select(x => (long)x), numbers.Order());
     }
 
+    [Fact]
+    public async Task Kitchen_queue_is_ordered_and_isolated_with_complete_preparation_details()
+    {
+        var options = CreateOptions();
+        Guid tenantId;
+        Guid firstEstablishmentId;
+        Guid preparingOrderId;
+        Guid confirmedOrderId;
+        var now = new DateTimeOffset(2026, 9, 28, 12, 0, 0, TimeSpan.Zero);
+
+        await using (var context = new OrderHubDbContext(options))
+        {
+            await context.Database.EnsureCreatedAsync();
+            var tenant = Tenant.Create("Group", now);
+            var first = Establishment.Create(tenant.Id, "First", new Slug("kitchen-first"), now);
+            var second = Establishment.Create(tenant.Id, "Second", new Slug("kitchen-second"), now);
+            var preparing = CreateKitchenOrder(tenant.Id, first.Id, 1, now, "Sem cebola");
+            preparing.StartPreparation(now.AddMinutes(3), Guid.NewGuid());
+            var confirmed = CreateKitchenOrder(tenant.Id, first.Id, 2, now.AddMinutes(1), null);
+            var otherUnit = CreateKitchenOrder(tenant.Id, second.Id, 1, now, null);
+            var completed = CreateKitchenOrder(tenant.Id, first.Id, 3, now.AddMinutes(2), null);
+            completed.StartPreparation(now.AddMinutes(3), Guid.NewGuid());
+            completed.MarkReady(now.AddMinutes(4), Guid.NewGuid());
+            context.AddRange(tenant, first, second, preparing, confirmed, otherUnit, completed);
+            await context.SaveChangesAsync();
+            tenantId = tenant.Id;
+            firstEstablishmentId = first.Id;
+            preparingOrderId = preparing.Id;
+            confirmedOrderId = confirmed.Id;
+        }
+
+        var gateway = new KitchenDisplayReadGateway(new NpgsqlReadConnectionFactory(
+            Microsoft.Extensions.Options.Options.Create(new DatabaseOptions
+            {
+                ConnectionString = database.GetConnectionString()
+            })));
+
+        var queue = await gateway.GetQueueAsync(
+            tenantId,
+            firstEstablishmentId,
+            CancellationToken.None);
+
+        Assert.Equal([preparingOrderId, confirmedOrderId], queue.Select(ticket => ticket.Id));
+        var firstTicket = queue[0];
+        Assert.Equal(OrderStatus.Preparing, firstTicket.Status);
+        Assert.NotNull(firstTicket.PreparationStartedAt);
+        var item = Assert.Single(firstTicket.Items);
+        Assert.Equal("Sem cebola", item.Notes);
+        Assert.Equal(2m, item.Quantity);
+        Assert.Equal("Molho", Assert.Single(item.Additionals).Name);
+        Assert.Empty(await gateway.GetQueueAsync(
+            Guid.NewGuid(),
+            firstEstablishmentId,
+            CancellationToken.None));
+    }
+
+    private static Order CreateKitchenOrder(
+        Guid tenantId,
+        Guid establishmentId,
+        long number,
+        DateTimeOffset now,
+        string? notes)
+    {
+        var order = Order.Create(
+            tenantId,
+            establishmentId,
+            OrderServiceType.Pickup,
+            null,
+            "Cliente",
+            null,
+            null,
+            null,
+            now);
+        order.AddItem(
+            Guid.NewGuid(),
+            null,
+            "Hambúrguer",
+            "Duplo",
+            new Money(20),
+            new Quantity(2),
+            [new(Guid.NewGuid(), "Molho", new Money(1), new Quantity(1))],
+            notes,
+            now);
+        order.Confirm(number, now);
+        return order;
+    }
+
     private DbContextOptions<OrderHubDbContext> CreateOptions() => new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString()).Options;
 }

@@ -13,6 +13,9 @@ public sealed record OrderDetailResponse(Guid Id, long? Number, string? PublicRe
 public sealed record AdminOrderItemResponse(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes, IReadOnlyList<AdminOrderAdditionalResponse> Additionals);
 public sealed record AdminOrderAdditionalResponse(string Name, decimal UnitPrice, decimal Quantity);
 public sealed record AdminOrderHistoryResponse(string PreviousStatus, string NewStatus, DateTimeOffset OccurredAt, Guid? ActorId, string? Note);
+public sealed record KitchenTicketResponse(Guid Id, long Number, string ServiceType, string Status, string? CustomerName, string? TableCode, DateTimeOffset ConfirmedAt, DateTimeOffset? PreparationStartedAt, string Action, IReadOnlyList<KitchenItemResponse> Items);
+public sealed record KitchenItemResponse(Guid Id, string ProductName, string? VariationName, decimal Quantity, string? Notes, IReadOnlyList<KitchenAdditionalResponse> Additionals);
+public sealed record KitchenAdditionalResponse(string Name, decimal Quantity);
 
 public sealed record CouponUpsertRequest(string Code, string? Description, string DiscountType, decimal Value, decimal MinimumOrder, DateTimeOffset StartsAt, DateTimeOffset EndsAt, int? MaximumUses);
 public sealed record CouponResponse(Guid Id, string Code, string? Description, string DiscountType, decimal Value, decimal MinimumOrder, DateTimeOffset StartsAt, DateTimeOffset EndsAt, int? MaximumUses, int UsedCount, bool IsActive);

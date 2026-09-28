@@ -88,6 +88,23 @@ public sealed class OrderApplicationTests
     }
 
     [Fact]
+    public async Task Stale_operational_transition_is_reported_as_conflict()
+    {
+        var order = DraftWithItem();
+        order.Confirm(1, Clock.Now);
+        order.StartPreparation(Clock.Now.AddMinutes(1), UserId);
+        var handler = new TransitionOrderCommandHandler(
+            Resolver(),
+            new Repository(order),
+            new Publisher(),
+            new Clock());
+
+        await Assert.ThrowsAsync<ConflictException>(() => handler.HandleAsync(
+            new TransitionOrderCommand(EstablishmentId, order.Id, OrderStatus.Preparing),
+            CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Query_uses_authenticated_tenant_scope()
     {
         var gateway = new ReadGateway(); var handler = new GetOrderQueryHandler(Resolver(), gateway);

@@ -77,6 +77,12 @@ export const routes: RouteRecordRaw[] = [
         path: '',
         component: () =>
           import('../modules/operations/orders/OrdersDashboardPage.vue')
+      },
+      {
+        path: 'kitchen',
+        meta: { capability: 'order-kitchen' },
+        component: () =>
+          import('../modules/operations/kitchen/KitchenDisplayPage.vue')
       }
     ]
   },

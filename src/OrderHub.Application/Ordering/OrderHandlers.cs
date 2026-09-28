@@ -9,6 +9,7 @@ using FluentValidation.Results;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Domain.Promotions;
 using OrderHub.Domain.Operations;
+using OrderHub.Domain.Exceptions;
 
 namespace OrderHub.Application.Ordering;
 
@@ -138,15 +139,22 @@ public sealed class TransitionOrderCommandHandler(
         var order = await repository.GetAsync(scope.TenantId, scope.EstablishmentId, command.OrderId, cancellationToken)
             ?? throw new NotFoundException("Order was not found.");
         var now = timeProvider.GetUtcNow();
-        switch (command.NewStatus)
+        try
         {
-            case OrderStatus.Preparing: order.StartPreparation(now, scope.UserId); break;
-            case OrderStatus.Ready: order.MarkReady(now, scope.UserId); break;
-            case OrderStatus.OutForDelivery: order.Dispatch(now, scope.UserId); break;
-            case OrderStatus.Completed: order.Complete(now, scope.UserId); break;
-            case OrderStatus.Cancelled: order.Cancel(now, scope.UserId, command.Note); break;
-            case OrderStatus.Rejected: order.Reject(now, scope.UserId, command.Note); break;
-            default: throw new ValidationException([new ValidationFailure(nameof(command.NewStatus), "Requested order status is not an operational transition.")]);
+            switch (command.NewStatus)
+            {
+                case OrderStatus.Preparing: order.StartPreparation(now, scope.UserId); break;
+                case OrderStatus.Ready: order.MarkReady(now, scope.UserId); break;
+                case OrderStatus.OutForDelivery: order.Dispatch(now, scope.UserId); break;
+                case OrderStatus.Completed: order.Complete(now, scope.UserId); break;
+                case OrderStatus.Cancelled: order.Cancel(now, scope.UserId, command.Note); break;
+                case OrderStatus.Rejected: order.Reject(now, scope.UserId, command.Note); break;
+                default: throw new ValidationException([new ValidationFailure(nameof(command.NewStatus), "Requested order status is not an operational transition.")]);
+            }
+        }
+        catch (DomainException exception)
+        {
+            throw new ConflictException($"Order state no longer allows this transition. {exception.Message}");
         }
         await repository.SaveChangesAsync(cancellationToken);
         await updatePublisher.PublishAsync(

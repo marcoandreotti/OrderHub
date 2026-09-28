@@ -90,12 +90,14 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<TransitionOrderCommand>, TransitionOrderCommandHandler>();
         services.AddScoped<IQueryHandler<GetOrderQuery, OrderReadModel>, GetOrderQueryHandler>();
         services.AddScoped<IQueryHandler<SearchOrdersQuery, OrderSearchResult>, SearchOrdersQueryHandler>();
+        services.AddScoped<IQueryHandler<GetKitchenQueueQuery, IReadOnlyList<KitchenTicketReadModel>>, GetKitchenQueueQueryHandler>();
         services.AddScoped<IValidator<CreateOrderDraftCommand>, CreateOrderDraftCommandValidator>();
         services.AddScoped<IValidator<AddOrderItemCommand>, AddOrderItemCommandValidator>();
         services.AddScoped<IValidator<ConfirmOrderCommand>, ConfirmOrderCommandValidator>();
         services.AddScoped<IValidator<TransitionOrderCommand>, TransitionOrderCommandValidator>();
         services.AddScoped<IValidator<GetOrderQuery>, GetOrderQueryValidator>();
         services.AddScoped<IValidator<SearchOrdersQuery>, SearchOrdersQueryValidator>();
+        services.AddScoped<IValidator<GetKitchenQueueQuery>, GetKitchenQueueQueryValidator>();
         services.AddScoped<ICommandHandler<UpsertCouponCommand, Guid>, UpsertCouponCommandHandler>();
         services.AddScoped<ICommandHandler<SetCouponActiveCommand>, SetCouponActiveCommandHandler>();
         services.AddScoped<ICommandHandler<ApplyCouponCommand>, ApplyCouponCommandHandler>();

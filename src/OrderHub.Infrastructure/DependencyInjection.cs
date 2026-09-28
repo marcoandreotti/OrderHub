@@ -73,6 +73,7 @@ public static class DependencyInjection
         services.AddScoped<IOrderCustomerResolver, OrderCustomerResolver>();
         services.AddScoped<IOrderTableResolver, OrderTableResolver>();
         services.AddScoped<IOrderReadGateway, OrderReadGateway>();
+        services.AddScoped<IKitchenDisplayReadGateway, KitchenDisplayReadGateway>();
         services.AddScoped<ICouponRepository, CouponRepository>();
         services.AddScoped<ICouponReadGateway, CouponReadGateway>();
         services.AddScoped<IPaymentMethodRepository, PaymentMethodRepository>();

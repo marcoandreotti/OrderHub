@@ -48,6 +48,19 @@ async function logout() {
           class="operations-unit"
         />
         <q-btn
+          v-if="session.can('order-kitchen')"
+          flat
+          no-caps
+          label="Cozinha"
+          to="/operations/kitchen"
+        />
+        <q-btn
+          flat
+          no-caps
+          label="Pedidos"
+          to="/operations"
+        />
+        <q-btn
           v-if="session.can('management')"
           flat
           no-caps
