@@ -76,13 +76,24 @@ public sealed class UpsertAdditionalGroupCommandHandler(EstablishmentScopeResolv
         var scope = await scopeResolver.ResolveAsync(command.EstablishmentId, cancellationToken);
         var group = command.Id is { } id
             ? await repository.GetAsync(scope.TenantId, scope.EstablishmentId, id, cancellationToken) ?? throw new NotFoundException("Additional group was not found.")
-            : AdditionalGroup.Create(scope.TenantId, scope.EstablishmentId, command.Name, command.MinimumSelection, command.MaximumSelection);
-        group.Update(command.Name, command.MinimumSelection, command.MaximumSelection);
+            : AdditionalGroup.Create(scope.TenantId, scope.EstablishmentId, command.Name, command.MinimumSelection, command.MaximumSelection, command.PricingStrategy, command.Type, command.RequiresCompleteComposition);
+        group.Update(command.Name, command.MinimumSelection, command.MaximumSelection, command.PricingStrategy, command.Type, command.RequiresCompleteComposition);
         var ids = command.Items.Select(x => x.AdditionalId).Distinct().ToArray();
         var additionals = await additionalRepository.GetManyAsync(scope.TenantId, scope.EstablishmentId, ids, cancellationToken);
         if (additionals.Count != ids.Length) throw new NotFoundException("One or more additionals were not found.");
         var byId = additionals.ToDictionary(x => x.Id);
         group.ReplaceItems(command.Items.Select(x => (byId[x.AdditionalId], x.Order)));
+        var compatibilityInputs = command.Items.SelectMany(item => (item.CompatibilityRules ?? [])
+            .Select(rule => new ModifierCompatibilityInput(item.AdditionalId, rule.TargetGroupId, rule.TargetAdditionalId, rule.Kind))).ToArray();
+        var targetGroupIds = compatibilityInputs.Select(x => x.TargetGroupId).Distinct().Where(x => x != group.Id).ToArray();
+        var targetGroups = await repository.GetManyAsync(scope.TenantId, scope.EstablishmentId, targetGroupIds, cancellationToken);
+        if (targetGroups.Count != targetGroupIds.Length) throw new NotFoundException("One or more modifier compatibility groups were not found.");
+        var groupsById = targetGroups.ToDictionary(x => x.Id);
+        groupsById[group.Id] = group;
+        if (compatibilityInputs.Any(rule => !groupsById.TryGetValue(rule.TargetGroupId, out var targetGroup)
+            || targetGroup.Items.All(item => item.AdditionalId != rule.TargetAdditionalId)))
+            throw new NotFoundException("One or more modifier compatibility options were not found in their groups.");
+        group.ReplaceCompatibilityRules(compatibilityInputs);
         if (command.IsActive) group.Activate(); else group.Deactivate();
         if (command.Id is null) await repository.AddAsync(group, cancellationToken); else await repository.SaveChangesAsync(cancellationToken);
         return group.Id;

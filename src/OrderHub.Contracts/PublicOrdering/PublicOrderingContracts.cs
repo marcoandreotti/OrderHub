@@ -18,12 +18,14 @@ public sealed record PublicAddressRequest(string Label, string Street, string Nu
 public sealed record PublicCustomerResponse(Guid CustomerId, Guid? AddressId);
 
 public sealed record PublicOrderItemRequest(Guid ProductId, Guid? VariationId, decimal Quantity, string? Notes, IReadOnlyList<PublicOrderAdditionalRequest> Additionals);
-public sealed record PublicOrderAdditionalRequest(Guid AdditionalId, decimal Quantity);
+public sealed record PublicOrderAdditionalRequest(Guid AdditionalId, decimal Quantity, Guid? GroupId = null, int? PortionNumerator = null, int? PortionDenominator = null);
 public sealed record PublicOrderSimulationRequest(string ServiceType, Guid? CustomerId, Guid? CustomerAddressId, string? TableToken, PublicAddressRequest? DeliveryAddress, string? CouponCode, Guid? PaymentMethodId, IReadOnlyList<PublicOrderItemRequest> Items);
 public sealed record PublicOrderSimulationResponse(decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<PublicOrderItemResponse> Items,
     Guid? DeliveryRegionId = null, string? DeliveryRegionName = null, decimal? DeliveryFee = null, int? DeliveryEstimatedMinutes = null, DateTimeOffset? DeliveryQuoteIssuedAt = null);
-public sealed record PublicOrderItemResponse(string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, IReadOnlyList<PublicOrderAdditionalResponse> Additionals);
+public sealed record PublicOrderItemResponse(string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, IReadOnlyList<PublicOrderAdditionalResponse> Additionals, decimal BasePrice = 0, IReadOnlyList<PublicOrderModifierGroupResponse>? ModifierGroups = null);
 public sealed record PublicOrderAdditionalResponse(string Name, decimal UnitPrice, decimal Quantity);
+public sealed record PublicOrderModifierGroupResponse(Guid GroupId, string Name, string PricingStrategy, decimal Price, IReadOnlyList<PublicOrderModifierOptionResponse> Options);
+public sealed record PublicOrderModifierOptionResponse(Guid OptionId, string Name, decimal UnitPrice, decimal Quantity, int? PortionNumerator, int? PortionDenominator);
 
 public sealed record PublicOrderConfirmationRequest(string ServiceType, Guid? CustomerId, Guid? CustomerAddressId, string? TableToken, PublicAddressRequest? DeliveryAddress, string? CouponCode, Guid PaymentMethodId, decimal? ReceivedAmount, IReadOnlyList<PublicOrderItemRequest> Items,
     Guid? DeliveryRegionId = null, decimal? ExpectedDeliveryFee = null, int? ExpectedDeliveryEstimatedMinutes = null, DateTimeOffset? DeliveryQuoteIssuedAt = null);

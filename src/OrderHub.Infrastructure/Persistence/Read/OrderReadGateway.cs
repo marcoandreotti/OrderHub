@@ -59,7 +59,7 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
             left join operations.service_table t on t.tenant_id = o.tenant_id and t.establishment_id = o.establishment_id and t.id = o.table_id
             where o.tenant_id = @TenantId and o.establishment_id = @EstablishmentId and o.id = @OrderId;
 
-            select i.id, i.product_name as ProductName, i.variation_name as VariationName, i.unit_price as UnitPrice,
+            select i.id, i.product_name as ProductName, i.variation_name as VariationName, i.unit_price as UnitPrice, i.base_price as BasePrice,
                    i.quantity, i.total, i.notes
             from orders.order_item i
             where i.tenant_id = @TenantId and i.establishment_id = @EstablishmentId and i.order_id = @OrderId
@@ -71,6 +71,19 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
             where a.tenant_id = @TenantId and a.establishment_id = @EstablishmentId and i.order_id = @OrderId
             order by a.id;
 
+            select g.id as SnapshotId,g.order_item_id as OrderItemId,g.modifier_group_id as GroupId,g.name,g.pricing_strategy as PricingStrategy,g.price
+            from orders.order_item_modifier_group g
+            join orders.order_item i on i.tenant_id=g.tenant_id and i.establishment_id=g.establishment_id and i.id=g.order_item_id
+            where g.tenant_id=@TenantId and g.establishment_id=@EstablishmentId and i.order_id=@OrderId
+            order by g.id;
+
+            select o.order_item_modifier_group_id as SnapshotId,o.modifier_option_id as OptionId,o.name,o.unit_price as UnitPrice,o.quantity,o.portion_numerator as PortionNumerator,o.portion_denominator as PortionDenominator
+            from orders.order_item_modifier_option o
+            join orders.order_item_modifier_group g on g.tenant_id=o.tenant_id and g.establishment_id=o.establishment_id and g.id=o.order_item_modifier_group_id
+            join orders.order_item i on i.tenant_id=g.tenant_id and i.establishment_id=g.establishment_id and i.id=g.order_item_id
+            where o.tenant_id=@TenantId and o.establishment_id=@EstablishmentId and i.order_id=@OrderId
+            order by o.id;
+
             select h.previous_status as PreviousStatus, h.new_status as NewStatus, h.occurred_at as OccurredAt, h.actor_id as ActorId, h.note
             from orders.order_status_history h
             where h.tenant_id = @TenantId and h.establishment_id = @EstablishmentId and h.order_id = @OrderId
@@ -79,19 +92,24 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
         await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken);
         using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, new { TenantId = tenantId, EstablishmentId = establishmentId, OrderId = orderId }, cancellationToken: cancellationToken));
         var order = await grid.ReadSingleOrDefaultAsync<OrderRow>(); if (order is null) return null;
-        var items = (await grid.ReadAsync<ItemRow>()).ToArray(); var additionals = (await grid.ReadAsync<AdditionalRow>()).ToLookup(x => x.OrderItemId); var history = (await grid.ReadAsync<HistoryRow>()).ToArray();
+        var items = (await grid.ReadAsync<ItemRow>()).ToArray(); var additionals = (await grid.ReadAsync<AdditionalRow>()).ToLookup(x => x.OrderItemId);
+        var modifierGroups = (await grid.ReadAsync<ModifierGroupRow>()).ToArray(); var modifierOptions = (await grid.ReadAsync<ModifierOptionRow>()).ToLookup(x => x.SnapshotId);
+        var history = (await grid.ReadAsync<HistoryRow>()).ToArray();
         var address = order.DeliveryStreet is null ? null : new DeliveryAddressSnapshot(order.DeliveryStreet, order.DeliveryNumber!, order.DeliveryComplement, order.DeliveryNeighborhood!, order.DeliveryCity!, order.DeliveryState!, order.DeliveryPostalCode!);
         return new(order.Id, order.Number, order.PublicReference, Enum.Parse<OrderServiceType>(order.ServiceType), Enum.Parse<OrderStatus>(order.Status), order.CustomerName, order.CustomerPhone, order.TableCode, address,
             order.Subtotal, order.Discount, order.Fees, order.Total, order.CouponCode, order.CouponDiscount,
             order.ConfirmedAmount, order.ConfirmedAmount >= order.Total,
-            items.Select(item => new OrderItemReadModel(item.Id, item.ProductName, item.VariationName, item.UnitPrice, item.Quantity, item.Total, item.Notes, additionals[item.Id].Select(a => new OrderAdditionalReadModel(a.Name, a.UnitPrice, a.Quantity)).ToArray())).ToArray(),
+            items.Select(item => new OrderItemReadModel(item.Id, item.ProductName, item.VariationName, item.UnitPrice, item.Quantity, item.Total, item.Notes, additionals[item.Id].Select(a => new OrderAdditionalReadModel(a.Name, a.UnitPrice, a.Quantity)).ToArray(), item.BasePrice,
+                modifierGroups.Where(g => g.OrderItemId == item.Id).Select(g => new OrderModifierGroupReadModel(g.GroupId, g.Name, g.PricingStrategy, g.Price, modifierOptions[g.SnapshotId].Select(o => new OrderModifierOptionReadModel(o.OptionId, o.Name, o.UnitPrice, o.Quantity, o.PortionNumerator, o.PortionDenominator)).ToArray())).ToArray())).ToArray(),
             history.Select(item => new OrderHistoryReadModel(Enum.Parse<OrderStatus>(item.PreviousStatus), Enum.Parse<OrderStatus>(item.NewStatus), item.OccurredAt, item.ActorId, item.Note)).ToArray(),
             order.DeliveryRegionId, order.DeliveryRegionName, order.DeliveryFee, order.DeliveryEstimatedMinutes);
     }
 
     private sealed record OrderRow(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, string? DeliveryStreet, string? DeliveryNumber, string? DeliveryComplement, string? DeliveryNeighborhood, string? DeliveryCity, string? DeliveryState, string? DeliveryPostalCode, Guid? DeliveryRegionId, string? DeliveryRegionName, decimal DeliveryFee, int? DeliveryEstimatedMinutes, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal CouponDiscount, decimal ConfirmedAmount);
-    private sealed record ItemRow(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes);
+    private sealed record ItemRow(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal BasePrice, decimal Quantity, decimal Total, string? Notes);
     private sealed record AdditionalRow(Guid OrderItemId, string Name, decimal UnitPrice, decimal Quantity);
+    private sealed record ModifierGroupRow(Guid SnapshotId, Guid OrderItemId, Guid GroupId, string Name, string PricingStrategy, decimal Price);
+    private sealed record ModifierOptionRow(Guid SnapshotId, Guid OptionId, string Name, decimal UnitPrice, decimal Quantity, int? PortionNumerator, int? PortionDenominator);
 
     private sealed class SummaryRow
     { public Guid Id { get; set; } public long Number { get; set; } public string ServiceType { get; set; } = string.Empty; public string Status { get; set; } = string.Empty; public string? CustomerName { get; set; } public string? CustomerPhone { get; set; } public decimal Total { get; set; } public DateTime CreatedAt { get; set; } }

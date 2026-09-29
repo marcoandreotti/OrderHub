@@ -138,6 +138,20 @@ public sealed class Order : IEstablishmentScopedEntity
         return item;
     }
 
+    /// <summary>Adds an item using a server-calculated modifier composition and preserves its complete price explanation.</summary>
+    public OrderItem AddComposedItem(Guid productId, Guid? variationId, string productName, string? variationName,
+        ModifierCompositionPrice composition, Quantity quantity, string? notes, DateTimeOffset now)
+    {
+        EnsureDraft();
+        if (productId == Guid.Empty) throw new DomainException("Order product is required.");
+        var item = new OrderItem(TenantId, EstablishmentId, Id, productId, variationId, productName, variationName,
+            composition, quantity, notes);
+        items.Add(item);
+        Recalculate();
+        Touch(now);
+        return item;
+    }
+
     /// <summary>Remove um item enquanto o pedido ainda está em composição.</summary>
     public void RemoveItem(Guid itemId, DateTimeOffset now)
     {
@@ -275,6 +289,7 @@ public sealed class Order : IEstablishmentScopedEntity
 public sealed class OrderItem : IEstablishmentScopedEntity
 {
     private readonly List<OrderItemAdditional> additionals = [];
+    private readonly List<OrderItemModifierGroup> modifierGroups = [];
 
     private OrderItem()
     { }
@@ -288,7 +303,23 @@ public sealed class OrderItem : IEstablishmentScopedEntity
             if (value.AdditionalId == Guid.Empty) throw new DomainException("Additional is required.");
             additionals.Add(new OrderItemAdditional(tenantId, establishmentId, Id, value.AdditionalId, value.Name, value.UnitPrice, value.Quantity));
         }
+        BasePrice = unitPrice;
         Total = new Money((unitPrice.Amount + additionals.Sum(x => x.UnitPrice.Amount * x.Quantity.Value)) * quantity.Value);
+    }
+
+    internal OrderItem(Guid tenantId, Guid establishmentId, Guid orderId, Guid productId, Guid? variationId,
+        string productName, string? variationName, ModifierCompositionPrice composition, Quantity quantity, string? notes)
+    {
+        Id = Guid.NewGuid(); TenantId = tenantId; EstablishmentId = establishmentId; OrderId = orderId; ProductId = productId; VariationId = variationId;
+        ProductName = Required(productName, 150); VariationName = Optional(variationName, 100);
+        BasePrice = composition.BasePrice; UnitPrice = composition.UnitPrice; Quantity = quantity; Notes = Optional(notes, 500);
+        foreach (var group in composition.Groups)
+        {
+            modifierGroups.Add(new OrderItemModifierGroup(tenantId, establishmentId, Id, group));
+            foreach (var option in group.Options)
+                additionals.Add(new OrderItemAdditional(tenantId, establishmentId, Id, option.OptionId, option.Name, option.UnitPrice, option.Quantity));
+        }
+        Total = new Money(UnitPrice.Amount * quantity.Value);
     }
 
     public Guid Id { get; private set; }
@@ -300,16 +331,61 @@ public sealed class OrderItem : IEstablishmentScopedEntity
     public string ProductName { get; private set; } = string.Empty;
     public string? VariationName { get; private set; }
     public Money UnitPrice { get; private set; }
+    public Money BasePrice { get; private set; }
     public Quantity Quantity { get; private set; }
     public string? Notes { get; private set; }
     public Money Total { get; private set; }
     public IReadOnlyCollection<OrderItemAdditional> Additionals => additionals;
+    public IReadOnlyCollection<OrderItemModifierGroup> ModifierGroups => modifierGroups;
 
     private static string Required(string value, int max)
     { var result = value.Trim(); if (result.Length is < 1 || result.Length > max) throw new DomainException("Order item snapshot is invalid."); return result; }
 
     private static string? Optional(string? value, int max)
     { if (string.IsNullOrWhiteSpace(value)) return null; var result = value.Trim(); if (result.Length > max) throw new DomainException("Order item snapshot is invalid."); return result; }
+}
+
+public sealed class OrderItemModifierGroup : IEstablishmentScopedEntity
+{
+    private readonly List<OrderItemModifierOption> options = [];
+    private OrderItemModifierGroup() { }
+    internal OrderItemModifierGroup(Guid tenantId, Guid establishmentId, Guid orderItemId, ModifierGroupSnapshot snapshot)
+    {
+        Id = Guid.NewGuid(); TenantId = tenantId; EstablishmentId = establishmentId; OrderItemId = orderItemId;
+        ModifierGroupId = snapshot.GroupId; Name = snapshot.Name; PricingStrategy = snapshot.PricingStrategy;
+        Price = snapshot.Price;
+        foreach (var option in snapshot.Options) options.Add(new OrderItemModifierOption(tenantId, establishmentId, Id, option));
+    }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public Guid OrderItemId { get; private set; }
+    public Guid ModifierGroupId { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public ModifierPricingStrategy PricingStrategy { get; private set; }
+    public Money Price { get; private set; }
+    public IReadOnlyCollection<OrderItemModifierOption> Options => options;
+}
+
+public sealed class OrderItemModifierOption : IEstablishmentScopedEntity
+{
+    private OrderItemModifierOption() { }
+    internal OrderItemModifierOption(Guid tenantId, Guid establishmentId, Guid groupId, ModifierOptionSnapshot snapshot)
+    {
+        Id = Guid.NewGuid(); TenantId = tenantId; EstablishmentId = establishmentId; OrderItemModifierGroupId = groupId;
+        ModifierOptionId = snapshot.OptionId; Name = snapshot.Name; UnitPrice = snapshot.UnitPrice; Quantity = snapshot.Quantity;
+        PortionNumerator = snapshot.Portion?.Numerator; PortionDenominator = snapshot.Portion?.Denominator;
+    }
+    public Guid Id { get; private set; }
+    public Guid TenantId { get; private set; }
+    public Guid EstablishmentId { get; private set; }
+    public Guid OrderItemModifierGroupId { get; private set; }
+    public Guid ModifierOptionId { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public Money UnitPrice { get; private set; }
+    public Quantity Quantity { get; private set; }
+    public int? PortionNumerator { get; private set; }
+    public int? PortionDenominator { get; private set; }
 }
 
 public sealed class OrderItemAdditional : IEstablishmentScopedEntity

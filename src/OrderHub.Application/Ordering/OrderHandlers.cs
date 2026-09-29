@@ -58,8 +58,10 @@ public sealed class AddOrderItemCommandHandler(
             ?? throw new NotFoundException("Order was not found.");
         var offer = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, command.ProductId, command.VariationId, command.Additionals, timeProvider.GetUtcNow(), cancellationToken)
             ?? throw new NotFoundException("Sellable offer was not found in this establishment.");
-        var item = order.AddItem(offer.ProductId, offer.VariationId, offer.ProductName, offer.VariationName, offer.UnitPrice, new Quantity(command.Quantity),
-            offer.Additionals.Select(x => new OrderAdditionalInput(x.AdditionalId, x.Name, x.UnitPrice, x.Quantity)).ToArray(), command.Notes, timeProvider.GetUtcNow());
+        var item = offer.Composition is { } composition
+            ? order.AddComposedItem(offer.ProductId, offer.VariationId, offer.ProductName, offer.VariationName, composition, new Quantity(command.Quantity), command.Notes, timeProvider.GetUtcNow())
+            : order.AddItem(offer.ProductId, offer.VariationId, offer.ProductName, offer.VariationName, offer.UnitPrice, new Quantity(command.Quantity),
+                offer.Additionals.Select(x => new OrderAdditionalInput(x.AdditionalId, x.Name, x.UnitPrice, x.Quantity)).ToArray(), command.Notes, timeProvider.GetUtcNow());
         await repository.SaveChangesAsync(cancellationToken);
         return item.Id;
     }
@@ -84,7 +86,8 @@ public sealed class ConfirmOrderCommandHandler(
 
         foreach (var item in order.Items)
         {
-            var selections = item.Additionals.Select(x => new OrderAdditionalSelection(x.AdditionalId, x.Quantity.Value)).ToArray();
+            var selections = item.ModifierGroups.SelectMany(g => g.Options.Select(o => new OrderAdditionalSelection(o.ModifierOptionId, o.Quantity.Value, g.ModifierGroupId, o.PortionNumerator, o.PortionDenominator))).ToArray();
+            if (selections.Length == 0) selections = item.Additionals.Select(x => new OrderAdditionalSelection(x.AdditionalId, x.Quantity.Value)).ToArray();
             var current = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, item.ProductId, item.VariationId, selections, timeProvider.GetUtcNow(), cancellationToken);
             if (current is null || !Matches(item, current))
                 throw new ConflictException("Order offer changed or is no longer available. Recompose the order before confirming.");
@@ -105,7 +108,8 @@ public sealed class ConfirmOrderCommandHandler(
             if (!decision.IsAvailable) throw new AvailabilityConflictException(decision.Message ?? "Service is unavailable.", decision.Reason, decision.NextOpening);
             foreach (var item in order.Items)
             {
-                var selections = item.Additionals.Select(x => new OrderAdditionalSelection(x.AdditionalId, x.Quantity.Value)).ToArray();
+                var selections = item.ModifierGroups.SelectMany(g => g.Options.Select(o => new OrderAdditionalSelection(o.ModifierOptionId, o.Quantity.Value, g.ModifierGroupId, o.PortionNumerator, o.PortionDenominator))).ToArray();
+                if (selections.Length == 0) selections = item.Additionals.Select(x => new OrderAdditionalSelection(x.AdditionalId, x.Quantity.Value)).ToArray();
                 var current = await offerResolver.ResolveAsync(scope.TenantId, scope.EstablishmentId, item.ProductId, item.VariationId, selections, now, token);
                 if (current is null || !Matches(item, current))
                     throw new AvailabilityConflictException("Order contains unavailable or changed offers.", AvailabilityReason.OfferUnavailable, null, [item.ProductId]);
@@ -121,10 +125,29 @@ public sealed class ConfirmOrderCommandHandler(
             cancellationToken);
     }
 
-    private static bool Matches(OrderItem item, OrderOfferSnapshot current) =>
-        item.ProductName == current.ProductName && item.VariationName == current.VariationName && item.UnitPrice == current.UnitPrice
-        && item.Additionals.Count == current.Additionals.Count
-        && item.Additionals.All(saved => current.Additionals.Any(value => value.AdditionalId == saved.AdditionalId && value.Name == saved.Name && value.UnitPrice == saved.UnitPrice && value.Quantity == saved.Quantity));
+    private static bool Matches(OrderItem item, OrderOfferSnapshot current)
+    {
+        if (item.ProductName != current.ProductName || item.VariationName != current.VariationName) return false;
+        if (current.Composition is null)
+            return item.UnitPrice == current.UnitPrice && MatchesAdditionals(item, current);
+
+        // Orders created before modifier snapshots stored the base price on the item and additions separately.
+        if (item.ModifierGroups.Count == 0)
+            return item.UnitPrice == current.Composition.BasePrice && MatchesAdditionals(item, current);
+
+        return item.BasePrice == current.Composition.BasePrice && item.UnitPrice == current.Composition.UnitPrice
+            && item.ModifierGroups.Count == current.Composition.Groups.Count
+            && item.ModifierGroups.All(saved => current.Composition.Groups.Any(value =>
+                value.GroupId == saved.ModifierGroupId && value.Name == saved.Name && value.PricingStrategy == saved.PricingStrategy
+                && value.Price == saved.Price && value.Options.Count == saved.Options.Count
+                && value.Options.All(option => saved.Options.Any(snapshot => snapshot.ModifierOptionId == option.OptionId
+                    && snapshot.Name == option.Name && snapshot.UnitPrice == option.UnitPrice && snapshot.Quantity == option.Quantity
+                    && snapshot.PortionNumerator == option.Portion?.Numerator && snapshot.PortionDenominator == option.Portion?.Denominator))));
+    }
+
+    private static bool MatchesAdditionals(OrderItem item, OrderOfferSnapshot current) =>
+        item.Additionals.Count == current.Additionals.Count && item.Additionals.All(saved => current.Additionals.Any(value =>
+            value.AdditionalId == saved.AdditionalId && value.Name == saved.Name && value.UnitPrice == saved.UnitPrice && value.Quantity == saved.Quantity));
 }
 
 public sealed class TransitionOrderCommandHandler(

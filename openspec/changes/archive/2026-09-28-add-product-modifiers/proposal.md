@@ -4,9 +4,10 @@ Variações e adicionais básicos não cobrem composições comuns em pizzarias,
 
 ## What Changes
 
-- Evoluir grupos de opções com tipos, quantidades, limites e regras de compatibilidade.
+- Evoluir grupos de opções com tipos, quantidades, limites, regras de compatibilidade e estratégias de preço `Additive`, `HighestPrice`, `Proportional` e `NoPriceChange`.
 - Suportar sabores, bordas, adicionais, remoções e escolhas compostas por configuração.
-- Calcular preços de modificadores no servidor e preservar snapshots no pedido.
+- Representar frações de escolhas compostas exatamente por numerador e denominador; validar composição integral no servidor.
+- Calcular preços de modificadores no servidor e preservar snapshots que expliquem o preço no pedido.
 - Orientar a interface pública a partir dos metadados do catálogo.
 
 ## Capabilities

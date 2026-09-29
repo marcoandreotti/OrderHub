@@ -13,7 +13,7 @@ namespace OrderHub.Infrastructure.Persistence.Write.Repositories;
 public sealed class OrderRepository(OrderHubDbContext context) : IOrderRepository
 {
     public Task<Order?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) =>
-        context.Orders.Include(x => x.Items).ThenInclude(x => x.Additionals).Include(x => x.History)
+        context.Orders.Include(x => x.Items).ThenInclude(x => x.Additionals).Include(x => x.Items).ThenInclude(x => x.ModifierGroups).ThenInclude(x => x.Options).Include(x => x.History)
             .SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
 
     public async Task AddAsync(Order order, CancellationToken cancellationToken)

@@ -1,7 +1,7 @@
 import { computed, reactive } from 'vue'
 import type { OrderItemRequest, PublicCatalog } from './types'
 
-const VERSION = 1
+const VERSION = 2
 const PREFIX = 'orderhub.public-cart.'
 export interface CartItem extends OrderItemRequest {
   key: string
@@ -16,7 +16,7 @@ const storage = () => typeof window === 'undefined' ? undefined : window.localSt
 
 function valid(value: unknown, slug: string): value is PersistedCart {
   const cart = value as Partial<PersistedCart> | null
-  return !!cart && cart.version === VERSION && cart.slug === slug &&
+  return !!cart && (cart.version === VERSION || cart.version === 1) && cart.slug === slug &&
     Array.isArray(cart.items) && cart.items.every(item =>
       typeof item?.key === 'string' && typeof item.productId === 'string' &&
       Number.isFinite(item.quantity) && item.quantity > 0 &&
@@ -39,7 +39,8 @@ export function loadCart(slug: string) {
     try {
       const value: unknown = JSON.parse(raw)
       if (valid(value, slug)) state.items = value.items.map(item => ({
-        ...item, productName: 'Item indisponível', variationName: null,
+        ...item, additionals: item.additionals.map(selected => ({ groupId: null, portionNumerator: null, portionDenominator: null, ...selected })),
+        productName: 'Item indisponível', variationName: null,
         displayedUnitPrice: 0
       }))
       else storage()?.removeItem(PREFIX + slug)
@@ -53,14 +54,22 @@ export function hydrateCartFromCatalog(catalog: PublicCatalog) {
     const product = products.find(candidate => candidate.id === line.productId)
     if (!product) return
     const variation = product.variations.find(candidate => candidate.id === line.variationId)
-    const additionals = product.additionalGroups.flatMap(group => group.items)
+    const groups = product.additionalGroups
+    line.additionals.forEach(selected => {
+      if (!selected.groupId) selected.groupId = groups.find(group => group.items.some(option => option.id === selected.additionalId))?.id ?? null
+    })
+    const selections = line.additionals.map(selected => ({ selected, group: groups.find(group => group.id === selected.groupId), option: groups.flatMap(group => group.items).find(option => option.id === selected.additionalId) }))
+    const composition = groups.find(group => group.pricingStrategy === 'HighestPrice' || group.pricingStrategy === 'Proportional')
+    const selectedComposition = selections.filter(item => item.group?.id === composition?.id && item.option)
+    const compositionPrice = composition?.pricingStrategy === 'HighestPrice'
+      ? Math.max(...selectedComposition.map(item => item.option!.price), 0)
+      : composition?.pricingStrategy === 'Proportional'
+        ? selectedComposition.reduce((sum, item) => sum + item.option!.price * (item.selected.portionNumerator ?? 0) / (item.selected.portionDenominator ?? 1), 0)
+        : variation?.price ?? product.basePrice
     line.productName = product.name + (product.isAvailable === false ? ' (indisponível)' : '')
     line.variationName = variation?.name ?? null
-    line.displayedUnitPrice = (variation?.price ?? product.basePrice) +
-      line.additionals.reduce((sum, selected) => {
-        const additional = additionals.find(candidate => candidate.id === selected.additionalId)
-        return sum + (additional?.price ?? 0) * selected.quantity
-      }, 0)
+    line.displayedUnitPrice = compositionPrice + selections.reduce((sum, item) =>
+      item.group?.pricingStrategy === 'Additive' ? sum + (item.option?.price ?? 0) * item.selected.quantity : sum, 0)
   })
 }
 export function usePublicCart() {

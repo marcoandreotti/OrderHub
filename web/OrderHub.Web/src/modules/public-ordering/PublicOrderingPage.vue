@@ -27,6 +27,7 @@ const quantity = ref(1)
 const variationId = ref<string | null>(null)
 const notes = ref('')
 const selections = reactive<Record<string, string[]>>({})
+const selectionQuantities = reactive<Record<string, number>>({})
 const compositionError = ref('')
 const cart = usePublicCart()
 const simulation = ref<Simulation>()
@@ -52,6 +53,10 @@ const checkout = reactive({
 const money = (value: number) => new Intl.NumberFormat('pt-BR', {
   style: 'currency', currency: 'BRL'
 }).format(value)
+const pricingLabel = (strategy?: string) => ({
+  Additive: 'valores somados', HighestPrice: 'considera o maior preço',
+  Proportional: 'preço proporcional às frações', NoPriceChange: 'sem alteração de preço'
+}[strategy ?? 'Additive'] ?? 'valores somados')
 const sortedCategories = computed(() => [...(catalog.value?.categories ?? [])]
   .filter(category => category.isActive)
   .sort((a, b) => a.order - b.order))
@@ -113,19 +118,35 @@ function openProduct(product: Product) {
   notes.value = ''
   compositionError.value = ''
   Object.keys(selections).forEach(key => delete selections[key])
+  Object.keys(selectionQuantities).forEach(key => delete selectionQuantities[key])
   product.additionalGroups.filter(x => x.isActive).forEach(group => { selections[group.id] = [] })
 }
 function toggle(groupId: string, additionalId: string, maximum: number) {
   const values = selections[groupId] ?? []
   const index = values.indexOf(additionalId)
-  if (index >= 0) values.splice(index, 1)
-  else if (values.length < maximum) values.push(additionalId)
+  if (index >= 0) { values.splice(index, 1); delete selectionQuantities[`${groupId}:${additionalId}`] }
+  else if (selectedCount(groupId) < maximum) { values.push(additionalId); selectionQuantities[`${groupId}:${additionalId}`] = 1 }
+}
+function isCompositeGroup(groupId: string) {
+  const strategy = selected.value?.additionalGroups.find(group => group.id === groupId)?.pricingStrategy
+  return strategy === 'HighestPrice' || strategy === 'Proportional'
+}
+function selectedCount(groupId: string) {
+  const values = selections[groupId] ?? []
+  return isCompositeGroup(groupId) ? values.length : values.reduce((sum, id) => sum + (selectionQuantities[`${groupId}:${id}`] ?? 1), 0)
+}
+function setSelectionQuantity(groupId: string, additionalId: string, value: string) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1) return
+  const max = selected.value?.additionalGroups.find(group => group.id === groupId)?.maximumSelection ?? 1
+  const otherCount = selectedCount(groupId) - (selectionQuantities[`${groupId}:${additionalId}`] ?? 1)
+  selectionQuantities[`${groupId}:${additionalId}`] = Math.min(Math.floor(parsed), max - otherCount)
 }
 function addProduct() {
   const product = selected.value
   if (!product || product.isAvailable === false) return
   const invalid = product.additionalGroups.filter(group => group.isActive).find(group => {
-    const count = selections[group.id]?.length ?? 0
+    const count = selectedCount(group.id)
     return count < group.minimumSelection || count > group.maximumSelection
   })
   if (invalid) {
@@ -133,21 +154,49 @@ function addProduct() {
       invalid.minimumSelection + ' e ' + invalid.maximumSelection + '.'
     return
   }
+  const chosenPairs = new Set(product.additionalGroups.flatMap(group =>
+    (selections[group.id] ?? []).map(optionId => `${group.id}:${optionId}`)))
+  for (const group of product.additionalGroups) for (const option of group.items) {
+    if (!chosenPairs.has(`${group.id}:${option.id}`)) continue
+    for (const rule of option.compatibilityRules ?? []) {
+      const targetSelected = chosenPairs.has(`${rule.targetGroupId}:${rule.targetAdditionalId}`)
+      if (rule.kind === 'Requires' && !targetSelected) {
+        compositionError.value = `${option.name} também exige uma opção de outro grupo.`
+        return
+      }
+      if (rule.kind === 'Excludes' && targetSelected) {
+        compositionError.value = `${option.name} não pode ser combinada com a opção selecionada.`
+        return
+      }
+    }
+  }
   const variation = product.variations.find(item => item.id === variationId.value)
   const additionals = product.additionalGroups.flatMap(group =>
-    group.items.filter(item => selections[group.id]?.includes(item.id))
+    group.items.filter(item => selections[group.id]?.includes(item.id)).map(item => ({ group, item }))
   )
-  if (variation?.isAvailable === false || additionals.some(item => item.isAvailable === false)) {
+  if (variation?.isAvailable === false || additionals.some(({ item }) => item.isAvailable === false)) {
     compositionError.value = 'Uma opção selecionada ficou indisponível. Revise a composição.'
     return
   }
+  const compositionGroup = product.additionalGroups.find(group => group.pricingStrategy === 'HighestPrice' || group.pricingStrategy === 'Proportional')
+  const compositionOptions = additionals.filter(x => x.group.id === compositionGroup?.id)
+  const compositionPrice = compositionGroup?.pricingStrategy === 'HighestPrice'
+    ? Math.max(...compositionOptions.map(x => x.item.price), 0)
+    : compositionGroup?.pricingStrategy === 'Proportional'
+      ? compositionOptions.reduce((sum, x) => sum + x.item.price / Math.max(compositionOptions.length, 1), 0)
+      : (variation?.price ?? product.basePrice)
+  const additivePrice = additionals.filter(x => (x.group.pricingStrategy ?? 'Additive') === 'Additive').reduce((sum, x) => sum + x.item.price * (selectionQuantities[`${x.group.id}:${x.item.id}`] ?? 1), 0)
   cart.add({
     key: crypto.randomUUID(), productId: product.id, variationId: variation?.id ?? null,
     productName: product.name, variationName: variation?.name ?? null,
-    displayedUnitPrice: (variation?.price ?? product.basePrice) +
-      additionals.reduce((sum, item) => sum + item.price, 0),
+    displayedUnitPrice: compositionPrice + additivePrice,
     quantity: quantity.value, notes: notes.value.trim() || null,
-    additionals: additionals.map(item => ({ additionalId: item.id, quantity: 1 }))
+    additionals: additionals.map(({ group, item }) => {
+      const fractional = group.pricingStrategy === 'HighestPrice' || group.pricingStrategy === 'Proportional'
+      const count = additionals.filter(x => x.group.id === group.id).length
+      return { additionalId: item.id, quantity: fractional ? 1 : selectionQuantities[`${group.id}:${item.id}`] ?? 1, groupId: group.id,
+        portionNumerator: fractional ? 1 : null, portionDenominator: fractional ? count : null }
+    })
   })
   selected.value = undefined
 }
@@ -388,12 +437,13 @@ onBeforeUnmount(() => controller?.abort())
             </label>
           </fieldset>
           <fieldset v-for="group in selected.additionalGroups.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="group.id">
-            <legend>{{ group.name }} ({{ group.minimumSelection }}–{{ group.maximumSelection }})</legend>
+            <legend>{{ group.name }} ({{ group.minimumSelection }}–{{ group.maximumSelection }}) · {{ pricingLabel(group.pricingStrategy) }}</legend>
             <label v-for="item in group.items.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="item.id">
               <input type="checkbox" :checked="selections[group.id]?.includes(item.id)"
-                :disabled="item.isAvailable === false || (!selections[group.id]?.includes(item.id) && (selections[group.id]?.length ?? 0) >= group.maximumSelection)"
+                :disabled="item.isAvailable === false || (!selections[group.id]?.includes(item.id) && selectedCount(group.id) >= group.maximumSelection)"
                 @change="toggle(group.id, item.id, group.maximumSelection)">
-              {{ item.name }} <span>+ {{ money(item.price) }}</span><small v-if="item.isAvailable === false"> · indisponível</small>
+              {{ item.name }} <span>{{ (group.pricingStrategy ?? 'Additive') === 'NoPriceChange' ? 'sem alteração' : money(item.price) }}</span><small v-if="item.isAvailable === false"> · indisponível</small>
+              <input v-if="(group.pricingStrategy ?? 'Additive') === 'Additive' && selections[group.id]?.includes(item.id)" type="number" min="1" :max="group.maximumSelection" :value="selectionQuantities[`${group.id}:${item.id}`] ?? 1" aria-label="Quantidade da opção" @click.stop @input="setSelectionQuantity(group.id, item.id, ($event.target as HTMLInputElement).value)">
             </label>
           </fieldset>
           <q-input v-if="selected.allowsNotes" v-model="notes" label="Observações" type="textarea" />

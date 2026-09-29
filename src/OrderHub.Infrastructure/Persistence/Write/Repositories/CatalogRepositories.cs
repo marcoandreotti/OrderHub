@@ -56,9 +56,9 @@ public sealed class AdditionalRepository(OrderHubDbContext context) : IAdditiona
 
 public sealed class AdditionalGroupRepository(OrderHubDbContext context) : IAdditionalGroupRepository
 {
-    public Task<AdditionalGroup?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => context.AdditionalGroups.Include(x => x.Items).SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
+    public Task<AdditionalGroup?> GetAsync(Guid tenantId, Guid establishmentId, Guid id, CancellationToken cancellationToken) => context.AdditionalGroups.Include(x => x.Items).Include(x => x.CompatibilityRules).SingleOrDefaultAsync(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && x.Id == id, cancellationToken);
 
-    public async Task<IReadOnlyList<AdditionalGroup>> GetManyAsync(Guid tenantId, Guid establishmentId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => await context.AdditionalGroups.Where(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && ids.Contains(x.Id)).ToListAsync(cancellationToken);
+    public async Task<IReadOnlyList<AdditionalGroup>> GetManyAsync(Guid tenantId, Guid establishmentId, IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) => await context.AdditionalGroups.Include(x => x.Items).Include(x => x.CompatibilityRules).Where(x => x.TenantId == tenantId && x.EstablishmentId == establishmentId && ids.Contains(x.Id)).ToListAsync(cancellationToken);
 
     public async Task AddAsync(AdditionalGroup group, CancellationToken cancellationToken)
     { await context.AdditionalGroups.AddAsync(group, cancellationToken); await CatalogPersistence.ExecuteAsync(() => context.SaveChangesAsync(cancellationToken)); }

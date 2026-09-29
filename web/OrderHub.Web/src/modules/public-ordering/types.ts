@@ -23,10 +23,14 @@ export interface PublicServiceAvailability {
 export interface Additional {
   id: string; name: string; price: number; isActive: boolean; order: number
   isAvailable?: boolean; unavailabilityReason?: string | null; availableAgainAt?: string | null
+  compatibilityRules?: { targetGroupId: string; targetAdditionalId: string; kind: 'Requires' | 'Excludes' }[]
 }
 export interface AdditionalGroup {
   id: string; name: string; minimumSelection: number; maximumSelection: number
   isActive: boolean; order: number; items: Additional[]
+  pricingStrategy?: 'Additive' | 'HighestPrice' | 'Proportional' | 'NoPriceChange'
+  type?: 'Additional' | 'Flavor' | 'Crust' | 'Removal'
+  requiresCompleteComposition?: boolean
 }
 export interface ProductVariation {
   id: string; name: string; price: number; order: number; isActive: boolean
@@ -52,7 +56,7 @@ export interface Address {
 }
 export interface OrderItemRequest {
   productId: string; variationId: string | null; quantity: number; notes: string | null
-  additionals: { additionalId: string; quantity: number }[]
+  additionals: { additionalId: string; quantity: number; groupId: string | null; portionNumerator: number | null; portionDenominator: number | null }[]
 }
 export type ServiceType = 'Table' | 'Pickup' | 'Delivery'
 export interface SimulationRequest {
@@ -63,6 +67,8 @@ export interface SimulationRequest {
 export interface SimulatedItem {
   productName: string; variationName: string | null; unitPrice: number; quantity: number
   total: number; additionals: { name: string; unitPrice: number; quantity: number }[]
+  basePrice?: number
+  modifierGroups?: { groupId: string; name: string; pricingStrategy: string; price: number; options: { optionId: string; name: string; unitPrice: number; quantity: number; portionNumerator: number | null; portionDenominator: number | null }[] }[] | null
 }
 export interface Simulation {
   subtotal: number; discount: number; fees: number; total: number

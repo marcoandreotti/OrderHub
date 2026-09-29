@@ -104,6 +104,39 @@ describe('catálogo público', () => {
     wrapper.unmount()
   })
 
+  it('envia frações exatas para um grupo de composição conforme metadados', async () => {
+    const composed = {
+      ...product,
+      additionalGroups: [{
+        id: 'flavors', name: 'Sabores', minimumSelection: 1, maximumSelection: 4,
+        isActive: true, order: 0, type: 'Flavor' as const, pricingStrategy: 'Proportional' as const, requiresCompleteComposition: true,
+        items: [
+          { id: 'calabresa', name: 'Calabresa', price: 40, isActive: true, order: 0 },
+          { id: 'portuguesa', name: 'Portuguesa', price: 50, isActive: true, order: 1 }
+        ]
+      }]
+    }
+    vi.mocked(publicOrderingClient.catalog).mockResolvedValue({
+      ...catalog,
+      categories: catalog.categories.map(category => ({ ...category, products: [composed] }))
+    })
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text().includes('Pizza'))!.trigger('click')
+    const choices = wrapper.findAll('input[type="checkbox"]')
+    await choices[0]!.setValue(true)
+    await choices[1]!.setValue(true)
+    await wrapper.findAll('button').find(button => button.text() === 'Adicionar')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text().startsWith('Carrinho'))!.trigger('click')
+    await flushPromises()
+    const request = vi.mocked(publicOrderingClient.simulate).mock.calls.at(-1)?.[1]
+    expect(request?.items[0]?.additionals).toEqual([
+      { additionalId: 'calabresa', quantity: 1, groupId: 'flavors', portionNumerator: 1, portionDenominator: 2 },
+      { additionalId: 'portuguesa', quantity: 1, groupId: 'flavors', portionNumerator: 1, portionDenominator: 2 }
+    ])
+    wrapper.unmount()
+  })
+
   it('não revela dados quando a unidade está indisponível', async () => {
     vi.mocked(publicOrderingClient.context).mockRejectedValue(new ApiError({ status: 404 }))
     const wrapper = mount(PublicOrderingPage, { global: { stubs } })

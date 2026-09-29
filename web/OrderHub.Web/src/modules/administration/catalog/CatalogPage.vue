@@ -73,7 +73,10 @@ const group = ref<Group>({
   maximumSelection: 1,
   isActive: true,
   order: 0,
-  items: []
+  items: [],
+  pricingStrategy: 'Additive',
+  type: 'Additional',
+  requiresCompleteComposition: false
 })
 const labels: Record<Resource, string> = {
   categories: 'Categorias',
@@ -82,6 +85,8 @@ const labels: Record<Resource, string> = {
   'additional-groups': 'Grupos de adicionais'
 }
 const maxPage = computed(() => Math.max(1, Math.ceil(total.value / 20)))
+const modifierTargets = computed(() => (catalog.value?.categories ?? []).flatMap(category => category.products.flatMap(product => product.additionalGroups.flatMap(targetGroup => targetGroup.items.map(target => ({ groupId: targetGroup.id, groupName: targetGroup.name, optionId: target.id, optionName: target.name }))))))
+const targetOptions = (groupId: string) => modifierTargets.value.filter(target => target.groupId === groupId).map(target => ({ label: `${target.groupName} — ${target.optionName}`, value: target.optionId }))
 const draft = computed(() =>
   kind.value === 'categories'
     ? category.value
@@ -428,6 +433,12 @@ onUnmounted(() => request?.abort())
                 :error-message="field('price')"
             /></template>
             <template v-if="kind === 'additional-groups'">
+              <q-select v-model="group.type" outlined label="Tipo do grupo" emit-value map-options
+                :options="[{label:'Adicionais',value:'Additional'},{label:'Sabores',value:'Flavor'},{label:'Bordas',value:'Crust'},{label:'Remoções',value:'Removal'}]" />
+              <q-select v-model="group.pricingStrategy" outlined label="Estratégia de preço" emit-value map-options
+                :options="[{label:'Somar opções',value:'Additive'},{label:'Maior preço',value:'HighestPrice'},{label:'Proporcional à fração',value:'Proportional'},{label:'Sem alteração',value:'NoPriceChange'}]" />
+              <q-checkbox v-if="group.pricingStrategy === 'HighestPrice' || group.pricingStrategy === 'Proportional'"
+                v-model="group.requiresCompleteComposition" label="Exigir composição integral (frações totalizam 1)" />
               <q-input
                 v-model.number="group.minimumSelection"
                 outlined
@@ -474,6 +485,16 @@ onUnmounted(() => request?.abort())
                   label="Remover vínculo"
                   @click="group.items.splice(index, 1)"
                 />
+                <div v-for="(rule, ruleIndex) in (item.compatibilityRules ??= [])" :key="ruleIndex" class="row col-12 items-center q-gutter-sm">
+                  <q-select v-model="rule.kind" outlined dense label="Regra" emit-value map-options
+                    :options="[{label:'Exige',value:'Requires'},{label:'Exclui',value:'Excludes'}]" style="min-width: 150px" />
+                  <q-select v-model="rule.targetGroupId" outlined dense label="Grupo alvo" emit-value map-options
+                    :options="Array.from(new Map(modifierTargets.map(target => [target.groupId, {label:target.groupName,value:target.groupId}])).values())" style="min-width: 180px" />
+                  <q-select v-model="rule.targetAdditionalId" outlined dense label="Opção alvo" emit-value map-options
+                    :options="targetOptions(rule.targetGroupId)" style="min-width: 200px" />
+                  <q-btn flat label="Remover regra" @click="item.compatibilityRules?.splice(ruleIndex, 1)" />
+                </div>
+                <q-btn flat label="Adicionar dependência/exclusão" @click="(item.compatibilityRules ??= []).push({targetGroupId:'',targetAdditionalId:'',kind:'Requires'})" />
               </div>
               <q-btn
                 outline

@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderHub.Domain.Ordering;
+using OrderHub.Domain.Catalog;
 using OrderHub.Domain.SharedKernel;
 using OrderHub.Domain.Tenancy;
+using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Infrastructure.Persistence;
 using OrderHub.Infrastructure.Persistence.Read;
 using OrderHub.Infrastructure.Persistence.Write;
@@ -43,6 +45,68 @@ public sealed class OrderPersistenceTests : IAsyncLifetime
         Assert.Equal(1,filtered.Total);Assert.Equal(orderId,Assert.Single(filtered.Items).Id);
         Assert.Empty((await gateway.SearchAsync(Guid.NewGuid(),establishmentId,null,null,null,null,null,1,20,CancellationToken.None)).Items);
         Assert.Empty((await gateway.SearchAsync(tenantId,establishmentId,null,null,OrderStatus.Completed,null,null,1,20,CancellationToken.None)).Items);
+    }
+
+    [Fact]
+    public async Task Ef_and_Dapper_preserve_composed_modifier_price_explanation()
+    {
+        var options = CreateOptions();
+        Guid tenantId; Guid establishmentId; Guid orderId;
+        var now = DateTimeOffset.UtcNow;
+        var firstOption = Guid.NewGuid(); var secondOption = Guid.NewGuid(); var groupId = Guid.NewGuid();
+        await using (var context = new OrderHubDbContext(options))
+        {
+            await context.Database.EnsureCreatedAsync();
+            var tenant = Tenant.Create("Group", now); var unit = Establishment.Create(tenant.Id, "Unit", new Slug("modifier-unit"), now);
+            var composition = new ModifierCompositionPrice(new Money(30), new Money(50), [
+                new ModifierGroupSnapshot(groupId, "Sabores", ModifierPricingStrategy.HighestPrice, new Money(50), [
+                    new(groupId, firstOption, "Calabresa", new Money(40), new Quantity(1), new ModifierPortion(1, 2)),
+                    new(groupId, secondOption, "Portuguesa", new Money(50), new Quantity(1), new ModifierPortion(1, 2))])]);
+            var order = Order.Create(tenant.Id, unit.Id, OrderServiceType.Pickup, null, null, null, null, null, now);
+            order.AddComposedItem(Guid.NewGuid(), null, "Pizza", "Grande", composition, new Quantity(2), null, now);
+            order.Confirm(1, now); context.AddRange(tenant, unit, order); await context.SaveChangesAsync();
+            tenantId = tenant.Id; establishmentId = unit.Id; orderId = order.Id;
+        }
+
+        var gateway = new OrderReadGateway(new NpgsqlReadConnectionFactory(Microsoft.Extensions.Options.Options.Create(new DatabaseOptions { ConnectionString = database.GetConnectionString() })));
+        var result = await gateway.GetAsync(tenantId, establishmentId, orderId, CancellationToken.None);
+        Assert.NotNull(result);
+        var item = Assert.Single(result.Items);
+        var group = Assert.Single(item.ModifierGroups!);
+        Assert.Equal(30m, item.BasePrice); Assert.Equal(50m, item.UnitPrice); Assert.Equal(100m, item.Total);
+        Assert.Equal("HighestPrice", group.PricingStrategy); Assert.Equal(50m, group.Price);
+        Assert.Equal([1, 1], group.Options.Select(x => x.PortionNumerator));
+        Assert.Equal([2, 2], group.Options.Select(x => x.PortionDenominator));
+        Assert.Equal(new[] { firstOption, secondOption }.Order(), group.Options.Select(x => x.OptionId).Order());
+    }
+
+    [Fact]
+    public async Task Offer_resolver_prices_from_tenant_catalog_and_rejects_foreign_scope_or_group()
+    {
+        var options = CreateOptions(); var now = DateTimeOffset.UtcNow;
+        Guid tenantId; Guid establishmentId; Guid productId; Guid groupId; Guid firstOptionId; Guid secondOptionId;
+        await using (var context = new OrderHubDbContext(options))
+        {
+            await context.Database.EnsureCreatedAsync();
+            var tenant = Tenant.Create("Group", now); var unit = Establishment.Create(tenant.Id, "Unit", new Slug("resolver-unit"), now);
+            var category = Category.Create(tenant.Id, unit.Id, "Pizzas"); var product = Product.Create(tenant.Id, unit.Id, category, "P1", "Pizza", new Money(30));
+            var first = Additional.Create(tenant.Id, unit.Id, "Calabresa", new Money(40)); var second = Additional.Create(tenant.Id, unit.Id, "Portuguesa", new Money(50));
+            var group = AdditionalGroup.Create(tenant.Id, unit.Id, "Sabores", 1, 4, ModifierPricingStrategy.Proportional, ModifierGroupType.Flavor, true);
+            group.AddItem(first, 0); group.AddItem(second, 1); product.LinkAdditionalGroup(group, 0);
+            context.AddRange(tenant, unit, category, product, first, second, group); await context.SaveChangesAsync();
+            tenantId = tenant.Id; establishmentId = unit.Id; productId = product.Id; groupId = group.Id; firstOptionId = first.Id; secondOptionId = second.Id;
+        }
+
+        var resolver = new OrderOfferResolver(new NpgsqlReadConnectionFactory(Microsoft.Extensions.Options.Options.Create(new DatabaseOptions { ConnectionString = database.GetConnectionString() })));
+        var selections = new[]
+        {
+            new OrderAdditionalSelection(firstOptionId, 1, groupId, 1, 2),
+            new OrderAdditionalSelection(secondOptionId, 1, groupId, 1, 2)
+        };
+        var offer = await resolver.ResolveAsync(tenantId, establishmentId, productId, null, selections, now, CancellationToken.None);
+        Assert.NotNull(offer); Assert.Equal(45m, offer.UnitPrice.Amount); Assert.Equal(30m, offer.Composition!.BasePrice.Amount);
+        Assert.Null(await resolver.ResolveAsync(Guid.NewGuid(), establishmentId, productId, null, selections, now, CancellationToken.None));
+        Assert.Null(await resolver.ResolveAsync(tenantId, establishmentId, productId, null, [selections[0] with { GroupId = Guid.NewGuid() }, selections[1]], now, CancellationToken.None));
     }
 
     [Fact]

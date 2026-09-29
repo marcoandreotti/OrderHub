@@ -64,9 +64,47 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
         builder.ToTable("order_item", DatabaseSchemas.Orders, table => table.HasCheckConstraint("ck_order_item_values", "unit_price >= 0 and quantity > 0 and total >= 0"));
         builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever(); builder.Property(x => x.TenantId).HasColumnName("tenant_id"); builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id"); builder.Property(x => x.OrderId).HasColumnName("order_id"); builder.Property(x => x.ProductId).HasColumnName("product_id"); builder.Property(x => x.VariationId).HasColumnName("variation_id");
         builder.Property(x => x.ProductName).HasColumnName("product_name").HasMaxLength(150); builder.Property(x => x.VariationName).HasColumnName("variation_name").HasMaxLength(100); builder.Property(x => x.Notes).HasColumnName("notes").HasMaxLength(500);
-        builder.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x)); builder.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(18, 3).HasConversion(x => x.Value, x => new Quantity(x)); builder.Property(x => x.Total).HasColumnName("total").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x));
+        builder.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x)); builder.Property(x => x.BasePrice).HasColumnName("base_price").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x)); builder.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(18, 3).HasConversion(x => x.Value, x => new Quantity(x)); builder.Property(x => x.Total).HasColumnName("total").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x));
         builder.HasAlternateKey(x => new { x.TenantId, x.EstablishmentId, x.Id }); builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.OrderId });
         builder.HasMany(x => x.Additionals).WithOne().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderItemId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+        builder.HasMany(x => x.ModifierGroups).WithOne().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderItemId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class OrderItemModifierGroupConfiguration : IEntityTypeConfiguration<OrderItemModifierGroup>
+{
+    public void Configure(EntityTypeBuilder<OrderItemModifierGroup> builder)
+    {
+        builder.ToTable("order_item_modifier_group", DatabaseSchemas.Orders);
+        builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id"); builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id");
+        builder.Property(x => x.OrderItemId).HasColumnName("order_item_id"); builder.Property(x => x.ModifierGroupId).HasColumnName("modifier_group_id");
+        builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(150);
+        builder.Property(x => x.PricingStrategy).HasColumnName("pricing_strategy").HasConversion<string>().HasMaxLength(30);
+        builder.Property(x => x.Price).HasColumnName("price").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x));
+        builder.HasAlternateKey(x => new { x.TenantId, x.EstablishmentId, x.Id });
+        builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.OrderItemId });
+        builder.HasMany(x => x.Options).WithOne().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderItemModifierGroupId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class OrderItemModifierOptionConfiguration : IEntityTypeConfiguration<OrderItemModifierOption>
+{
+    public void Configure(EntityTypeBuilder<OrderItemModifierOption> builder)
+    {
+        builder.ToTable("order_item_modifier_option", DatabaseSchemas.Orders, table =>
+        {
+            table.HasCheckConstraint("ck_order_item_modifier_option_portion", "(portion_numerator is null and portion_denominator is null) or (portion_numerator > 0 and portion_denominator > 0 and portion_numerator <= portion_denominator)");
+            table.HasCheckConstraint("ck_order_item_modifier_option_values", "unit_price >= 0 and quantity > 0");
+        });
+        builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id"); builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id");
+        builder.Property(x => x.OrderItemModifierGroupId).HasColumnName("order_item_modifier_group_id"); builder.Property(x => x.ModifierOptionId).HasColumnName("modifier_option_id");
+        builder.Property(x => x.Name).HasColumnName("name").HasMaxLength(150);
+        builder.Property(x => x.UnitPrice).HasColumnName("unit_price").HasPrecision(18, 2).HasConversion(x => x.Amount, x => new Money(x));
+        builder.Property(x => x.Quantity).HasColumnName("quantity").HasPrecision(18, 3).HasConversion(x => x.Value, x => new Quantity(x));
+        builder.Property(x => x.PortionNumerator).HasColumnName("portion_numerator"); builder.Property(x => x.PortionDenominator).HasColumnName("portion_denominator");
+        builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.OrderItemModifierGroupId });
     }
 }
 

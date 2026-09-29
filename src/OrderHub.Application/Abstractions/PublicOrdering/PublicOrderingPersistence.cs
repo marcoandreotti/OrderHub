@@ -36,6 +36,6 @@ public sealed record PublicOrderLine(Guid ProductId, Guid? VariationId, decimal 
 public sealed record PublicAddress(string Label, string Street, string Number, string? Complement, string Neighborhood, string City, string State, string PostalCode);
 public sealed record PublicSimulation(decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, IReadOnlyList<PublicSimulationItem> Items,
     Guid? DeliveryRegionId = null, string? DeliveryRegionName = null, decimal? DeliveryFee = null, int? DeliveryEstimatedMinutes = null, DateTimeOffset? DeliveryQuoteIssuedAt = null);
-public sealed record PublicSimulationItem(string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, IReadOnlyList<PublicSimulationAdditional> Additionals);
+public sealed record PublicSimulationItem(string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, IReadOnlyList<PublicSimulationAdditional> Additionals, decimal BasePrice = 0, IReadOnlyList<OrderModifierGroupReadModel>? ModifierGroups = null);
 public sealed record PublicSimulationAdditional(string Name, decimal UnitPrice, decimal Quantity);
 public sealed record PublicConfirmation(string Reference, long Number, OrderStatus Status, decimal Total);

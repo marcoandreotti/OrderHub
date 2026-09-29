@@ -86,7 +86,25 @@ public sealed class Product : IEstablishmentScopedEntity
 
     /// <summary>Substitui os grupos de adicionais garantindo o isolamento por estabelecimento.</summary>
     public void ReplaceAdditionalGroups(IEnumerable<(AdditionalGroup Group, int Order)> replacements)
-    { additionalGroups.Clear(); foreach (var item in replacements) LinkAdditionalGroup(item.Group, item.Order); }
+    {
+        var values = replacements.ToArray();
+        var groupIds = values.Select(x => x.Group.Id).ToHashSet();
+        foreach (var (group, order) in values)
+            if (group.TenantId != TenantId || group.EstablishmentId != EstablishmentId || order < 0)
+                throw new DomainException("Additional group must belong to the same establishment.");
+        if (values.Select(x => x.Group.Id).Distinct().Count() != values.Length)
+            throw new DomainException("Product cannot link the same additional group more than once.");
+        if (values.Count(x => IsCompositionPricing(x.Group.PricingStrategy)) > 1)
+            throw new DomainException("A product can have only one composition pricing group.");
+        if (values.SelectMany(x => x.Group.CompatibilityRules).Any(rule => !groupIds.Contains(rule.TargetGroupId) && rule.Kind == ModifierCompatibilityKind.Requires))
+            throw new DomainException("Product is missing a group required by a modifier compatibility rule.");
+
+        additionalGroups.Clear();
+        foreach (var item in values) LinkAdditionalGroup(item.Group, item.Order);
+    }
+
+    private static bool IsCompositionPricing(ModifierPricingStrategy strategy) =>
+        strategy is ModifierPricingStrategy.HighestPrice or ModifierPricingStrategy.Proportional;
 
     private static string Normalize(string input, int max, string field)
     { var value = input.Trim(); if (value.Length is < 1 || value.Length > max) throw new DomainException($"{field} is invalid."); return value; }

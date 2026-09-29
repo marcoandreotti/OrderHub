@@ -77,13 +77,67 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
         await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>();
-        await context.Database.MigrateAsync(); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        await migrator.MigrateAsync("20260928204645_DeliveryManagement"); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
         var expected = new[] { "additional", "additional_group", "additional_group_item", "category", "offer_unavailability", "product", "product_additional_group", "product_image", "product_variation" };
         Assert.Equal(expected, (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='catalog' order by table_name;")).ToArray());
         await migrator.MigrateAsync("20260820120132_IdentityOperations");
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='catalog';"));
-        await context.Database.MigrateAsync();
+        await migrator.MigrateAsync("20260928204645_DeliveryManagement");
         Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='catalog';"));
+    }
+
+    [Fact]
+    public async Task Product_modifiers_migration_backfills_existing_groups_as_additive_without_changing_prices()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>()
+            .UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName))
+            .Options;
+        await using var context = new OrderHubDbContext(options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync("20260928204645_DeliveryManagement");
+
+        var tenantId = Guid.NewGuid();
+        var establishmentId = Guid.NewGuid();
+        var categoryId = Guid.NewGuid();
+        var productId = Guid.NewGuid();
+        var groupId = Guid.NewGuid();
+        var additionalId = Guid.NewGuid();
+        await using var connection = new NpgsqlConnection(database.GetConnectionString());
+        await connection.OpenAsync();
+        await connection.ExecuteAsync("""
+            insert into tenancy.tenant(id, name, is_active, created_at, updated_at)
+            values (@TenantId, 'Migration tenant', true, now(), now());
+            insert into tenancy.establishment(id, tenant_id, trade_name, slug, is_active, created_at, updated_at)
+            values (@EstablishmentId, @TenantId, 'Migration unit', @Slug, true, now(), now());
+            insert into catalog.category(id, tenant_id, establishment_id, name, "order", is_active)
+            values (@CategoryId, @TenantId, @EstablishmentId, 'Pizzas', 0, true);
+            insert into catalog.product(id, tenant_id, establishment_id, category_id, code, name, base_price, is_featured, is_active, allows_notes)
+            values (@ProductId, @TenantId, @EstablishmentId, @CategoryId, 'PIZZA-1', 'Pizza', 50, false, true, true);
+            insert into catalog.additional(id, tenant_id, establishment_id, name, price, is_active)
+            values (@AdditionalId, @TenantId, @EstablishmentId, 'Borda', 8, true);
+            insert into catalog.additional_group(id, tenant_id, establishment_id, name, minimum_selection, maximum_selection, is_active)
+            values (@GroupId, @TenantId, @EstablishmentId, 'Bordas', 0, 1, true);
+            insert into catalog.additional_group_item(group_id, additional_id, tenant_id, establishment_id, "order")
+            values (@GroupId, @AdditionalId, @TenantId, @EstablishmentId, 0);
+            insert into catalog.product_additional_group(product_id, group_id, tenant_id, establishment_id, "order")
+            values (@ProductId, @GroupId, @TenantId, @EstablishmentId, 0);
+            """, new { TenantId = tenantId, EstablishmentId = establishmentId, CategoryId = categoryId, ProductId = productId, GroupId = groupId, AdditionalId = additionalId, Slug = $"migration-{Guid.NewGuid():N}" });
+
+        const string legacyPriceSql = "select p.base_price + a.price from catalog.product p join catalog.product_additional_group pg on pg.tenant_id=p.tenant_id and pg.establishment_id=p.establishment_id and pg.product_id=p.id join catalog.additional_group_item gi on gi.tenant_id=pg.tenant_id and gi.establishment_id=pg.establishment_id and gi.group_id=pg.group_id join catalog.additional a on a.tenant_id=gi.tenant_id and a.establishment_id=gi.establishment_id and a.id=gi.additional_id where p.tenant_id=@TenantId and p.establishment_id=@EstablishmentId and p.id=@ProductId";
+        var priceBefore = await connection.ExecuteScalarAsync<decimal>(legacyPriceSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId });
+        Assert.Equal(58m, priceBefore);
+
+        await context.Database.MigrateAsync();
+        Assert.Equal("Additive", await connection.ExecuteScalarAsync<string>("select pricing_strategy from catalog.additional_group where id=@GroupId", new { GroupId = groupId }));
+        Assert.Equal(priceBefore, await connection.ExecuteScalarAsync<decimal>(legacyPriceSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId }));
+        Assert.Equal(50m, await connection.ExecuteScalarAsync<decimal>("select base_price from catalog.product where id=@ProductId", new { ProductId = productId }));
+        Assert.Equal(8m, await connection.ExecuteScalarAsync<decimal>("select price from catalog.additional where id=@AdditionalId", new { AdditionalId = additionalId }));
+
+        await migrator.MigrateAsync("20260928204645_DeliveryManagement");
+        Assert.Equal(priceBefore, await connection.ExecuteScalarAsync<decimal>(legacyPriceSql, new { TenantId = tenantId, EstablishmentId = establishmentId, ProductId = productId }));
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='catalog' and table_name='additional_group' and column_name='pricing_strategy'"));
+        await context.Database.MigrateAsync();
+        Assert.Equal("Additive", await connection.ExecuteScalarAsync<string>("select pricing_strategy from catalog.additional_group where id=@GroupId", new { GroupId = groupId }));
     }
 
 
@@ -110,12 +164,12 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
     {
         var options = new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
         await using var context = new OrderHubDbContext(options); var migrator = context.Database.GetService<IMigrator>();
-        await context.Database.MigrateAsync(); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
+        await migrator.MigrateAsync("20260903001324_PublicOrderingApi"); await using var connection = new NpgsqlConnection(database.GetConnectionString()); await connection.OpenAsync();
         var expected = new[] { "order", "order_item", "order_item_additional", "order_number_counter", "order_status_history", "public_order_request" };
         Assert.Equal(expected, (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='orders' order by table_name;")).ToArray());
         await migrator.MigrateAsync("20260902201903_CustomerRecords");
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
-        await context.Database.MigrateAsync();
+        await migrator.MigrateAsync("20260903001324_PublicOrderingApi");
         Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
     }
 

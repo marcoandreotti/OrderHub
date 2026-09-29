@@ -31,7 +31,7 @@ const group: Group = {
 describe('edição de catálogo', () => {
   it('preserva IDs e ordem de itens inativos do grupo', () => {
     expect(groupPayload(group).items).toEqual([
-      { additionalId: 'inactive', order: 7 }
+      { additionalId: 'inactive', order: 7, compatibilityRules: [] }
     ])
   })
   it('preserva grupos e variações inativos no produto', () => {

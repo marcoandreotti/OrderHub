@@ -14,6 +14,7 @@ export interface Additional {
   isAvailable?: boolean
   unavailabilityReason?: string | null
   availableAgainAt?: string | null
+  compatibilityRules?: { targetGroupId: string; targetAdditionalId: string; kind: 'Requires' | 'Excludes' }[]
 }
 export interface Group {
   id: string
@@ -23,6 +24,10 @@ export interface Group {
   isActive: boolean
   order: number
   items: Additional[]
+  pricingStrategy?: 'Additive' | 'HighestPrice' | 'Proportional' | 'NoPriceChange'
+  type?: 'Additional' | 'Flavor' | 'Crust' | 'Removal'
+  requiresCompleteComposition?: boolean
+  compatibilityRules?: { targetGroupId: string; targetAdditionalId: string; kind: 'Requires' | 'Excludes' }[]
 }
 export interface Product {
   id: string
@@ -114,9 +119,13 @@ export const groupPayload = (group: Group) => ({
   minimumSelection: group.minimumSelection,
   maximumSelection: group.maximumSelection,
   isActive: group.isActive,
+  pricingStrategy: group.pricingStrategy ?? 'Additive',
+  type: group.type ?? 'Additional',
+  requiresCompleteComposition: (group.pricingStrategy === 'HighestPrice' || group.pricingStrategy === 'Proportional') && (group.requiresCompleteComposition ?? false),
   items: group.items.map((item) => ({
     additionalId: item.id,
-    order: item.order
+    order: item.order,
+    compatibilityRules: item.compatibilityRules ?? []
   }))
 })
 export const productPayload = (product: Product, categoryId: string) => ({

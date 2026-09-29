@@ -71,9 +71,9 @@ public sealed record OrderUpdateSignal(
     OrderUpdateKind ChangeType,
     DateTimeOffset OccurredAt);
 
-public sealed record OrderAdditionalSelection(Guid AdditionalId, decimal Quantity);
+public sealed record OrderAdditionalSelection(Guid AdditionalId, decimal Quantity, Guid? GroupId = null, int? PortionNumerator = null, int? PortionDenominator = null);
 public sealed record OrderAdditionalSnapshot(Guid AdditionalId, string Name, Money UnitPrice, Quantity Quantity);
-public sealed record OrderOfferSnapshot(Guid ProductId, Guid? VariationId, string ProductName, string? VariationName, Money UnitPrice, IReadOnlyList<OrderAdditionalSnapshot> Additionals);
+public sealed record OrderOfferSnapshot(Guid ProductId, Guid? VariationId, string ProductName, string? VariationName, Money UnitPrice, IReadOnlyList<OrderAdditionalSnapshot> Additionals, ModifierCompositionPrice? Composition = null);
 public sealed record OrderTableSnapshot(Guid TableId, string Code);
 public sealed record OrderCustomerSnapshot(Guid CustomerId, string Name, string Phone, Guid? AddressId, DeliveryAddressSnapshot? DeliveryAddress);
 
@@ -102,8 +102,10 @@ public sealed record OrderReadModel(
     decimal DeliveryFee = 0,
     int? DeliveryEstimatedMinutes = null);
 
-public sealed record OrderItemReadModel(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes, IReadOnlyList<OrderAdditionalReadModel> Additionals);
+public sealed record OrderItemReadModel(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal Quantity, decimal Total, string? Notes, IReadOnlyList<OrderAdditionalReadModel> Additionals, decimal BasePrice = 0, IReadOnlyList<OrderModifierGroupReadModel>? ModifierGroups = null);
 public sealed record OrderAdditionalReadModel(string Name, decimal UnitPrice, decimal Quantity);
+public sealed record OrderModifierGroupReadModel(Guid GroupId, string Name, string PricingStrategy, decimal Price, IReadOnlyList<OrderModifierOptionReadModel> Options);
+public sealed record OrderModifierOptionReadModel(Guid OptionId, string Name, decimal UnitPrice, decimal Quantity, int? PortionNumerator, int? PortionDenominator);
 public sealed record OrderHistoryReadModel(OrderStatus PreviousStatus, OrderStatus NewStatus, DateTimeOffset OccurredAt, Guid? ActorId, string? Note);
 public sealed record OrderSearchResult(int Total, IReadOnlyList<OrderSummaryReadModel> Items);
 public sealed record OrderSummaryReadModel(Guid Id, long Number, OrderServiceType ServiceType, OrderStatus Status, string? CustomerName, string? CustomerPhone, decimal Total, DateTimeOffset CreatedAt);

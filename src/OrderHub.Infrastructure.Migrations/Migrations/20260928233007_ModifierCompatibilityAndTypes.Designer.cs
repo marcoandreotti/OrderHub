@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OrderHub.Infrastructure.Persistence.Write;
@@ -11,9 +12,11 @@ using OrderHub.Infrastructure.Persistence.Write;
 namespace OrderHub.Infrastructure.Migrations.Migrations
 {
     [DbContext(typeof(OrderHubDbContext))]
-    partial class OrderHubDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260928233007_ModifierCompatibilityAndTypes")]
+    partial class ModifierCompatibilityAndTypes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1294,11 +1297,6 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
-                    b.Property<decimal>("BasePrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("base_price");
-
                     b.Property<Guid>("EstablishmentId")
                         .HasColumnType("uuid")
                         .HasColumnName("establishment_id");
@@ -1409,114 +1407,6 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                     b.ToTable("order_item_additional", "orders", t =>
                         {
                             t.HasCheckConstraint("ck_order_item_additional_values", "unit_price >= 0 and quantity > 0");
-                        });
-                });
-
-            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemModifierGroup", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("EstablishmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("establishment_id");
-
-                    b.Property<Guid>("ModifierGroupId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("modifier_group_id");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("order_item_id");
-
-                    b.Property<decimal>("Price")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("price");
-
-                    b.Property<string>("PricingStrategy")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("pricing_strategy");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "EstablishmentId", "OrderItemId");
-
-                    b.ToTable("order_item_modifier_group", "orders");
-                });
-
-            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemModifierOption", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<Guid>("EstablishmentId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("establishment_id");
-
-                    b.Property<Guid>("ModifierOptionId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("modifier_option_id");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("name");
-
-                    b.Property<Guid>("OrderItemModifierGroupId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("order_item_modifier_group_id");
-
-                    b.Property<int?>("PortionDenominator")
-                        .HasColumnType("integer")
-                        .HasColumnName("portion_denominator");
-
-                    b.Property<int?>("PortionNumerator")
-                        .HasColumnType("integer")
-                        .HasColumnName("portion_numerator");
-
-                    b.Property<decimal>("Quantity")
-                        .HasPrecision(18, 3)
-                        .HasColumnType("numeric(18,3)")
-                        .HasColumnName("quantity");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.Property<decimal>("UnitPrice")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)")
-                        .HasColumnName("unit_price");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.HasIndex("TenantId", "EstablishmentId", "OrderItemModifierGroupId");
-
-                    b.ToTable("order_item_modifier_option", "orders", t =>
-                        {
-                            t.HasCheckConstraint("ck_order_item_modifier_option_portion", "(portion_numerator is null and portion_denominator is null) or (portion_numerator > 0 and portion_denominator > 0 and portion_numerator <= portion_denominator)");
-
-                            t.HasCheckConstraint("ck_order_item_modifier_option_values", "unit_price >= 0 and quantity > 0");
                         });
                 });
 
@@ -2583,26 +2473,6 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemModifierGroup", b =>
-                {
-                    b.HasOne("OrderHub.Domain.Ordering.OrderItem", null)
-                        .WithMany("ModifierGroups")
-                        .HasForeignKey("TenantId", "EstablishmentId", "OrderItemId")
-                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemModifierOption", b =>
-                {
-                    b.HasOne("OrderHub.Domain.Ordering.OrderItemModifierGroup", null)
-                        .WithMany("Options")
-                        .HasForeignKey("TenantId", "EstablishmentId", "OrderItemModifierGroupId")
-                        .HasPrincipalKey("TenantId", "EstablishmentId", "Id")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("OrderHub.Domain.Ordering.OrderStatusHistory", b =>
                 {
                     b.HasOne("OrderHub.Domain.Ordering.Order", null)
@@ -2802,13 +2672,6 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
             modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItem", b =>
                 {
                     b.Navigation("Additionals");
-
-                    b.Navigation("ModifierGroups");
-                });
-
-            modelBuilder.Entity("OrderHub.Domain.Ordering.OrderItemModifierGroup", b =>
-                {
-                    b.Navigation("Options");
                 });
 
             modelBuilder.Entity("OrderHub.Domain.Promotions.Coupon", b =>
