@@ -88,6 +88,9 @@ public sealed class Order : IEstablishmentScopedEntity
     public string? CustomerPhone { get; private set; }
     public Guid? TableId { get; private set; }
     public DeliveryAddressSnapshot? DeliveryAddress { get; private set; }
+    public DateTimeOffset? ScheduledAtUtc { get; private set; }
+    public string? ScheduledTimeZoneId { get; private set; }
+    public bool IsScheduled => ScheduledAtUtc.HasValue;
     public Guid? DeliveryRegionId { get; private set; }
     public string? DeliveryRegionName { get; private set; }
     public Money DeliveryFee { get; private set; }
@@ -103,6 +106,24 @@ public sealed class Order : IEstablishmentScopedEntity
     public DateTimeOffset UpdatedAt { get; private set; }
     public IReadOnlyCollection<OrderItem> Items => items;
     public IReadOnlyCollection<OrderStatusHistory> History => history;
+
+    public void Schedule(DateTimeOffset scheduledAt, string timeZoneId, DateTimeOffset now)
+    {
+        EnsureDraft();
+        if (ServiceType is not (OrderServiceType.Pickup or OrderServiceType.Delivery) || scheduledAt <= now)
+            throw new DomainException("Order scheduling is invalid for this service or time.");
+        if (string.IsNullOrWhiteSpace(timeZoneId) || timeZoneId.Trim().Length > 100)
+            throw new DomainException("Order scheduling time zone is invalid.");
+
+        var normalizedTimeZone = timeZoneId.Trim();
+        try { _ = TimeZoneInfo.FindSystemTimeZoneById(normalizedTimeZone); }
+        catch (TimeZoneNotFoundException) { throw new DomainException("Order scheduling time zone is invalid."); }
+        catch (InvalidTimeZoneException) { throw new DomainException("Order scheduling time zone is invalid."); }
+
+        ScheduledAtUtc = scheduledAt.ToUniversalTime();
+        ScheduledTimeZoneId = normalizedTimeZone;
+        Touch(now);
+    }
 
     /// <summary>Cria um rascunho de pedido no escopo do estabelecimento.</summary>
     public static Order Create(

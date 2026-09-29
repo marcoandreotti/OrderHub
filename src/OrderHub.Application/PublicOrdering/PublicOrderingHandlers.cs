@@ -60,23 +60,34 @@ public sealed class UpsertPublicCustomerCommandHandler(IPublicOrderingContextGat
     }
 }
 
-public sealed class SimulatePublicOrderQueryHandler(IPublicOrderingContextGateway contexts, IOrderOfferResolver offers, IOrderCustomerResolver customers, IOrderTableResolver tables, ICouponRepository coupons, IPaymentMethodRepository paymentMethods, IAvailabilityReadGateway availability, IDeliveryReadGateway delivery, TimeProvider timeProvider) : IQueryHandler<SimulatePublicOrderQuery, PublicSimulation>
+public sealed class SimulatePublicOrderQueryHandler(IPublicOrderingContextGateway contexts, IOrderOfferResolver offers, IOrderCustomerResolver customers, IOrderTableResolver tables, ICouponRepository coupons, IPaymentMethodRepository paymentMethods, IAvailabilityReadGateway availability, IDeliveryReadGateway delivery, IOrderSchedulingRepository scheduling, TimeProvider timeProvider) : IQueryHandler<SimulatePublicOrderQuery, PublicSimulation>
 {
     public async Task<PublicSimulation> HandleAsync(SimulatePublicOrderQuery query, CancellationToken cancellationToken)
     {
         var scope = await PublicOrderComposer.ResolveScopeAsync(contexts, query.Slug, query.TableToken, cancellationToken);
         var now = timeProvider.GetUtcNow();
-        var decision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, query.ServiceType, now, cancellationToken);
+        var decision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, query.ServiceType, query.ScheduledAtUtc ?? now, cancellationToken);
         if (!decision.IsAvailable) throw new AvailabilityConflictException(decision.Message ?? "Service is unavailable.", decision.Reason, decision.NextOpening);
+        string? timeZoneId = null;
+        if (query.ScheduledAtUtc is { } scheduledAt)
+        {
+            var policy = await scheduling.GetPolicyAsync(scope.TenantId, scope.EstablishmentId, query.ServiceType, cancellationToken);
+            timeZoneId = await scheduling.GetTimeZoneIdAsync(scope.TenantId, scope.EstablishmentId, cancellationToken);
+            if (policy is null || timeZoneId is null) throw new ConflictException("Scheduling is not configured for this service.");
+            var endDecision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, query.ServiceType, scheduledAt.AddMinutes(policy.SlotIntervalMinutes).AddTicks(-1), cancellationToken);
+            var reserved = await scheduling.CountReservedOrdersAsync(scope.TenantId, scope.EstablishmentId, query.ServiceType, scheduledAt, cancellationToken);
+            try { OrderSchedulingEvaluator.EnsureSlotIsValid(policy, timeZoneId, scheduledAt, now, reserved, decision.IsAvailable && endDecision.IsAvailable); }
+            catch (OrderHub.Domain.Exceptions.DomainException exception) { throw new ConflictException(exception.Message); }
+        }
         if (query.PaymentMethodId is { } methodId && (await paymentMethods.GetAsync(scope.TenantId, scope.EstablishmentId, methodId, cancellationToken) is not { IsActive: true })) throw new ConflictException("Payment method is not available.");
         var order = await PublicOrderComposer.ComposeAsync(scope, query.ServiceType, query.CustomerId, query.CustomerAddressId, query.DeliveryAddress, query.Items, offers, customers, tables, now, cancellationToken);
         var quote = await PublicOrderComposer.ApplyDeliveryQuoteAsync(order, scope, delivery, now, cancellationToken);
         await PublicOrderComposer.ApplyCouponAsync(order, query.CouponCode, scope, coupons, now, cancellationToken);
-        return PublicOrderComposer.ToSimulation(order, quote, query.ServiceType == OrderServiceType.Delivery ? now : null);
+        return PublicOrderComposer.ToSimulation(order, quote, query.ServiceType == OrderServiceType.Delivery ? now : null, query.ScheduledAtUtc, timeZoneId);
     }
 }
 
-public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGateway contexts, IOrderOfferResolver offers, IOrderCustomerResolver customers, IOrderTableResolver tables, ICouponRepository coupons, IPaymentMethodRepository paymentMethods, IPaymentRepository payments, IOrderRepository orders, IOrderNumberSequence sequence, IPublicOrderRequestRepository requests, IPublicOrderTransaction transaction, IOrderAvailabilityGateway availability, IDeliveryReadGateway delivery, IOrderUpdatePublisher updatePublisher, TimeProvider timeProvider) : ICommandHandler<ConfirmPublicOrderCommand, PublicConfirmation>
+public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGateway contexts, IOrderOfferResolver offers, IOrderCustomerResolver customers, IOrderTableResolver tables, ICouponRepository coupons, IPaymentMethodRepository paymentMethods, IPaymentRepository payments, IOrderRepository orders, IOrderNumberSequence sequence, IPublicOrderRequestRepository requests, IPublicOrderTransaction transaction, IOrderAvailabilityGateway availability, IDeliveryReadGateway delivery, IOrderSchedulingRepository scheduling, IOrderUpdatePublisher updatePublisher, TimeProvider timeProvider) : ICommandHandler<ConfirmPublicOrderCommand, PublicConfirmation>
 {
     public async Task<PublicConfirmation> HandleAsync(ConfirmPublicOrderCommand command, CancellationToken cancellationToken)
     {
@@ -92,9 +103,20 @@ public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGatew
             var method = await paymentMethods.GetAsync(scope.TenantId, scope.EstablishmentId, command.PaymentMethodId, token);
             if (method is not { IsActive: true }) throw new ConflictException("Payment method is not available.");
             var now = timeProvider.GetUtcNow();
-            var decision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, command.ServiceType, now, token);
+            var decision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, command.ServiceType, command.ScheduledAtUtc ?? now, token);
             if (!decision.IsAvailable) throw new AvailabilityConflictException(decision.Message ?? "Service is unavailable.", decision.Reason, decision.NextOpening);
             var order = await PublicOrderComposer.ComposeAsync(scope, command.ServiceType, command.CustomerId, command.CustomerAddressId, command.DeliveryAddress, command.Items, offers, customers, tables, now, token);
+            if (command.ScheduledAtUtc is { } scheduledAt)
+            {
+                var policy = await scheduling.GetPolicyAsync(scope.TenantId, scope.EstablishmentId, command.ServiceType, token);
+                var timeZoneId = await scheduling.GetTimeZoneIdAsync(scope.TenantId, scope.EstablishmentId, token);
+                if (policy is null || timeZoneId is null) throw new ConflictException("Scheduling is not configured for this service.");
+                var startDecision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, command.ServiceType, scheduledAt, token);
+                var endDecision = await availability.EvaluateAsync(scope.TenantId, scope.EstablishmentId, command.ServiceType, scheduledAt.AddMinutes(policy.SlotIntervalMinutes).AddTicks(-1), token);
+                var reserved = await scheduling.CountReservedOrdersAsync(scope.TenantId, scope.EstablishmentId, command.ServiceType, scheduledAt, token);
+                try { OrderSchedulingEvaluator.EnsureSlotIsValid(policy, timeZoneId, scheduledAt, now, reserved, startDecision.IsAvailable && endDecision.IsAvailable); order.Schedule(scheduledAt, timeZoneId, now); }
+                catch (OrderHub.Domain.Exceptions.DomainException exception) { throw new ConflictException(exception.Message); }
+            }
             var quote = await PublicOrderComposer.ApplyDeliveryQuoteAsync(order, scope, delivery, now, token);
             var coupon = await PublicOrderComposer.ApplyCouponAsync(order, command.CouponCode, scope, coupons, now, token);
             if (command.ServiceType == OrderServiceType.Delivery &&
@@ -125,7 +147,7 @@ public sealed class ConfirmPublicOrderCommandHandler(IPublicOrderingContextGatew
 
     private static string Hash(ConfirmPublicOrderCommand value)
     {
-        var content = string.Join('|', value.Slug.Trim().ToLowerInvariant(), value.ServiceType, value.CustomerId, value.CustomerAddressId, value.TableToken?.Trim(), Address(value.DeliveryAddress), value.CouponCode?.Trim().ToUpperInvariant(), value.PaymentMethodId, value.ReceivedAmount?.ToString(CultureInfo.InvariantCulture), value.DeliveryRegionId, value.ExpectedDeliveryFee?.ToString(CultureInfo.InvariantCulture), value.ExpectedDeliveryEstimatedMinutes, value.DeliveryQuoteIssuedAt?.ToString("O"), string.Join(';', value.Items.Select(x => $"{x.ProductId},{x.VariationId},{x.Quantity.ToString(CultureInfo.InvariantCulture)},{x.Notes},{string.Join(',', x.Additionals.OrderBy(a => a.GroupId).ThenBy(a => a.AdditionalId).Select(a => $"{a.GroupId}:{a.AdditionalId}:{a.Quantity.ToString(CultureInfo.InvariantCulture)}:{a.PortionNumerator}/{a.PortionDenominator}"))}")));
+        var content = string.Join('|', value.Slug.Trim().ToLowerInvariant(), value.ServiceType, value.CustomerId, value.CustomerAddressId, value.TableToken?.Trim(), Address(value.DeliveryAddress), value.CouponCode?.Trim().ToUpperInvariant(), value.PaymentMethodId, value.ReceivedAmount?.ToString(CultureInfo.InvariantCulture), value.DeliveryRegionId, value.ExpectedDeliveryFee?.ToString(CultureInfo.InvariantCulture), value.ExpectedDeliveryEstimatedMinutes, value.DeliveryQuoteIssuedAt?.ToString("O"), value.ScheduledAtUtc?.ToUniversalTime().ToString("O"), string.Join(';', value.Items.Select(x => $"{x.ProductId},{x.VariationId},{x.Quantity.ToString(CultureInfo.InvariantCulture)},{x.Notes},{string.Join(',', x.Additionals.OrderBy(a => a.GroupId).ThenBy(a => a.AdditionalId).Select(a => $"{a.GroupId}:{a.AdditionalId}:{a.Quantity.ToString(CultureInfo.InvariantCulture)}:{a.PortionNumerator}/{a.PortionDenominator}"))}")));
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(content))).ToLowerInvariant();
     }
     private static string Address(PublicAddress? x) => x is null ? string.Empty : $"{x.Label},{x.Street},{x.Number},{x.Complement},{x.Neighborhood},{x.City},{x.State},{x.PostalCode}";
@@ -167,5 +189,5 @@ internal static class PublicOrderComposer
     }
     public static async Task<Domain.Promotions.Coupon?> ApplyCouponAsync(Order order, string? code, PublicOrderingContext scope, ICouponRepository coupons, DateTimeOffset now, CancellationToken token)
     { if (string.IsNullOrWhiteSpace(code)) return null; var coupon = await coupons.FindByCodeAsync(scope.TenantId, scope.EstablishmentId, Domain.Promotions.Coupon.NormalizeCode(code), token) ?? throw new NotFoundException("Coupon was not found."); var evaluation = coupon.Evaluate(order.Subtotal, now); order.ApplyCoupon(evaluation.CouponId, evaluation.Code, evaluation.Discount, now); return coupon; }
-    public static PublicSimulation ToSimulation(Order order, DeliveryQuote? quote, DateTimeOffset? issuedAt) => new(order.Subtotal.Amount, order.Discount.Amount, order.Fees.Amount, order.Total.Amount, order.CouponCode, order.Items.Select(x => new PublicSimulationItem(x.ProductName, x.VariationName, x.UnitPrice.Amount, x.Quantity.Value, x.Total.Amount, x.Additionals.Select(a => new PublicSimulationAdditional(a.Name, a.UnitPrice.Amount, a.Quantity.Value)).ToArray(), x.BasePrice.Amount, x.ModifierGroups.Select(g => new OrderModifierGroupReadModel(g.ModifierGroupId, g.Name, g.PricingStrategy.ToString(), g.Price.Amount, g.Options.Select(o => new OrderModifierOptionReadModel(o.ModifierOptionId, o.Name, o.UnitPrice.Amount, o.Quantity.Value, o.PortionNumerator, o.PortionDenominator)).ToArray())).ToArray())).ToArray(), quote?.RegionId, quote?.RegionName, quote?.Fee.Amount, quote?.EstimatedMinutes, issuedAt);
+    public static PublicSimulation ToSimulation(Order order, DeliveryQuote? quote, DateTimeOffset? issuedAt, DateTimeOffset? scheduledAtUtc = null, string? timeZoneId = null) => new(order.Subtotal.Amount, order.Discount.Amount, order.Fees.Amount, order.Total.Amount, order.CouponCode, order.Items.Select(x => new PublicSimulationItem(x.ProductName, x.VariationName, x.UnitPrice.Amount, x.Quantity.Value, x.Total.Amount, x.Additionals.Select(a => new PublicSimulationAdditional(a.Name, a.UnitPrice.Amount, a.Quantity.Value)).ToArray(), x.BasePrice.Amount, x.ModifierGroups.Select(g => new OrderModifierGroupReadModel(g.ModifierGroupId, g.Name, g.PricingStrategy.ToString(), g.Price.Amount, g.Options.Select(o => new OrderModifierOptionReadModel(o.ModifierOptionId, o.Name, o.UnitPrice.Amount, o.Quantity.Value, o.PortionNumerator, o.PortionDenominator)).ToArray())).ToArray())).ToArray(), quote?.RegionId, quote?.RegionName, quote?.Fee.Amount, quote?.EstimatedMinutes, issuedAt, scheduledAtUtc?.ToUniversalTime(), timeZoneId);
 }

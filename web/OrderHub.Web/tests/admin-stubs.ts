@@ -18,6 +18,12 @@ export const adminStubs = {
     template:
       '<label>{{ label }}<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" /></label>'
   },
+  QToggle: {
+    props: ['label', 'modelValue'],
+    emits: ['update:modelValue'],
+    template:
+      '<label>{{ label }}<input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" /></label>'
+  },
   QSelect: {
     props: ['label', 'modelValue', 'options'],
     emits: ['update:modelValue'],

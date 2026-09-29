@@ -61,7 +61,7 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
             ["establishment", "establishment_theme", "platform_provisioning_intent", "tenant"],
             tablesAfterUp.Order(StringComparer.Ordinal).ToArray());
         Assert.Equal(6, await connection.ExecuteScalarAsync<int>("select count(*) from identity.administrative_role;"));
-        Assert.Equal(4, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations';"));
+        Assert.Equal(5, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations';"));
 
         var migrator = context.Database.GetService<IMigrator>();
         await migrator.MigrateAsync(Migration.InitialDatabase);
@@ -169,8 +169,8 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(expected, (await connection.QueryAsync<string>("select table_name from information_schema.tables where table_schema='orders' order by table_name;")).ToArray());
         await migrator.MigrateAsync("20260902201903_CustomerRecords");
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
-        await migrator.MigrateAsync("20260903001324_PublicOrderingApi");
-        Assert.Equal(expected.Length, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
+        await migrator.MigrateAsync("20260928234032_ModifierOrderSnapshots");
+        Assert.Equal(expected.Length + 2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders';"));
     }
 
 
@@ -206,6 +206,26 @@ public sealed class TenancyMigrationTests : IAsyncLifetime
         Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
         await context.Database.MigrateAsync();
         Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='orders' and table_name='public_order_request';"));
+    }
+
+    [Fact]
+    public async Task Order_scheduling_migration_upgrades_rolls_back_and_reapplies()
+    {
+        var options = new DbContextOptionsBuilder<OrderHubDbContext>()
+            .UseNpgsql(database.GetConnectionString(), npgsql => npgsql.MigrationsAssembly(typeof(OrderHubDbContextFactory).Assembly.FullName)).Options;
+        await using var context = new OrderHubDbContext(options);
+        var migrator = context.Database.GetService<IMigrator>();
+        await context.Database.MigrateAsync();
+        await using var connection = new NpgsqlConnection(database.GetConnectionString());
+        await connection.OpenAsync();
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations' and table_name='order_scheduling_policy';"));
+        Assert.Equal(2, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='orders' and table_name='order' and column_name in ('scheduled_at_utc','scheduled_time_zone_id');"));
+
+        await migrator.MigrateAsync("20260903001324_PublicOrderingApi");
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations' and table_name='order_scheduling_policy';"));
+        Assert.Equal(0, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.columns where table_schema='orders' and table_name='order' and column_name in ('scheduled_at_utc','scheduled_time_zone_id');"));
+        await context.Database.MigrateAsync();
+        Assert.Equal(1, await connection.ExecuteScalarAsync<int>("select count(*) from information_schema.tables where table_schema='operations' and table_name='order_scheduling_policy';"));
     }
 
 

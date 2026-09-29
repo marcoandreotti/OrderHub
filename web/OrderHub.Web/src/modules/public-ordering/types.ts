@@ -62,7 +62,12 @@ export type ServiceType = 'Table' | 'Pickup' | 'Delivery'
 export interface SimulationRequest {
   serviceType: ServiceType; customerId: string | null; customerAddressId: string | null
   tableToken: string | null; deliveryAddress: Address | null; couponCode: string | null
-  paymentMethodId: string | null; items: OrderItemRequest[]
+  paymentMethodId: string | null; items: OrderItemRequest[]; scheduledAtUtc?: string | null
+}
+export interface SchedulingSlots {
+  serviceType: ServiceType; isEnabled: boolean; timeZoneId: string; slotIntervalMinutes: number
+  minimumAdvanceMinutes: number; horizonDays: number
+  slots: { startsAt: string; remainingCapacity: number | null }[]
 }
 export interface SimulatedItem {
   productName: string; variationName: string | null; unitPrice: number; quantity: number
@@ -75,6 +80,7 @@ export interface Simulation {
   couponCode: string | null; items: SimulatedItem[]
   deliveryRegionId?: string | null; deliveryRegionName?: string | null; deliveryFee?: number | null
   deliveryEstimatedMinutes?: number | null; deliveryQuoteIssuedAt?: string | null
+  scheduledAtUtc?: string | null; scheduledTimeZoneId?: string | null
 }
 export interface ConfirmationRequest extends Omit<SimulationRequest, 'paymentMethodId'> {
   paymentMethodId: string; receivedAmount: number | null
@@ -87,5 +93,6 @@ export interface Tracking extends Confirmation {
   couponCode: string | null; items: SimulatedItem[]
   deliveryRegionName?: string | null; deliveryFee?: number
   deliveryEstimatedMinutes?: number | null
+  scheduledAtUtc?: string | null; scheduledTimeZoneId?: string | null
   history: { status: string; occurredAt: string; note: string | null }[]
 }

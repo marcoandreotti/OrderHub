@@ -129,6 +129,13 @@ Pedido de entrega confirmado MUST preservar endereço normalizado, região ou re
 - **WHEN** taxa ou cobertura é alterada
 - **THEN** o pedido histórico mantém os valores e dados de entrega confirmados
 
+### Requirement: Pedido distingue atendimento imediato e agendado
+O pedido SHALL indicar se é imediato ou agendado e, no segundo caso, MUST preservar o compromisso temporal validado na confirmação.
+
+#### Scenario: Agendamento ausente
+- **WHEN** um pedido declarado agendado não possui slot válido
+- **THEN** a confirmação é rejeitada sem reservar número de pedido
+
 ### Requirement: Pedido valida e preserva modificadores
 O domínio MUST validar a composição vigente e calcular seu efeito monetário conforme as estratégias configuradas no catálogo. O preço da variação selecionada, ou o preço-base do produto, SHALL ser mantido quando não houver grupo de composição; com um grupo `HighestPrice` ou `Proportional`, seu resultado SHALL substituí-lo. Os valores de grupos `Additive` serão somados ao preço-base ou composto e grupos `NoPriceChange` não alterarão o preço. O domínio MUST preservar no snapshot do item os identificadores e nomes do produto, grupos e opções, preço-base considerado, frações exatas quando aplicáveis, quantidades, preços vigentes das opções, estratégia e valor calculado por grupo e preço unitário final.
 

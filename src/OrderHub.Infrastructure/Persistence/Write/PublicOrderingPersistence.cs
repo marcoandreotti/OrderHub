@@ -20,5 +20,18 @@ public sealed class PublicOrderRequestRepository(OrderHubDbContext context) : IP
 public sealed class PublicOrderTransaction(OrderHubDbContext context) : IPublicOrderTransaction
 {
     public async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken cancellationToken)
-    { if (context.Database.CurrentTransaction is not null) return await operation(cancellationToken); await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken); var result = await operation(cancellationToken); await transaction.CommitAsync(cancellationToken); return result; }
+    {
+        if (context.Database.CurrentTransaction is not null) return await operation(cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable, cancellationToken);
+        try
+        {
+            var result = await operation(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.SerializationFailure)
+        {
+            throw new ConflictException("The selected order slot was filled by another order. Choose another available time.");
+        }
+    }
 }

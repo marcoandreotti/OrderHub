@@ -11,6 +11,7 @@ vi.mock('../src/modules/administration/availability/client', async original => (
   ...(await original<typeof import('../src/modules/administration/availability/client')>()),
   availabilityClient: {
     configuration: vi.fn(), timeZone: vi.fn(), exceptions: vi.fn(),
+    scheduling: vi.fn(), saveScheduling: vi.fn(),
     pause: vi.fn(), resume: vi.fn(), unavailable: vi.fn(), reactivate: vi.fn()
   }
 }))
@@ -35,6 +36,13 @@ beforeEach(() => {
   })
   vi.mocked(catalogClient.get).mockResolvedValue({
     establishmentId: 'unit', establishmentName: 'Unit', slug: 'unit', categories: []
+  })
+  vi.mocked(availabilityClient.scheduling).mockResolvedValue({
+    timeZoneId: 'America/Sao_Paulo',
+    policies: [
+      { serviceType: 'Pickup', isEnabled: false, slotIntervalMinutes: 30, minimumAdvanceMinutes: 60, horizonDays: 30, maximumOrdersPerSlot: null },
+      { serviceType: 'Delivery', isEnabled: false, slotIntervalMinutes: 30, minimumAdvanceMinutes: 60, horizonDays: 30, maximumOrdersPerSlot: null }
+    ]
   })
   vi.mocked(availabilityClient.pause).mockResolvedValue()
 })

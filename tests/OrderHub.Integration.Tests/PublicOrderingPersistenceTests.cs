@@ -42,6 +42,61 @@ public sealed class PublicOrderingPersistenceTests : IAsyncLifetime
         await using var verification=new OrderHubDbContext(options); Assert.Empty(await verification.Orders.ToListAsync());
     }
 
+    [Fact]
+    public async Task Concurrent_scheduled_orders_cannot_exceed_the_last_slot_capacity()
+    {
+        var options = Options(); var now = DateTimeOffset.UtcNow; Guid tenantId; Guid unitId;
+        await using (var setup = new OrderHubDbContext(options))
+        {
+            await setup.Database.EnsureCreatedAsync();
+            var tenant = Tenant.Create("Group", now);
+            var unit = Establishment.Create(tenant.Id, "Unit", new Slug("unit"), now);
+            setup.AddRange(tenant, unit);
+            await setup.SaveChangesAsync();
+            tenantId = tenant.Id; unitId = unit.Id;
+        }
+
+        var slot = DateTimeOffset.FromUnixTimeSeconds(now.AddHours(2).ToUnixTimeSeconds() / 60 * 60);
+        var bothRead = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var ready = 0;
+        async Task ConfirmAsync(long number)
+        {
+            await using var context = new OrderHubDbContext(options);
+            var transaction = new PublicOrderTransaction(context);
+            var repository = new OrderRepository(context);
+            await transaction.ExecuteAsync(async token =>
+            {
+                var reservations = await context.Orders.CountAsync(x => x.TenantId == tenantId
+                    && x.EstablishmentId == unitId && x.ScheduledAtUtc == slot
+                    && x.Status != OrderStatus.Cancelled && x.Status != OrderStatus.Rejected, token);
+                Assert.Equal(0, reservations);
+                if (Interlocked.Increment(ref ready) == 2) bothRead.TrySetResult(true);
+                await bothRead.Task.WaitAsync(token);
+                var order = Order.Create(tenantId, unitId, OrderServiceType.Pickup, null, null, null, null, null, now);
+                order.AddItem(Guid.NewGuid(), null, "Product", null, new Money(10), new Quantity(1), [], null, now);
+                order.Schedule(slot, "UTC", now);
+                order.Confirm(number, now);
+                await repository.AddAsync(order, token);
+                return true;
+            }, CancellationToken.None);
+        }
+
+        var outcomes = await Task.WhenAll(
+            CaptureConflictAsync(() => ConfirmAsync(1)),
+            CaptureConflictAsync(() => ConfirmAsync(2)));
+        Assert.Single(outcomes, x => !x);
+        Assert.Single(outcomes, x => x);
+        await using var verification = new OrderHubDbContext(options);
+        Assert.Equal(1, await verification.Orders.CountAsync(x => x.TenantId == tenantId
+            && x.EstablishmentId == unitId && x.ScheduledAtUtc == slot));
+    }
+
+    private static async Task<bool> CaptureConflictAsync(Func<Task> action)
+    {
+        try { await action(); return false; }
+        catch (OrderHub.Application.Exceptions.ConflictException) { return true; }
+    }
+
     private DbContextOptions<OrderHubDbContext> Options()=>new DbContextOptionsBuilder<OrderHubDbContext>().UseNpgsql(database.GetConnectionString()).Options;
     private static Order Confirmed(Guid tenantId,Guid unitId,DateTimeOffset now,long number){var order=Order.Create(tenantId,unitId,OrderServiceType.Pickup,null,null,null,null,null,now);order.AddItem(Guid.NewGuid(),null,"Product",null,new Money(10),new Quantity(1),[],null,now);order.Confirm(number,now);return order;}
 }

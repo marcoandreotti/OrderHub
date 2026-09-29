@@ -94,3 +94,10 @@ A aplicação SHALL renderizar grupos, limites, dependências, estratégia, pre�
 #### Scenario: Estratégia de preço apresentada
 - **WHEN** a pessoa seleciona opções em grupos com estratégias diferentes
 - **THEN** a interface apresenta os efeitos de preço descritos pela API sem implementar fórmulas específicas de sabor, borda ou remoção
+
+### Requirement: Cliente escolhe somente horários retornados pelo servidor
+A aplicação SHALL apresentar opção imediata ou agendada conforme modalidade, unidade e slots vigentes e SHALL comunicar fuso e prazo esperado.
+
+#### Scenario: Slot expira no checkout
+- **WHEN** a confirmação rejeita o slot selecionado
+- **THEN** a aplicação preserva o carrinho e solicita nova escolha

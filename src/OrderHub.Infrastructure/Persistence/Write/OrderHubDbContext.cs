@@ -18,6 +18,7 @@ public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> option
     public DbSet<OrderHub.Domain.Operations.BusinessHours> BusinessHours => Set<OrderHub.Domain.Operations.BusinessHours>();
     public DbSet<OrderHub.Domain.Operations.ServiceScheduleException> ServiceScheduleExceptions => Set<OrderHub.Domain.Operations.ServiceScheduleException>();
     public DbSet<OrderHub.Domain.Operations.ServicePause> ServicePauses => Set<OrderHub.Domain.Operations.ServicePause>();
+    public DbSet<OrderHub.Domain.Ordering.OrderSchedulingPolicy> OrderSchedulingPolicies => Set<OrderHub.Domain.Ordering.OrderSchedulingPolicy>();
     public DbSet<OrderHub.Domain.Catalog.Category> Categories => Set<OrderHub.Domain.Catalog.Category>();
     public DbSet<OrderHub.Domain.Catalog.Product> Products => Set<OrderHub.Domain.Catalog.Product>();
     public DbSet<OrderHub.Domain.Catalog.Additional> Additionals => Set<OrderHub.Domain.Catalog.Additional>();

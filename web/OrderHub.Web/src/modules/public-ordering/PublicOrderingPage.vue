@@ -9,7 +9,7 @@ import { applyPublicTheme } from './theme'
 import { checkoutValidation } from './checkout'
 import type {
   Address, Confirmation, Product, PublicCatalog, PublicContext,
-  ServiceType, Simulation
+  SchedulingSlots, ServiceType, Simulation
 } from './types'
 
 type Step = 'catalog' | 'cart' | 'checkout' | 'receipt'
@@ -31,6 +31,10 @@ const selectionQuantities = reactive<Record<string, number>>({})
 const compositionError = ref('')
 const cart = usePublicCart()
 const simulation = ref<Simulation>()
+const scheduling = ref<SchedulingSlots>()
+const schedulingMode = ref<'immediate' | 'scheduled'>('immediate')
+const scheduledAtUtc = ref('')
+const slotsLoading = ref(false)
 const simulating = ref(false)
 const priceChanged = ref(false)
 const submitting = ref(false)
@@ -38,6 +42,7 @@ const confirmation = ref<Confirmation>()
 const previousReference = ref<string | null>(null)
 const idempotencyKey = ref<string>()
 let controller: AbortController | undefined
+let slotsController: AbortController | undefined
 
 const customer = reactive({ name: '', phone: '', email: '' })
 const address = reactive<Address>({
@@ -69,12 +74,17 @@ const serviceOptions = computed(() => {
     : [{ label: 'Retirada', value: 'Pickup' as ServiceType }, { label: 'Entrega', value: 'Delivery' as ServiceType }]
   return options.map(option => ({
     ...option,
-    disable: availableServices.value.find(item => item.serviceType === option.value)?.isAvailable === false
+    disable: option.value === 'Table' && availableServices.value.find(item => item.serviceType === option.value)?.isAvailable === false
   }))
 })
 const activeMethods = computed(() => context.value?.paymentMethods ?? [])
 const canCheckout = computed(() => cart.state.items.length > 0 &&
-  selectedServiceAvailability.value?.isAvailable !== false)
+  (schedulingMode.value === 'scheduled'
+    ? !!scheduledAtUtc.value && !!scheduling.value?.slots.some(slot => slot.startsAt === scheduledAtUtc.value)
+    : selectedServiceAvailability.value?.isAvailable !== false))
+const canChooseCheckout = computed(() => cart.state.items.length > 0 &&
+  (selectedServiceAvailability.value?.isAvailable !== false ||
+    (scheduling.value?.isEnabled === true && scheduling.value.slots.length > 0)))
 const formatOpening = (value: string | null | undefined) => value
   ? new Date(value).toLocaleString('pt-BR')
   : null
@@ -107,8 +117,26 @@ async function load() {
         (resolvedContext.table || item.serviceType !== 'Table'))?.serviceType ?? preferred
     checkout.paymentMethodId = resolvedContext.paymentMethods[0]?.id ?? ''
     applyPublicTheme(resolvedContext)
+    await loadSchedulingSlots()
   } catch (failure) { error.value = failure } finally { loading.value = false }
 }
+async function loadSchedulingSlots() {
+  slotsController?.abort()
+  scheduling.value = undefined
+  scheduledAtUtc.value = ''
+  if (checkout.serviceType === 'Table') return
+  slotsController = new AbortController()
+  slotsLoading.value = true
+  try {
+    scheduling.value = await publicOrderingClient.scheduleSlots(slug.value, checkout.serviceType, slotsController.signal)
+    if (!scheduling.value.isEnabled) schedulingMode.value = 'immediate'
+  } catch (failure) {
+    if (!(failure instanceof Error && failure.name === 'CanceledError')) error.value = failure
+  } finally { slotsLoading.value = false }
+}
+const formatSlot = (value: string) => new Intl.DateTimeFormat('pt-BR', {
+  timeZone: scheduling.value?.timeZoneId ?? 'UTC', dateStyle: 'medium', timeStyle: 'short'
+}).format(new Date(value))
 function openProduct(product: Product) {
   if (product.isAvailable === false) return
   selected.value = product
@@ -200,7 +228,7 @@ function addProduct() {
   })
   selected.value = undefined
 }
-function request(deliveryAddress: Address | null = null) {
+function request(deliveryAddress: Address | null = null, scheduledAtOverride?: string | null) {
   return {
     serviceType: checkout.serviceType,
     customerId: null,
@@ -209,17 +237,21 @@ function request(deliveryAddress: Address | null = null) {
     deliveryAddress,
     couponCode: checkout.couponCode.trim() || null,
     paymentMethodId: checkout.paymentMethodId || null,
-    items: orderItems(cart.state.items)
+    items: orderItems(cart.state.items),
+    scheduledAtUtc: scheduledAtOverride !== undefined ? scheduledAtOverride :
+      schedulingMode.value === 'scheduled' ? scheduledAtUtc.value : null
   }
 }
 async function simulate() {
-  if (!canCheckout.value) return
+  if (!cart.state.items.length) return
   simulating.value = true
   error.value = null
   try {
+    const fallbackSlot = selectedServiceAvailability.value?.isAvailable === false && scheduling.value?.slots.length
+      ? scheduling.value.slots[0]?.startsAt ?? null : undefined
     const result = await publicOrderingClient.simulate(
       slug.value,
-      request(checkout.serviceType === 'Delivery' ? address : null)
+      request(checkout.serviceType === 'Delivery' ? address : null, fallbackSlot)
     )
     priceChanged.value = simulation.value
       ? simulation.value.total !== result.total || simulation.value.subtotal !== result.subtotal
@@ -282,6 +314,12 @@ async function confirm() {
     step.value = 'receipt'
     idempotencyKey.value = undefined
   } catch (failure) {
+    if (failure instanceof ApiError && failure.problem.status === 409 && schedulingMode.value === 'scheduled') {
+      await loadSchedulingSlots()
+      scheduledAtUtc.value = ''
+      error.value = new Error('Esse horário acabou de ficar indisponível. O carrinho foi preservado; escolha outro horário.')
+      return
+    }
     error.value = failure instanceof ApiError && typeof failure.problem.currentTotal === 'number'
       ? new Error(`${failure.message} Total atualizado: ${money(failure.problem.currentTotal)}.`)
       : failure
@@ -294,9 +332,13 @@ function editIntent() {
 watch(() => [cart.state.revision, checkout.serviceType, checkout.couponCode,
   checkout.paymentMethodId, checkout.receivedAmount, customer.name, customer.phone,
   customer.email, ...Object.values(address)], editIntent)
+watch(() => checkout.serviceType, async () => {
+  schedulingMode.value = 'immediate'
+  await loadSchedulingSlots()
+})
 watch(() => [slug.value, tableToken.value], load)
 onMounted(load)
-onBeforeUnmount(() => controller?.abort())
+onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
 </script>
 
 <template>
@@ -317,7 +359,7 @@ onBeforeUnmount(() => controller?.abort())
           <p v-if="context.table">Mesa {{ context.table.code }}</p>
         </div>
         <q-btn v-if="step === 'catalog'" :label="'Carrinho (' + cart.count.value + ')'"
-          color="primary" :disable="!canCheckout" @click="step = 'cart'; simulate()" />
+          color="primary" :disable="cart.state.items.length === 0" @click="step = 'cart'; simulate()" />
       </header>
       <aside v-if="step === 'catalog' && previousReference" class="resume-order">
         <span>Você tem um pedido recente.</span>
@@ -378,7 +420,7 @@ onBeforeUnmount(() => controller?.abort())
           <p v-if="priceChanged" role="alert">O total mudou. Confira os valores atualizados antes de confirmar.</p>
         </div>
         <div class="flow-actions"><q-btn flat label="Voltar ao cardápio" @click="step = 'catalog'" />
-          <q-btn label="Continuar" color="primary" :disable="!simulation || !canCheckout"
+          <q-btn label="Continuar" color="primary" :disable="!simulation || !canChooseCheckout"
             @click="step = 'checkout'" /></div>
       </main>
 
@@ -387,6 +429,19 @@ onBeforeUnmount(() => controller?.abort())
         <q-form @submit="confirm">
           <fieldset><legend>Como você quer receber?</legend>
             <q-option-group v-model="checkout.serviceType" :options="serviceOptions" type="radio" />
+          </fieldset>
+          <fieldset v-if="checkout.serviceType !== 'Table' && scheduling?.isEnabled">
+            <legend>Quando prefere receber?</legend>
+            <q-option-group v-model="schedulingMode" :options="[
+              { label: 'O mais rápido possível', value: 'immediate', disable: selectedServiceAvailability?.isAvailable === false },
+              { label: 'Agendar', value: 'scheduled' }
+            ]" type="radio" />
+            <div v-if="schedulingMode === 'scheduled'">
+              <div v-if="slotsLoading" role="status">Buscando horários disponíveis…</div>
+              <q-select v-else v-model="scheduledAtUtc" outlined emit-value map-options
+                label="Horário disponível" :options="scheduling.slots.map(slot => ({ label: formatSlot(slot.startsAt), value: slot.startsAt }))" />
+              <small>Horários no fuso {{ scheduling.timeZoneId }} · pedidos com pelo menos {{ scheduling.minimumAdvanceMinutes }} minutos de antecedência.</small>
+            </div>
           </fieldset>
           <fieldset v-if="checkout.serviceType !== 'Table'"><legend>Seus dados</legend>
             <q-input v-model="customer.name" label="Nome" autocomplete="name" />

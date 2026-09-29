@@ -48,6 +48,27 @@ public sealed class OrderTests
         Assert.Throws<DomainException>(() => order.AddItem(Guid.NewGuid(), null, "Other", null, new Money(1), new Quantity(1), [], null, Now));
     }
 
+    [Fact]
+    public void Scheduled_order_preserves_utc_instant_and_establishment_time_zone()
+    {
+        var order = Create(OrderServiceType.Pickup);
+        var promisedAt = new DateTimeOffset(2026, 9, 28, 18, 30, 0, TimeSpan.FromHours(-3));
+
+        order.Schedule(promisedAt, "America/Sao_Paulo", Now);
+
+        Assert.True(order.IsScheduled);
+        Assert.Equal(promisedAt.ToUniversalTime(), order.ScheduledAtUtc);
+        Assert.Equal("America/Sao_Paulo", order.ScheduledTimeZoneId);
+    }
+
+    [Fact]
+    public void Schedule_rejects_table_service_non_future_time_and_invalid_time_zone()
+    {
+        Assert.Throws<DomainException>(() => Create(OrderServiceType.Table).Schedule(Now.AddHours(1), "UTC", Now));
+        Assert.Throws<DomainException>(() => Create(OrderServiceType.Pickup).Schedule(Now, "UTC", Now));
+        Assert.Throws<DomainException>(() => Create(OrderServiceType.Delivery).Schedule(Now.AddHours(1), "invalid-zone", Now));
+    }
+
     [Theory]
     [InlineData(OrderServiceType.Table)]
     [InlineData(OrderServiceType.Pickup)]

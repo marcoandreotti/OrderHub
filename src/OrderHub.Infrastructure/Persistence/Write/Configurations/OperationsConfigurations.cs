@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OrderHub.Domain.Operations;
+using OrderHub.Domain.Ordering;
 
 namespace OrderHub.Infrastructure.Persistence.Write.Configurations;
 
@@ -81,6 +82,32 @@ internal sealed class ServicePauseConfiguration : IEntityTypeConfiguration<Servi
         builder.Property(x => x.CancelledAt).HasColumnName("cancelled_at");
         builder.Property(x => x.Reason).HasColumnName("reason").HasMaxLength(250);
         builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.ServiceType, x.StartsAt });
+        builder.HasOne<OrderHub.Domain.Tenancy.Establishment>().WithMany()
+            .HasForeignKey(x => new { x.TenantId, x.EstablishmentId })
+            .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class OrderSchedulingPolicyConfiguration : IEntityTypeConfiguration<OrderSchedulingPolicy>
+{
+    public void Configure(EntityTypeBuilder<OrderSchedulingPolicy> builder)
+    {
+        builder.ToTable("order_scheduling_policy", DatabaseSchemas.Operations, table =>
+        {
+            table.HasCheckConstraint("ck_order_scheduling_policy_window", "minimum_advance_minutes >= 0 and horizon_days between 1 and 90 and minimum_advance_minutes <= horizon_days * 1440");
+            table.HasCheckConstraint("ck_order_scheduling_policy_capacity", "maximum_orders_per_slot is null or maximum_orders_per_slot > 0");
+        });
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
+        builder.Property(x => x.TenantId).HasColumnName("tenant_id");
+        builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id");
+        builder.Property(x => x.ServiceType).HasColumnName("service_type").HasConversion<short>();
+        builder.Property(x => x.IsEnabled).HasColumnName("is_enabled");
+        builder.Property(x => x.MinimumAdvanceMinutes).HasColumnName("minimum_advance_minutes");
+        builder.Property(x => x.HorizonDays).HasColumnName("horizon_days");
+        builder.Property(x => x.MaximumOrdersPerSlot).HasColumnName("maximum_orders_per_slot");
+        builder.HasAlternateKey(x => new { x.TenantId, x.EstablishmentId, x.Id });
+        builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.ServiceType }).IsUnique();
         builder.HasOne<OrderHub.Domain.Tenancy.Establishment>().WithMany()
             .HasForeignKey(x => new { x.TenantId, x.EstablishmentId })
             .HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);

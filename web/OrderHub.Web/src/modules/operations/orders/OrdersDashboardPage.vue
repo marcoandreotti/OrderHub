@@ -38,7 +38,9 @@ const grouped = computed(() =>
     .filter((item) => !status.value || item === status.value)
     .map((item) => ({
       status: item,
-      orders: store.orders.filter((order) => order.status === item)
+      orders: store.orders.filter((order) => order.status === item),
+      immediate: store.orders.filter((order) => order.status === item && !order.scheduledAtUtc),
+      scheduled: store.orders.filter((order) => order.status === item && !!order.scheduledAtUtc)
     }))
 )
 const selected = computed(() =>
@@ -53,6 +55,12 @@ const interval = Math.max(
   5_000,
   Number(import.meta.env.VITE_OPERATIONS_POLL_INTERVAL_MS) || 15_000
 )
+function promisedTime(order: Pick<OrderSummary, 'scheduledAtUtc' | 'scheduledTimeZoneId'>) {
+  if (!order.scheduledAtUtc) return ''
+  return new Intl.DateTimeFormat('pt-BR', {
+    timeZone: order.scheduledTimeZoneId ?? undefined, dateStyle: 'short', timeStyle: 'short'
+  }).format(new Date(order.scheduledAtUtc))
+}
 const poller = new PollingCoordinator(
   () => store.synchronize(session.unitId, filters.value),
   {
@@ -249,9 +257,9 @@ function elapsed(value: string) {
             {{ statusLabels[group.status] }}
             <q-badge :label="group.orders.length" color="grey-8" />
           </h2>
-          <p v-if="!group.orders.length" class="empty-state">Nenhum pedido nesta etapa.</p>
+          <h3 v-if="group.immediate.length" class="queue-subheading">Imediatos</h3>
           <button
-            v-for="order in group.orders"
+            v-for="order in group.immediate"
             :key="order.id"
             type="button"
             class="order-card"
@@ -268,6 +276,23 @@ function elapsed(value: string) {
             <span v-if="store.isNew(order.id)" class="signal new">✦ Novo</span>
             <span v-if="store.isLate(order)" class="signal late">⚠ Atrasado</span>
           </button>
+          <h3 v-if="group.scheduled.length" class="queue-subheading">Agendados</h3>
+          <button
+            v-for="order in group.scheduled"
+            :key="order.id"
+            type="button"
+            class="order-card scheduled-order"
+            :class="{ selected: store.selectedId === order.id }"
+            @click="openOrder(order)"
+          >
+            <span class="order-card-title"><strong>#{{ order.number }}</strong><span>{{ promisedTime(order) }}</span></span>
+            <span>{{ serviceLabels[order.serviceType] }} · Horário prometido</span>
+            <span v-if="order.customerName">{{ order.customerName }}</span>
+            <span>{{ money(order.total) }}</span>
+            <span v-if="store.isNew(order.id)" class="signal new">✦ Novo</span>
+            <span v-if="store.isLate(order)" class="signal late">⚠ Horário ultrapassado</span>
+          </button>
+          <p v-if="!group.orders.length" class="empty-state">Nenhum pedido nesta etapa.</p>
         </article>
       </section>
 
@@ -294,6 +319,7 @@ function elapsed(value: string) {
         </q-banner>
 
         <dl class="detail-facts">
+          <div v-if="selected.scheduledAtUtc"><dt>Agendado para</dt><dd>{{ promisedTime(selected) }} · {{ selected.scheduledTimeZoneId }}</dd></div>
           <div><dt>Atendimento</dt><dd>{{ serviceLabels[selected.serviceType] }}</dd></div>
           <div v-if="selected.tableCode"><dt>Mesa</dt><dd>{{ selected.tableCode }}</dd></div>
           <div><dt>Pagamento</dt><dd>{{ selected.isFullyPaid ? '✓ Pago' : '◷ Pendente' }}</dd></div>
@@ -374,6 +400,8 @@ function elapsed(value: string) {
 .empty-state { color: #64748b; font-size: .875rem; }
 .order-card { display: grid; gap: 7px; width: 100%; margin-bottom: 10px; padding: 14px; border: 2px solid transparent; border-radius: 10px; background: white; color: #172033; text-align: left; cursor: pointer; box-shadow: 0 1px 3px #1720331a; }
 .order-card:hover, .order-card.selected { border-color: var(--oh-color-primary); }
+.scheduled-order { border-left-color: #7c3aed; background: #faf7ff; }
+.queue-subheading { margin: 12px 0 8px; font-size: .9rem; color: #475569; }
 .signal { width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
 .signal.new { background: #dbeafe; color: #1d4ed8; }
 .signal.late { background: #ffedd5; color: #9a3412; }

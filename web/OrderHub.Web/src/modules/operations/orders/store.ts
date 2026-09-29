@@ -112,7 +112,8 @@ export const useOrderOperationsStore = defineStore('order-operations', () => {
     if (!['Confirmed', 'Preparing', 'Ready', 'OutForDelivery'].includes(order.status))
       return false
     const threshold = order.status === 'Confirmed' ? 10 : 20
-    return now - Date.parse(order.createdAt) >= threshold * 60_000
+    const dueAt = order.scheduledAtUtc ? Date.parse(order.scheduledAtUtc) : Date.parse(order.createdAt)
+    return now - dueAt >= threshold * 60_000
   }
 
   return {

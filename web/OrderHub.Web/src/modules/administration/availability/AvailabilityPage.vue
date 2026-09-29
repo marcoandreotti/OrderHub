@@ -6,6 +6,7 @@ import { catalogClient } from '../catalog/client'
 import {
   availabilityClient,
   type AvailabilityConfiguration,
+  type OrderSchedulingConfiguration,
   type OfferKind,
   type ScheduleException,
   type ServiceType
@@ -14,6 +15,7 @@ import {
 const session = useSessionStore()
 const configuration = ref<AvailabilityConfiguration>()
 const catalog = ref<Awaited<ReturnType<typeof catalogClient.get>>>()
+const scheduling = ref<OrderSchedulingConfiguration>()
 const loading = ref(true)
 const busy = ref(false)
 const error = ref<unknown>(null)
@@ -48,12 +50,14 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [config, tree] = await Promise.all([
+    const [config, tree, scheduleConfig] = await Promise.all([
       availabilityClient.configuration(session.unitId, controller.signal),
-      catalogClient.get(session.unitId, controller.signal)
+      catalogClient.get(session.unitId, controller.signal),
+      availabilityClient.scheduling(session.unitId, controller.signal)
     ])
     configuration.value = config
     catalog.value = tree
+    scheduling.value = scheduleConfig
   } catch (failure) { error.value = failure }
   finally { loading.value = false }
 }
@@ -87,6 +91,20 @@ onUnmounted(() => controller?.abort())
       <q-card flat bordered><q-card-section><h2 class="text-h6">Fuso da unidade</h2>
         <div class="row q-gutter-md items-start"><q-input v-model="configuration.timeZoneId" outlined label="Fuso IANA" hint="Ex.: America/Sao_Paulo" class="col" />
           <q-btn color="primary" label="Salvar fuso" :loading="busy" @click="execute(() => availabilityClient.timeZone(session.unitId, configuration!), 'Fuso atualizado.')" /></div>
+      </q-card-section></q-card>
+
+      <q-card v-if="scheduling" flat bordered><q-card-section><h2 class="text-h6">Pedidos agendados</h2>
+        <p>Os horários são exibidos em {{ scheduling.timeZoneId }}, em intervalos fixos de 30 minutos.</p>
+        <div v-for="policy in scheduling.policies" :key="policy.serviceType" class="q-mb-lg">
+          <h3 class="text-subtitle1">{{ policy.serviceType === 'Pickup' ? 'Retirada' : 'Entrega' }}</h3>
+          <q-toggle v-model="policy.isEnabled" label="Permitir agendamento" />
+          <div class="row q-col-gutter-md items-center">
+            <q-input v-model.number="policy.minimumAdvanceMinutes" type="number" min="0" max="129600" outlined label="Antecedência mínima (minutos)" class="col-12 col-md-4" />
+            <q-input v-model.number="policy.horizonDays" type="number" min="1" max="90" outlined label="Horizonte (dias)" class="col-12 col-md-4" />
+            <q-input v-model.number="policy.maximumOrdersPerSlot" type="number" min="1" clearable outlined label="Máx. pedidos por horário (vazio = ilimitado)" class="col-12 col-md-4" />
+          </div>
+          <q-btn color="primary" label="Salvar configuração" :loading="busy" @click="execute(() => availabilityClient.saveScheduling(session.unitId, policy), 'Configuração de agendamento atualizada.')" />
+        </div>
       </q-card-section></q-card>
 
       <q-card flat bordered><q-card-section><h2 class="text-h6">Exceções de calendário</h2>

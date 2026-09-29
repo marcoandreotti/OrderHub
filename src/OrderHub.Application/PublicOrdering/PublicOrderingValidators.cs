@@ -16,6 +16,7 @@ public sealed class SimulatePublicOrderQueryValidator : AbstractValidator<Simula
         RuleFor(x=>x.Slug).NotEmpty().MaximumLength(100); RuleFor(x=>x.ServiceType).IsInEnum();
         RuleFor(x=>x.TableToken).NotEmpty().When(x=>x.ServiceType==OrderServiceType.Table);
         RuleFor(x=>x.DeliveryAddress).NotNull().When(x=>x.ServiceType==OrderServiceType.Delivery);
+        RuleFor(x => x.ScheduledAtUtc).Null().When(x => x.ServiceType == OrderServiceType.Table);
         RuleFor(x=>x.Items).NotEmpty().Must(x=>x.Count<=100); RuleForEach(x=>x.Items).SetValidator(new PublicOrderLineValidator());
     }
 }
@@ -27,6 +28,7 @@ public sealed class ConfirmPublicOrderCommandValidator : AbstractValidator<Confi
         RuleFor(x=>x.Slug).NotEmpty().MaximumLength(100); RuleFor(x=>x.ServiceType).IsInEnum();
         RuleFor(x=>x.TableToken).NotEmpty().When(x=>x.ServiceType==OrderServiceType.Table);
         RuleFor(x=>x.DeliveryAddress).NotNull().When(x=>x.ServiceType==OrderServiceType.Delivery);
+        RuleFor(x => x.ScheduledAtUtc).Null().When(x => x.ServiceType == OrderServiceType.Table);
         RuleFor(x=>x.Items).NotEmpty().Must(x=>x.Count<=100); RuleForEach(x=>x.Items).SetValidator(new PublicOrderLineValidator());
         RuleFor(x => x.IdempotencyKey).NotEmpty().MinimumLength(8).MaximumLength(100);
         RuleFor(x => x.PaymentMethodId).NotEmpty();

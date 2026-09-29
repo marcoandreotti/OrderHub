@@ -23,6 +23,8 @@ public sealed class OrderRepository(OrderHubDbContext context) : IOrderRepositor
     {
         try { await context.SaveChangesAsync(cancellationToken); }
         catch (DbUpdateConcurrencyException) { throw new ConflictException("Order was changed by another operation."); }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.SerializationFailure })
+        { throw new ConflictException("The selected order slot was filled by another order. Choose another available time."); }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation }) { throw new ConflictException("Order number or public reference already exists."); }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation or PostgresErrorCodes.CheckViolation }) { throw new ConflictException("Order data violates establishment integrity."); }
     }

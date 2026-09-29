@@ -54,3 +54,10 @@ O painel SHALL aplicar notificações em tempo real, indicar o estado da conexã
 #### Scenario: Canal em tempo real indisponível
 - **WHEN** a conexão falha ou é interrompida
 - **THEN** o painel mantém dados visíveis, sinaliza possível defasagem e inicia o fallback sem ciclos concorrentes
+
+### Requirement: Painel separa demanda futura da demanda executável
+O painel SHALL identificar pedidos agendados, ordenar pelo momento prometido e evitar que pedidos distantes ocultem trabalho imediato.
+
+#### Scenario: Pedido aproxima-se da janela de produção
+- **WHEN** o horário operacional configurado é alcançado
+- **THEN** o pedido passa a receber destaque na fila sem mudança automática de status

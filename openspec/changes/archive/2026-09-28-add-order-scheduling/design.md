@@ -12,6 +12,8 @@ Agendamento combina disponibilidade, capacidade e compromisso temporal, sem just
 
 Modelar política e slots no módulo Ordering. Consultas calculam disponibilidade; confirmação reserva capacidade na mesma transação do pedido. Armazenar UTC e fuso da unidade. O dashboard usa janela de produção, não muda status automaticamente.
 
+Padrões iniciais de agendamento: habilitação independente por unidade e modalidade, somente retirada e entrega; slots alinhados à hora local em intervalos fixos de 30 minutos; antecedência mínima de 60 minutos; horizonte padrão de 30 dias e máximo configurável de 90 dias para limitar o cálculo de slots; capacidade configurável como quantidade de pedidos por slot, sem limite quando não configurada. Horários prometidos são exibidos no fuso da unidade, mantendo o instante UTC no pedido.
+
 ## Risks / Trade-offs
 
 [Risco] Concorrência no último slot → restrição transacional. [Risco] Alteração de horário → pedidos confirmados permanecem e geram destaque operacional.

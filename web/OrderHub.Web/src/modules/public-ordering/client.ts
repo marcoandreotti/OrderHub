@@ -1,6 +1,6 @@
 import axios, { type AxiosError, type AxiosInstance } from 'axios'
 import { ApiError, type ProblemDetails } from '../../http/client'
-import type { Address, Confirmation, ConfirmationRequest, PublicCatalog, PublicContext, Simulation, SimulationRequest, Tracking } from './types'
+import type { Address, Confirmation, ConfirmationRequest, PublicCatalog, PublicContext, SchedulingSlots, ServiceType, Simulation, SimulationRequest, Tracking } from './types'
 
 const path = (slug: string) => '/api/public/ordering/' + encodeURIComponent(slug)
 
@@ -19,6 +19,11 @@ export function createPublicOrderingClient(http: AxiosInstance) {
     return (await http.get<PublicCatalog>(
       '/api/public/establishments/' + encodeURIComponent(slug) + '/catalog', { signal }
     )).data
+  },
+  async scheduleSlots(slug: string, serviceType: ServiceType, signal?: AbortSignal) {
+    return (await http.get<SchedulingSlots>(path(slug) + '/schedule-slots', {
+      params: { serviceType }, signal
+    })).data
   },
   async customer(slug: string, value: {
     name: string; phone: string; email: string | null; address: Address | null

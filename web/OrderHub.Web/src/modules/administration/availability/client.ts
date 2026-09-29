@@ -23,11 +23,25 @@ export interface AvailabilityConfiguration {
   exceptions: ScheduleException[]
   pauses: ServicePause[]
 }
+export interface OrderSchedulingPolicy {
+  serviceType: 'Pickup' | 'Delivery'; isEnabled: boolean; slotIntervalMinutes: number
+  minimumAdvanceMinutes: number; horizonDays: number; maximumOrdersPerSlot: number | null
+}
+export interface OrderSchedulingConfiguration { timeZoneId: string; policies: OrderSchedulingPolicy[] }
 const root = (unit: string) =>
   '/api/admin/establishments/' + encodeURIComponent(unit)
 export const availabilityClient = {
   async configuration(unit: string, signal?: AbortSignal) {
     return (await api.get<AvailabilityConfiguration>(root(unit) + '/configuration', { signal })).data
+  },
+  async scheduling(unit: string, signal?: AbortSignal) {
+    return (await api.get<OrderSchedulingConfiguration>(root(unit) + '/order-scheduling', { signal })).data
+  },
+  async saveScheduling(unit: string, value: OrderSchedulingPolicy) {
+    await api.put(root(unit) + '/order-scheduling/' + value.serviceType, {
+      isEnabled: value.isEnabled, minimumAdvanceMinutes: value.minimumAdvanceMinutes,
+      horizonDays: value.horizonDays, maximumOrdersPerSlot: value.maximumOrdersPerSlot
+    })
   },
   async timeZone(unit: string, value: AvailabilityConfiguration) {
     await api.put(root(unit) + '/configuration', {

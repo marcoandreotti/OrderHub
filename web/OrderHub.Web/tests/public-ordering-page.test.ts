@@ -13,7 +13,7 @@ vi.mock('vue-router', () => ({
 }))
 vi.mock('../src/modules/public-ordering/client', () => ({
   publicOrderingClient: {
-    context: vi.fn(), catalog: vi.fn(), customer: vi.fn(), simulate: vi.fn(),
+    context: vi.fn(), catalog: vi.fn(), scheduleSlots: vi.fn(), customer: vi.fn(), simulate: vi.fn(),
     confirm: vi.fn(), track: vi.fn(), cancel: vi.fn()
   }
 }))
@@ -79,6 +79,10 @@ beforeEach(() => {
   route.params = { slug: 'unit', tableToken: undefined }
   vi.mocked(publicOrderingClient.context).mockResolvedValue(context)
   vi.mocked(publicOrderingClient.catalog).mockResolvedValue(catalog)
+  vi.mocked(publicOrderingClient.scheduleSlots).mockResolvedValue({
+    serviceType: 'Pickup', isEnabled: false, timeZoneId: 'America/Sao_Paulo',
+    slotIntervalMinutes: 30, minimumAdvanceMinutes: 60, horizonDays: 30, slots: []
+  })
   vi.mocked(publicOrderingClient.simulate).mockResolvedValue(simulation)
   vi.mocked(publicOrderingClient.customer).mockResolvedValue({ customerId: 'customer', addressId: null })
   vi.mocked(publicOrderingClient.confirm).mockResolvedValue({ reference: 'r'.repeat(48), number: 42, status: 'Confirmed', total: 22 })
@@ -183,6 +187,72 @@ describe('catálogo público', () => {
 })
 
 describe('checkout idempotente', () => {
+  it('confirma no slot retornado e preserva a intenção de agendamento', async () => {
+    const startsAt = '2026-10-01T18:00:00Z'
+    vi.mocked(publicOrderingClient.scheduleSlots).mockResolvedValue({
+      serviceType: 'Pickup', isEnabled: true, timeZoneId: 'America/Sao_Paulo',
+      slotIntervalMinutes: 30, minimumAdvanceMinutes: 60, horizonDays: 30,
+      slots: [{ startsAt, remainingCapacity: 2 }]
+    })
+    localStorage.setItem('orderhub.public-cart.unit', JSON.stringify({
+      version: 1, slug: 'unit', items: [{
+        key: 'line', productId: 'p1', variationId: null, quantity: 1, notes: null,
+        additionals: [], productName: 'Pizza', variationName: null, displayedUnitPrice: 22
+      }]
+    }))
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Carrinho (1)')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Continuar')!.trigger('click')
+    const groups = wrapper.findAllComponents({ name: 'QOptionGroup' })
+    groups[1]!.vm.$emit('update:modelValue', 'scheduled')
+    await flushPromises()
+    await wrapper.findAll('select')[0]!.setValue(startsAt)
+    const labels = wrapper.findAll('label')
+    await labels.find(label => label.text().startsWith('Nome'))!.find('input').setValue('Ana')
+    await labels.find(label => label.text().startsWith('Telefone'))!.find('input').setValue('11999999999')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(publicOrderingClient.confirm).toHaveBeenCalledWith('unit',
+      expect.objectContaining({ scheduledAtUtc: startsAt }), expect.any(String))
+    wrapper.unmount()
+  })
+
+  it('preserva o carrinho e pede outro horário quando o slot expira', async () => {
+    const startsAt = '2026-10-01T18:00:00Z'
+    vi.mocked(publicOrderingClient.scheduleSlots).mockResolvedValue({
+      serviceType: 'Pickup', isEnabled: true, timeZoneId: 'America/Sao_Paulo',
+      slotIntervalMinutes: 30, minimumAdvanceMinutes: 60, horizonDays: 30,
+      slots: [{ startsAt, remainingCapacity: 1 }]
+    })
+    vi.mocked(publicOrderingClient.confirm).mockRejectedValue(new ApiError({
+      status: 409, detail: 'Selected order slot has reached its capacity.'
+    }))
+    localStorage.setItem('orderhub.public-cart.unit', JSON.stringify({
+      version: 1, slug: 'unit', items: [{
+        key: 'line', productId: 'p1', variationId: null, quantity: 1, notes: null,
+        additionals: [], productName: 'Pizza', variationName: null, displayedUnitPrice: 22
+      }]
+    }))
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Carrinho (1)')!.trigger('click')
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'Continuar')!.trigger('click')
+    wrapper.findAllComponents({ name: 'QOptionGroup' })[1]!.vm.$emit('update:modelValue', 'scheduled')
+    await flushPromises()
+    await wrapper.findAll('select')[0]!.setValue(startsAt)
+    const labels = wrapper.findAll('label')
+    await labels.find(label => label.text().startsWith('Nome'))!.find('input').setValue('Ana')
+    await labels.find(label => label.text().startsWith('Telefone'))!.find('input').setValue('11999999999')
+    await wrapper.get('form').trigger('submit')
+    await flushPromises()
+    expect(wrapper.text()).toContain('O carrinho foi preservado')
+    expect(localStorage.getItem('orderhub.public-cart.unit')).toContain('Pizza')
+    wrapper.unmount()
+  })
+
   it('reutiliza a chave após resposta perdida e impede duplo envio', async () => {
     localStorage.setItem('orderhub.public-cart.unit', JSON.stringify({
       version: 1, slug: 'unit', items: [{

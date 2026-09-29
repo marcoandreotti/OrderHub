@@ -16,6 +16,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         {
             table.HasCheckConstraint("ck_order_number", "number is null or number > 0");
             table.HasCheckConstraint("ck_order_totals", "subtotal >= 0 and discount >= 0 and fees >= 0 and total >= 0");
+            table.HasCheckConstraint("ck_order_schedule", "(scheduled_at_utc is null and scheduled_time_zone_id is null) or (scheduled_at_utc is not null and scheduled_time_zone_id is not null)");
         });
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever();
@@ -25,6 +26,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(x => x.Status).HasColumnName("status").HasConversion<string>().HasMaxLength(30);
         builder.Property(x => x.CustomerId).HasColumnName("customer_id"); builder.Property(x => x.CustomerName).HasColumnName("customer_name").HasMaxLength(150); builder.Property(x => x.CustomerPhone).HasColumnName("customer_phone").HasMaxLength(30);
         builder.Property(x => x.TableId).HasColumnName("table_id");
+        builder.Property(x => x.ScheduledAtUtc).HasColumnName("scheduled_at_utc");
+        builder.Property(x => x.ScheduledTimeZoneId).HasColumnName("scheduled_time_zone_id").HasMaxLength(100);
         builder.Property(x => x.DeliveryRegionId).HasColumnName("delivery_region_id");
         builder.Property(x => x.DeliveryRegionName).HasColumnName("delivery_region_name").HasMaxLength(100);
         Money(builder.Property(x => x.DeliveryFee), "delivery_fee");
@@ -45,6 +48,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasAlternateKey(x => new { x.TenantId, x.EstablishmentId, x.Id });
         builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.Number }).IsUnique().HasFilter("number is not null");
         builder.HasIndex(x => x.PublicReference).IsUnique().HasFilter("public_reference is not null");
+        builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.ServiceType, x.ScheduledAtUtc }).HasFilter("scheduled_at_utc is not null");
         builder.HasOne<OrderHub.Domain.Tenancy.Establishment>().WithMany().HasForeignKey(x => new { x.TenantId, x.EstablishmentId }).HasPrincipalKey(x => new { x.TenantId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne<OrderHub.Domain.Promotions.Coupon>().WithMany().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.CouponId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Restrict);
         builder.HasMany(x => x.Items).WithOne().HasForeignKey(x => new { x.TenantId, x.EstablishmentId, x.OrderId }).HasPrincipalKey(x => new { x.TenantId, x.EstablishmentId, x.Id }).OnDelete(DeleteBehavior.Cascade);

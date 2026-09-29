@@ -18,6 +18,8 @@ export interface OrderSummary {
   customerPhone: string | null
   total: number
   createdAt: string
+  scheduledAtUtc?: string | null
+  scheduledTimeZoneId?: string | null
 }
 
 export interface OrderAdditional {
@@ -68,6 +70,8 @@ export interface OrderDetail {
   deliveryRegionName?: string | null
   deliveryFee?: number
   deliveryEstimatedMinutes?: number | null
+  scheduledAtUtc?: string | null
+  scheduledTimeZoneId?: string | null
 }
 
 export interface OrderPage {

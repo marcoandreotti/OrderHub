@@ -18,18 +18,19 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
               and (@From is null or o.created_at>=@From) and (@To is null or o.created_at<@To)
               and (@Status is null or o.status=@Status) and (@Number is null or o.number=@Number)
               and (@ServiceType is null or o.service_type=@ServiceType);
-            select o.id,o.number,o.service_type as ServiceType,o.status,o.customer_name as CustomerName,o.customer_phone as CustomerPhone,o.total,o.created_at as CreatedAt
+            select o.id,o.number,o.service_type as ServiceType,o.status,o.customer_name as CustomerName,o.customer_phone as CustomerPhone,o.total,o.created_at as CreatedAt,
+                   o.scheduled_at_utc as ScheduledAtUtc,o.scheduled_time_zone_id as ScheduledTimeZoneId
             from orders."order" o
             where o.tenant_id=@TenantId and o.establishment_id=@EstablishmentId
               and (@From is null or o.created_at>=@From) and (@To is null or o.created_at<@To)
               and (@Status is null or o.status=@Status) and (@Number is null or o.number=@Number)
               and (@ServiceType is null or o.service_type=@ServiceType)
-            order by o.created_at desc,o.id desc offset @Offset rows fetch next @PageSize rows only;
+            order by (o.scheduled_at_utc is not null),o.scheduled_at_utc asc nulls first,o.created_at desc,o.id desc offset @Offset rows fetch next @PageSize rows only;
             """;
         var parameters = new { TenantId = tenantId, EstablishmentId = establishmentId, From = from, To = to, Status = status?.ToString(), Number = number, ServiceType = serviceType?.ToString(), Offset = (page - 1) * pageSize, PageSize = pageSize };
         await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken); using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
         var total = await grid.ReadSingleAsync<int>(); var rows = (await grid.ReadAsync<SummaryRow>()).ToArray();
-        return new(total, rows.Select(x => new OrderSummaryReadModel(x.Id, x.Number, Enum.Parse<OrderServiceType>(x.ServiceType), Enum.Parse<OrderStatus>(x.Status), x.CustomerName, x.CustomerPhone, x.Total, new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc)))).ToArray());
+        return new(total, rows.Select(x => new OrderSummaryReadModel(x.Id, x.Number, Enum.Parse<OrderServiceType>(x.ServiceType), Enum.Parse<OrderStatus>(x.Status), x.CustomerName, x.CustomerPhone, x.Total, new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc)), ToUtcOffset(x.ScheduledAtUtc), x.ScheduledTimeZoneId)).ToArray());
     }
 
     /// <summary>
@@ -45,7 +46,8 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
                    o.delivery_neighborhood as DeliveryNeighborhood, o.delivery_city as DeliveryCity, o.delivery_state as DeliveryState,
                    o.delivery_postal_code as DeliveryPostalCode, o.delivery_region_id as DeliveryRegionId,
                    o.delivery_region_name as DeliveryRegionName, o.delivery_fee as DeliveryFee,
-                   o.delivery_estimated_minutes as DeliveryEstimatedMinutes, o.subtotal, o.discount, o.fees, o.total,
+                   o.delivery_estimated_minutes as DeliveryEstimatedMinutes, o.scheduled_at_utc as ScheduledAtUtc,
+                   o.scheduled_time_zone_id as ScheduledTimeZoneId, o.subtotal, o.discount, o.fees, o.total,
                    o.coupon_code as CouponCode, case when o.coupon_code is null then 0 else o.discount end as CouponDiscount,
                    coalesce((
                        select sum(p.amount)
@@ -102,17 +104,20 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
             items.Select(item => new OrderItemReadModel(item.Id, item.ProductName, item.VariationName, item.UnitPrice, item.Quantity, item.Total, item.Notes, additionals[item.Id].Select(a => new OrderAdditionalReadModel(a.Name, a.UnitPrice, a.Quantity)).ToArray(), item.BasePrice,
                 modifierGroups.Where(g => g.OrderItemId == item.Id).Select(g => new OrderModifierGroupReadModel(g.GroupId, g.Name, g.PricingStrategy, g.Price, modifierOptions[g.SnapshotId].Select(o => new OrderModifierOptionReadModel(o.OptionId, o.Name, o.UnitPrice, o.Quantity, o.PortionNumerator, o.PortionDenominator)).ToArray())).ToArray())).ToArray(),
             history.Select(item => new OrderHistoryReadModel(Enum.Parse<OrderStatus>(item.PreviousStatus), Enum.Parse<OrderStatus>(item.NewStatus), item.OccurredAt, item.ActorId, item.Note)).ToArray(),
-            order.DeliveryRegionId, order.DeliveryRegionName, order.DeliveryFee, order.DeliveryEstimatedMinutes);
+            order.DeliveryRegionId, order.DeliveryRegionName, order.DeliveryFee, order.DeliveryEstimatedMinutes,
+            ToUtcOffset(order.ScheduledAtUtc), order.ScheduledTimeZoneId);
     }
 
-    private sealed record OrderRow(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, string? DeliveryStreet, string? DeliveryNumber, string? DeliveryComplement, string? DeliveryNeighborhood, string? DeliveryCity, string? DeliveryState, string? DeliveryPostalCode, Guid? DeliveryRegionId, string? DeliveryRegionName, decimal DeliveryFee, int? DeliveryEstimatedMinutes, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal CouponDiscount, decimal ConfirmedAmount);
+    private static DateTimeOffset? ToUtcOffset(DateTime? value) => value is null ? null : new DateTimeOffset(DateTime.SpecifyKind(value.Value, DateTimeKind.Utc));
+
+    private sealed record OrderRow(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, string? DeliveryStreet, string? DeliveryNumber, string? DeliveryComplement, string? DeliveryNeighborhood, string? DeliveryCity, string? DeliveryState, string? DeliveryPostalCode, Guid? DeliveryRegionId, string? DeliveryRegionName, decimal DeliveryFee, int? DeliveryEstimatedMinutes, DateTime? ScheduledAtUtc, string? ScheduledTimeZoneId, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal CouponDiscount, decimal ConfirmedAmount);
     private sealed record ItemRow(Guid Id, string ProductName, string? VariationName, decimal UnitPrice, decimal BasePrice, decimal Quantity, decimal Total, string? Notes);
     private sealed record AdditionalRow(Guid OrderItemId, string Name, decimal UnitPrice, decimal Quantity);
     private sealed record ModifierGroupRow(Guid SnapshotId, Guid OrderItemId, Guid GroupId, string Name, string PricingStrategy, decimal Price);
     private sealed record ModifierOptionRow(Guid SnapshotId, Guid OptionId, string Name, decimal UnitPrice, decimal Quantity, int? PortionNumerator, int? PortionDenominator);
 
     private sealed class SummaryRow
-    { public Guid Id { get; set; } public long Number { get; set; } public string ServiceType { get; set; } = string.Empty; public string Status { get; set; } = string.Empty; public string? CustomerName { get; set; } public string? CustomerPhone { get; set; } public decimal Total { get; set; } public DateTime CreatedAt { get; set; } }
+    { public Guid Id { get; set; } public long Number { get; set; } public string ServiceType { get; set; } = string.Empty; public string Status { get; set; } = string.Empty; public string? CustomerName { get; set; } public string? CustomerPhone { get; set; } public decimal Total { get; set; } public DateTime CreatedAt { get; set; } public DateTime? ScheduledAtUtc { get; set; } public string? ScheduledTimeZoneId { get; set; } }
 
     private sealed class HistoryRow
     {

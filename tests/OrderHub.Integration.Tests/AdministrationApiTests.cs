@@ -37,6 +37,19 @@ public sealed class AdministrationApiTests
     }
 
     [Theory]
+    [InlineData(AdministrativeRole.Owner,true)] [InlineData(AdministrativeRole.Admin,true)] [InlineData(AdministrativeRole.Manager,true)]
+    [InlineData(AdministrativeRole.Attendant,false)] [InlineData(AdministrativeRole.Kitchen,false)] [InlineData(AdministrativeRole.Delivery,false)]
+    public async Task Order_scheduling_configuration_obeys_management_role_matrix(AdministrativeRole role, bool allowed)
+    {
+        await using var factory = new AdminFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Role", role.ToString());
+        var response = await client.PutAsJsonAsync($"/api/admin/establishments/{UnitId}/order-scheduling/Pickup",
+            new OrderSchedulingPolicyRequest(true, 60, 30, null));
+        Assert.Equal(allowed ? HttpStatusCode.NoContent : HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Theory]
     [InlineData(AdministrativeRole.Owner,true)] [InlineData(AdministrativeRole.Admin,true)] [InlineData(AdministrativeRole.Manager,true)] [InlineData(AdministrativeRole.Kitchen,true)]
     [InlineData(AdministrativeRole.Attendant,false)] [InlineData(AdministrativeRole.Delivery,false)]
     public async Task Kitchen_transition_obeys_role_matrix(AdministrativeRole role,bool allowed)
@@ -92,7 +105,7 @@ public sealed class AdministrationApiTests
     public async Task Administrative_routes_and_explicit_contracts_are_in_openapi()
     {
         await using var factory=new AdminFactory(environment:"Development");using var client=factory.CreateClient();var json=await client.GetStringAsync("/openapi/v1.json");
-        Assert.Contains("/api/admin/establishments/{establishmentId}/customers",json);Assert.Contains("/api/admin/establishments/{establishmentId}/orders",json);Assert.Contains("/api/admin/establishments/{establishmentId}/kitchen",json);Assert.Contains(nameof(PagedResponse<CustomerResponse>),json);Assert.Contains(nameof(KitchenTicketResponse),json);
+        Assert.Contains("/api/admin/establishments/{establishmentId}/customers",json);Assert.Contains("/api/admin/establishments/{establishmentId}/orders",json);Assert.Contains("/api/admin/establishments/{establishmentId}/kitchen",json);Assert.Contains("/api/admin/establishments/{establishmentId}/order-scheduling",json);Assert.Contains(nameof(PagedResponse<CustomerResponse>),json);Assert.Contains(nameof(KitchenTicketResponse),json);
     }
 
     private sealed class AdminFactory(bool rejectScope=false,string environment="Testing",bool conflict=false):WebApplicationFactory<Program>
