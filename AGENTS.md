@@ -2,17 +2,38 @@
 
 # OrderHub — Codex Development Rules
 
-Este arquivo contém regras obrigatórias para qualquer agente que altere este repositório.
+Este arquivo contém regras permanentes e obrigatórias para qualquer agente que altere este repositório.
 
-Antes de criar, alterar ou remover código:
+Antes de criar, alterar, refatorar ou remover código:
 
-1. Leia este arquivo completamente.
-2. Leia `openspec/project.md`.
-3. Leia `openspec/architecture.md`.
-4. Leia `openspec/conventions.md`.
-5. Localize a spec correspondente em `openspec/specs/`.
-6. Não implemente requisitos que não estejam na spec atual.
-7. Não altere decisões arquiteturais sem registrar um ADR.
+1. Leia completamente o `AGENTS.md` aplicável ao escopo.
+2. Leia `openspec/project.md`, `openspec/architecture.md` e `openspec/conventions.md`.
+3. Consulte os ADRs relevantes em `openspec/decisions/`.
+4. Localize e leia a spec correspondente em `openspec/specs/` e os artefatos da change ativa, quando houver.
+5. Pesquise implementações, abstrações, componentes e testes equivalentes antes de criar algo novo.
+6. Para qualquer alteração frontend, leia `docs/web-design-system.md` e consulte os tokens, layouts e componentes existentes.
+7. Não implemente requisitos que não estejam na spec atual.
+8. Não altere decisões arquiteturais sem registrar um ADR.
+
+Regra permanente:
+
+> Antes de escrever código, descubra como o OrderHub já resolve o problema.
+> Reutilize padrões existentes quando forem semanticamente adequados.
+> Não crie uma segunda maneira de resolver um problema que já possui solução oficial.
+> Se o padrão existente não atender à necessidade, não o contorne silenciosamente: identifique a lacuna e determine se ela exige extensão, novo padrão, atualização de spec ou decisão arquitetural.
+
+## Hierarquia de autoridade
+
+Quando fontes divergirem, utilize esta ordem:
+
+1. `AGENTS.md` aplicável ao escopo;
+2. arquitetura e ADRs aprovados em `openspec/architecture.md` e `openspec/decisions/`;
+3. Design System e padrões oficiais de componentes em `docs/web-design-system.md`;
+4. convenções globais em `openspec/conventions.md`;
+5. OpenSpec da funcionalidade atual;
+6. implementação existente que seja coerente com as fontes anteriores.
+
+Uma spec de funcionalidade não pode violar silenciosamente uma decisão arquitetural global. Se houver conflito entre fontes, não escolha arbitrariamente e não implemente um desvio: registre o conflito, os arquivos envolvidos e a decisão necessária.
 
 ---
 
@@ -409,6 +430,14 @@ Reutilizar código existente quando semanticamente apropriado.
 
 Não criar duplicações com nomes diferentes.
 
+Antes de criar abstrações como `IRepository<T>`, `IService<T>`, `IHandler<T>`, factories, helpers ou infraestrutura genérica, verificar:
+
+1. se já existe padrão equivalente;
+2. se existe necessidade concreta;
+3. se há pelo menos dois casos reais com o mesmo comportamento quando houver generalização;
+4. se a abstração respeita as dependências arquiteturais;
+5. se composição ou extensão localizada resolve melhor o problema.
+
 ---
 
 # 19. Mudanças arquiteturais
@@ -451,3 +480,133 @@ Uma feature só está pronta quando:
 - [ ] Spec foi atendida completamente
 
 "Funciona" não significa "pronto".
+
+---
+
+# 21. Frontend e Design System
+
+`docs/web-design-system.md` é a fonte oficial das regras visuais, superfícies, tokens, classificação e catálogo de componentes do frontend.
+
+Antes de criar ou modificar página, layout ou componente Vue/Quasar:
+
+1. consultar o Design System;
+2. pesquisar componentes compartilhados e componentes do módulo;
+3. consultar `src/themes/`, `src/css/app.scss` e os layouts existentes;
+4. verificar padrões de formulário, navegação, feedback e estados;
+5. classificar qualquer novo componente como global, de domínio/feature ou específico de página;
+6. analisar smartphone, tablet e desktop nos tamanhos aplicáveis;
+7. considerar loading, success, empty, error, disabled e unauthorized quando aplicáveis;
+8. verificar teclado, foco, rótulos, semântica, contraste e áreas de toque.
+
+Não iniciar uma tela usando componentes Quasar sem verificar se existe padrão de aplicação correspondente. Um wrapper compartilhado deve ser usado quando representar comportamento ou linguagem oficial. Componentes Quasar podem ser usados diretamente para estruturas locais quando não houver padrão global.
+
+Não criar wrappers sem benefício real e não transformar componentes compartilhados em componentes excessivamente configuráveis apenas para evitar especialização legítima.
+
+---
+
+# 22. Reutilização de componentes e tokens
+
+Antes de criar um componente, pesquisar por responsabilidade, comportamento, aparência, nome e contexto de uso.
+
+Classificação obrigatória:
+
+- **Global:** padrão estável utilizado por múltiplos contextos; pertence ao Design System ou a `src/components/`.
+- **Domain/Feature:** reutilizável dentro de um módulo; permanece próximo ao módulo correspondente.
+- **Page-specific:** existe para uma única página; permanece próximo à página.
+
+Quando existir componente semelhante:
+
+1. avaliar reutilização direta;
+2. avaliar composição, props ou slots coerentes;
+3. avaliar extensão do padrão existente;
+4. somente então criar um componente diferente.
+
+Não duplicar conceitos por variações de nome. Também não promover automaticamente componentes de feature para o Design System.
+
+É proibido espalhar valores visuais arbitrários quando existir token correspondente. Consultar tokens antes de adicionar cores, espaçamentos, raios, sombras, tipografia, breakpoints ou z-index. Um novo token deve representar uma decisão semântica e reutilizável, não apenas substituir um valor isolado.
+
+---
+
+# 23. Superfícies, responsividade e acessibilidade
+
+As superfícies possuem propósitos diferentes e não devem compartilhar um layout apenas por conveniência técnica:
+
+- **Public:** mobile-first, identidade do Tenant, fotografia, descoberta, conversão, carrinho e composição de produtos.
+- **Administration:** produtividade, clareza, densidade controlada, formulários, tabelas, indicadores e navegação consistente. A marca do Tenant não pode comprometer a consistência administrativa.
+- **Operations:** velocidade, alto contraste, estados e tempo claros, poucos cliques, atualização em tempo real e uso em monitor, tablet ou touch.
+- **KDS:** leitura à distância, prioridade, tempo prometido, modificadores e observações de produção.
+- **Platform:** contexto global institucional, separado visual e operacionalmente dos dados de um Tenant.
+
+Os layouts oficiais atuais são `PublicLayout`, `AdministrationLayout`, `OperationsLayout` e `PlatformLayout`.
+
+Toda alteração frontend deve preservar:
+
+- navegação por teclado e foco visível;
+- rótulos e semântica HTML;
+- contraste adequado;
+- estado comunicado também por texto ou ícone, não somente por cor;
+- áreas acionáveis adequadas para touch;
+- responsividade sem lógica JavaScript de layout quando CSS ou Quasar forem suficientes.
+
+---
+
+# 24. Alteração de padrões
+
+Uma feature não autoriza refatoração arquitetural ou visual global.
+
+Ao identificar uma solução melhor que o padrão consolidado:
+
+1. documentar o problema e o padrão atual;
+2. apresentar a alternativa e o impacto;
+3. listar os arquivos e consumidores afetados;
+4. determinar se a mudança exige atualização do Design System, da spec ou um ADR;
+5. obter a decisão necessária antes da substituição global.
+
+Um novo componente global deve ter propósito e limites documentados, usar tokens oficiais, registrar props, slots e eventos relevantes e possuir testes quando tiver comportamento próprio. Atualizar o catálogo em `docs/web-design-system.md` na mesma mudança.
+
+OpenSpecs descrevem principalmente o que muda em uma capability. Não redefinir regras permanentes dentro de uma feature; referenciar arquitetura, convenções e Design System. Qualquer necessidade de alterar esses padrões deve ser declarada explicitamente.
+
+---
+
+# 25. Checklist antes de implementar
+
+## Architecture Check
+
+- [ ] Li o `AGENTS.md` aplicável.
+- [ ] Consultei projeto, arquitetura, convenções e ADRs relevantes.
+- [ ] Consultei a OpenSpec e a change da feature.
+- [ ] Pesquisei implementação e testes equivalentes.
+- [ ] Não estou duplicando abstrações existentes.
+- [ ] A mudança respeita CQRS, DDD e arquitetura hexagonal quando aplicável.
+- [ ] Considerei Multi-Tenancy, segurança, autenticação e autorização.
+
+## Frontend Check
+
+- [ ] Consultei `docs/web-design-system.md`.
+- [ ] Consultei componentes, layouts e tokens existentes.
+- [ ] Classifiquei novos componentes como Global, Domain/Feature ou Page-specific.
+- [ ] Não dupliquei componente ou padrão existente.
+- [ ] Respeitei a identidade da superfície afetada.
+- [ ] Considerei smartphone, tablet e desktop aplicáveis.
+- [ ] Considerei loading, success, empty, error, disabled e unauthorized aplicáveis.
+- [ ] Considerei teclado, foco, semântica, contraste e touch.
+
+---
+
+# 26. Checklist após implementar
+
+Antes de declarar uma tarefa concluída:
+
+- executar build e testes relevantes;
+- executar testes arquiteturais;
+- executar lint, formatação e typecheck aplicáveis;
+- revisar warnings e arquivos alterados;
+- verificar violações de arquitetura e isolamento Multi-Tenant;
+- verificar duplicação de abstrações e componentes;
+- verificar valores visuais hardcoded quando houver token aplicável;
+- verificar responsividade e acessibilidade nas superfícies afetadas;
+- atualizar documentação e catálogo quando um padrão for criado ou alterado.
+
+"Compilou" não significa "está aderente à arquitetura".
+
+"Ficou bonito" não significa "está aderente ao Design System".

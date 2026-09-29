@@ -18,6 +18,16 @@
 - Contracts contém contratos externos explícitos e não expõe entidades de domínio.
 - SQL permanece em Infrastructure, junto aos adapters de leitura.
 
+## Frontend e Design System
+
+- `docs/web-design-system.md` é a fonte oficial das regras visuais, superfícies e catálogo de componentes web.
+- Antes de criar páginas ou componentes, pesquisar tokens, layouts, componentes compartilhados e componentes do módulo.
+- Classificar componentes novos como globais, de domínio/feature ou específicos de página; não promover abstrações prematuramente.
+- Usar componentes Quasar diretamente quando forem estrutura local sem padrão de aplicação correspondente; wrappers globais precisam acrescentar semântica, comportamento ou consistência real.
+- Preservar as identidades distintas de Public, Administration, Operations, KDS e Platform.
+- Evitar valores visuais arbitrários quando existir token semântico aplicável.
+- Toda alteração frontend considera os estados relevantes, responsividade, teclado, foco, semântica, contraste e touch.
+
 ## CQRS e validação
 
 - Commands alteram estado; Queries nunca alteram estado.
