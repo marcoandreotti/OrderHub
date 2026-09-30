@@ -90,8 +90,8 @@ onMounted(load)
 onUnmounted(() => { alive = false; request.abort() })
 </script>
 <template>
-  <q-page padding class="onboarding-page">
-    <header class="q-mb-lg"><div class="text-overline text-primary">CONFIGURAÇÃO DA UNIDADE</div><h1 class="text-h4 q-my-sm">Prepare seu estabelecimento</h1><p class="text-grey-7">Salve cada etapa e continue quando quiser. Tema e mesas são opcionais.</p></header>
+  <q-page class="admin-page onboarding-page">
+    <header class="admin-page-header"><div><p class="admin-page-eyebrow">CONFIGURAÇÃO DA UNIDADE</p><h1 class="text-h4 q-my-sm">Prepare seu estabelecimento</h1><p>Salve cada etapa e continue quando quiser. Tema e mesas são opcionais.</p></div></header>
     <nav aria-label="Etapas de configuração" class="row q-gutter-sm q-mb-lg">
       <q-btn v-for="s in steps" :key="s.id" :label="s.label" :outline="step !== s.id" :aria-current="step === s.id ? 'step' : undefined" color="primary" no-caps :disable="busy || loading" @click="go(s.id)" />
     </nav>

@@ -20,12 +20,13 @@ export const defaultTenantTheme: TenantTheme = {
   fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 }
 
-export function applyTenantTheme(theme: TenantTheme): void {
-  const root = document.documentElement
-  Object.entries(theme).forEach(([key, value]) => {
-    const cssName = key.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)
-    root.style.setProperty(`--oh-${cssName.startsWith('color-') ? cssName : `color-${cssName}`}`, value)
-  })
-  root.style.setProperty('--oh-border-radius', theme.borderRadius)
-  root.style.setProperty('--oh-font-family', theme.fontFamily)
+export function applyTenantTheme(theme: TenantTheme, surface: HTMLElement): void {
+  surface.style.setProperty('--oh-brand-primary', theme.primary)
+  surface.style.setProperty('--oh-brand-secondary', theme.secondary)
+  surface.style.setProperty('--oh-brand-accent', theme.accent)
+  surface.style.setProperty('--oh-surface-page', theme.background)
+  surface.style.setProperty('--oh-surface-raised', theme.surface)
+  surface.style.setProperty('--oh-text-primary', theme.text)
+  surface.style.setProperty('--oh-border-radius', theme.borderRadius)
+  surface.style.setProperty('--oh-font-family', theme.fontFamily)
 }

@@ -89,7 +89,15 @@ beforeEach(() => {
 })
 
 describe('catálogo público', () => {
+  it('comunica loading enquanto contexto e catálogo estão pendentes', () => {
+    vi.mocked(publicOrderingClient.context).mockReturnValue(new Promise(() => {}))
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    expect(wrapper.get('[role="status"]').text()).toContain('Carregando cardápio')
+    wrapper.unmount()
+  })
+
   it('resolve QR, preserva ordenação e bloqueia composição inválida', async () => {
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus')
     route.params.tableToken = 'opaque'
     vi.mocked(publicOrderingClient.context).mockResolvedValue({
       ...context, table: { code: '10', token: 'opaque' }
@@ -102,8 +110,38 @@ describe('catálogo público', () => {
     await wrapper.findAll('button').find(button => button.text().includes('Pizza'))!.trigger('click')
     await wrapper.findAll('button').find(button => button.text() === 'Adicionar')!.trigger('click')
     expect(wrapper.get('[role="alert"]').text()).toContain('selecione entre 1 e 1')
+    expect(focus).toHaveBeenCalled()
     await wrapper.get('input[type="checkbox"]').setValue(true)
     await wrapper.findAll('button').find(button => button.text() === 'Adicionar')!.trigger('click')
+    expect(wrapper.text()).toContain('Carrinho (1)')
+    focus.mockRestore()
+    wrapper.unmount()
+  })
+
+  it('preserva contexto e carrinho ao buscar e trocar categoria', async () => {
+    vi.mocked(publicOrderingClient.catalog).mockResolvedValue({
+      ...catalog,
+      categories: [
+        catalog.categories[1]!,
+        { ...catalog.categories[0]!, products: [{ ...product, id: 'p2', name: 'Suco' }] }
+      ]
+    })
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+
+    await wrapper.findAll('button').find(button => button.text().includes('Pizza'))!.trigger('click')
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await wrapper.findAll('button').find(button => button.text() === 'Adicionar')!.trigger('click')
+
+    await wrapper.get('input[type="search"]').setValue('suco')
+    expect(wrapper.text()).toContain('Pizzaria')
+    expect(wrapper.text()).toContain('Suco')
+    expect(wrapper.text()).not.toContain('PizzaDeliciosa')
+    expect(wrapper.text()).toContain('Carrinho (1)')
+
+    await wrapper.findAll('button').find(button => button.text() === 'Depois')!.trigger('click')
+    expect(wrapper.text()).toContain('Pizzaria')
+    expect(wrapper.text()).toContain('Suco')
     expect(wrapper.text()).toContain('Carrinho (1)')
     wrapper.unmount()
   })
@@ -147,6 +185,32 @@ describe('catálogo público', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('Pedidos indisponíveis')
     expect(wrapper.text()).not.toContain('internal-not-rendered')
+  })
+
+  it('orienta recuperação quando o catálogo está vazio', async () => {
+    vi.mocked(publicOrderingClient.catalog).mockResolvedValue({ ...catalog, categories: [] })
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Nenhum item disponível no momento.')
+    await wrapper.findAll('button').find(button => button.text() === 'Atualizar cardápio')!.trigger('click')
+    await flushPromises()
+    expect(publicOrderingClient.catalog).toHaveBeenCalledTimes(2)
+    wrapper.unmount()
+  })
+
+  it('explica fechamento sem depender da cor', async () => {
+    vi.mocked(publicOrderingClient.context).mockResolvedValue({
+      ...context,
+      availability: [{
+        serviceType: 'Pickup', isAvailable: false, reason: 'OutsideBusinessHours',
+        message: null, nextOpening: '2026-09-24T14:00:00Z'
+      }]
+    })
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.get('[role="status"]').text()).toContain('fora do horário de atendimento')
+    expect(wrapper.text()).toContain('Próxima abertura:')
+    wrapper.unmount()
   })
 
   it('oferece retomar a referência pública válida após recarregar', async () => {

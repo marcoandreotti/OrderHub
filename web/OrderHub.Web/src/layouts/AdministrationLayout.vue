@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../modules/session/store'
 const drawer = ref(false)
 const session = useSessionStore()
 const router = useRouter()
 const route = useRoute()
+const activeUnitName = computed(
+  () => session.units.find((unit) => unit.id === session.unitId)?.name ?? 'Sem unidade ativa'
+)
 watch(
-  () => route.path,
+  () => [route.path, session.revision],
   async () => {
     drawer.value = false
     await nextTick()
@@ -27,16 +30,19 @@ async function logout() {
 }
 </script>
 <template>
-  <q-layout view="hHh lpR fFf">
+  <q-layout view="hHh lpR fFf" data-surface="administration">
     <q-header bordered class="bg-white text-dark">
       <a class="skip-link" href="#admin-content">Ir para o conteúdo</a>
-      <q-toolbar class="q-px-md q-py-sm">
+      <q-toolbar class="q-px-md q-py-sm administration-toolbar">
         <q-btn flat round aria-label="Abrir navegação" @click="drawer = !drawer"
           ><span aria-hidden="true">☰</span></q-btn
         >
         <q-toolbar-title class="brand-wordmark"
           >OrderHub <span>ADMIN</span></q-toolbar-title
         >
+        <span class="administration-active-unit" aria-label="Unidade ativa">
+          {{ activeUnitName }}
+        </span>
         <q-btn flat no-caps label="Sair" @click="logout" />
       </q-toolbar>
     </q-header>
@@ -58,6 +64,7 @@ async function logout() {
           map-options
           outlined
           label="Unidade ativa"
+          aria-label="Unidade ativa"
           :disable="!session.units.length"
           @update:model-value="session.selectUnit"
           class="q-mb-lg"

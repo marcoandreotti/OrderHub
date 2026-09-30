@@ -1,0 +1,92 @@
+<script setup lang="ts">
+import type { OrderAction } from './actions'
+import type { OrderSummary } from './types'
+
+defineProps<{
+  order: OrderSummary
+  statusLabel: string
+  serviceLabel: string
+  timeLabel: string
+  totalLabel: string
+  selected: boolean
+  isNew: boolean
+  isLate: boolean
+  lateLabel: string
+  productionDue?: boolean
+  nextAction?: OrderAction
+}>()
+
+defineEmits<{
+  select: [order: OrderSummary]
+  action: [order: OrderSummary, action: OrderAction]
+}>()
+</script>
+
+<template>
+  <article class="order-card-shell" :class="{ selected, scheduled: !!order.scheduledAtUtc, due: productionDue, late: isLate }">
+    <button class="order-card" type="button"
+      :aria-label="`Pedido ${order.number}, ${statusLabel}, ${serviceLabel}, ${timeLabel}`"
+      @click="$emit('select', order)">
+      <span class="order-card-title">
+        <strong>#{{ order.number }}</strong>
+        <span>{{ timeLabel }}</span>
+      </span>
+      <span class="order-card-state">{{ statusLabel }}</span>
+      <span>{{ serviceLabel }}<span v-if="order.scheduledAtUtc"> · Horário prometido</span></span>
+      <span v-if="order.customerName">{{ order.customerName }}</span>
+      <span class="order-card-items">
+        <span v-for="(item, index) in order.items ?? []" :key="`${item.productName}:${index}`">
+          <strong>{{ item.quantity }}×</strong> {{ item.productName }}<small v-if="item.variationName"> · {{ item.variationName }}</small>
+        </span>
+      </span>
+      <strong>{{ totalLabel }}</strong>
+      <span v-if="isNew" class="signal new">✦ Novo</span>
+      <span v-if="productionDue" class="signal due">▶ Produzir agora</span>
+      <span v-if="isLate" class="signal late">⚠ {{ lateLabel }}</span>
+    </button>
+    <q-btn
+      v-if="nextAction"
+      class="order-card-action"
+      color="primary"
+      no-caps
+      :label="nextAction.label"
+      @click="$emit('action', order, nextAction)"
+    />
+  </article>
+</template>
+
+<style scoped>
+.order-card-shell {
+  margin-bottom: 10px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: var(--oh-surface-raised);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--oh-text-primary) 10%, transparent);
+}
+.order-card-shell:hover, .order-card-shell.selected { border-color: var(--oh-brand-primary); }
+.order-card-shell.late { border-color: var(--oh-status-urgency); }
+.order-card-shell.scheduled { border-left-color: #7c3aed; background: #faf7ff; }
+.order-card-shell.due { border-color: var(--oh-status-warning); }
+.order-card {
+  display: grid;
+  gap: 7px;
+  width: 100%;
+  padding: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--oh-text-primary);
+  text-align: left;
+  cursor: pointer;
+  min-height: 44px;
+}
+.order-card-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.order-card-state { color: var(--oh-text-muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.order-card-items { display: grid; gap: 3px; padding: 8px 0; border-block: 1px solid var(--oh-border-subtle); }
+.order-card-items small { color: var(--oh-text-muted); }
+.order-card-action { width: calc(100% - 20px); min-height: 44px; margin: 0 10px 10px; }
+.signal { width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+.signal.new { background: #dbeafe; color: #1d4ed8; }
+.signal.due { background: color-mix(in srgb, var(--oh-status-warning) 14%, var(--oh-surface-raised)); color: var(--oh-status-warning); }
+.signal.late { background: color-mix(in srgb, var(--oh-status-urgency) 10%, var(--oh-surface-raised)); color: var(--oh-status-urgency); }
+</style>

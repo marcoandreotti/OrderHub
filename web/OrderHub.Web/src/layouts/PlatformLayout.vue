@@ -6,7 +6,7 @@ const session = useSessionStore()
 async function logout() { try { await session.logout() } finally { await router.replace('/login') } }
 </script>
 <template>
-  <q-layout view="hHh lpR fFf">
+  <q-layout view="hHh lpR fFf" data-surface="platform">
     <q-header bordered class="bg-white text-dark">
       <a class="skip-link" href="#platform-content">Ir para o conteúdo</a>
       <q-toolbar class="q-px-md q-py-sm">

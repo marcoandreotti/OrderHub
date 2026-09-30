@@ -110,4 +110,5 @@ public sealed record OrderModifierGroupReadModel(Guid GroupId, string Name, stri
 public sealed record OrderModifierOptionReadModel(Guid OptionId, string Name, decimal UnitPrice, decimal Quantity, int? PortionNumerator, int? PortionDenominator);
 public sealed record OrderHistoryReadModel(OrderStatus PreviousStatus, OrderStatus NewStatus, DateTimeOffset OccurredAt, Guid? ActorId, string? Note);
 public sealed record OrderSearchResult(int Total, IReadOnlyList<OrderSummaryReadModel> Items);
-public sealed record OrderSummaryReadModel(Guid Id, long Number, OrderServiceType ServiceType, OrderStatus Status, string? CustomerName, string? CustomerPhone, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ScheduledAtUtc = null, string? ScheduledTimeZoneId = null);
+public sealed record OrderSummaryItemReadModel(decimal Quantity, string ProductName, string? VariationName);
+public sealed record OrderSummaryReadModel(Guid Id, long Number, OrderServiceType ServiceType, OrderStatus Status, string? CustomerName, string? CustomerPhone, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ScheduledAtUtc = null, string? ScheduledTimeZoneId = null, IReadOnlyList<OrderSummaryItemReadModel>? Items = null);

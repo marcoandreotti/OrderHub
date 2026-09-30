@@ -14,6 +14,9 @@ import {
 import { useOrderOperationsStore } from '../src/modules/operations/orders/store'
 import type { OrderDetail, OrderSummary } from '../src/modules/operations/orders/types'
 import OrdersDashboardPage from '../src/modules/operations/orders/OrdersDashboardPage.vue'
+import OperationsOrderCard from '../src/modules/operations/orders/OperationsOrderCard.vue'
+import OperationsSyncStatus from '../src/modules/operations/orders/OperationsSyncStatus.vue'
+import { isProductionDue, sortImmediateOrders, sortScheduledOrders } from '../src/modules/operations/orders/board'
 import { useSessionStore } from '../src/modules/session/store'
 
 const summary = (id: string, status: OrderSummary['status'] = 'Confirmed'): OrderSummary => ({
@@ -24,7 +27,8 @@ const summary = (id: string, status: OrderSummary['status'] = 'Confirmed'): Orde
   customerName: 'Cliente',
   customerPhone: null,
   total: 42,
-  createdAt: '2026-09-14T10:00:00Z'
+  createdAt: '2026-09-14T10:00:00Z',
+  items: [{ quantity: 2, productName: 'Pizza', variationName: 'Grande' }]
 })
 const detail = (status: OrderDetail['status'] = 'Confirmed'): OrderDetail => ({
   ...summary('1', status),
@@ -114,6 +118,62 @@ describe('matriz visual de ações', () => {
     expect(
       availableActions({ ...detail('Ready'), serviceType: 'Pickup' }, ['order-completion']).map((x) => x.transition)
     ).toEqual(['complete'])
+  })
+
+  it('apresenta itens essenciais e somente a próxima ação autorizada no cartão', async () => {
+    const action = availableActions(detail(), ['order-kitchen'])[0]!
+    const wrapper = mount(OperationsOrderCard, {
+      props: {
+        order: summary('1'), statusLabel: 'Confirmados', serviceLabel: 'Entrega',
+        timeLabel: 'há 5 min', totalLabel: 'R$ 42,00', selected: false,
+        isNew: true, isLate: false, lateLabel: 'Atrasado', nextAction: action
+      },
+      global: {
+        stubs: {
+          QBtn: {
+            props: ['label'], emits: ['click'],
+            template: '<button type="button" @click="$emit(\'click\')">{{ label }}</button>'
+          }
+        }
+      }
+    })
+    expect(wrapper.text()).toContain('2× Pizza · Grande')
+    expect(wrapper.text()).toContain('Iniciar preparo')
+    await wrapper.findAll('button').find(button => button.text() === 'Iniciar preparo')!.trigger('click')
+    expect(wrapper.emitted('action')?.[0]).toEqual([expect.objectContaining({ id: '1' }), action])
+  })
+
+  it('comunica atraso por texto e ícone e mantém controles nativos de teclado', () => {
+    const wrapper = mount(OperationsOrderCard, {
+      props: {
+        order: summary('7'), statusLabel: 'Confirmados', serviceLabel: 'Entrega',
+        timeLabel: 'há 18 min', totalLabel: 'R$ 42,00', selected: false,
+        isNew: false, isLate: true, lateLabel: 'Atrasado'
+      }
+    })
+    expect(wrapper.get('.order-card-shell').classes()).toContain('late')
+    expect(wrapper.text()).toContain('⚠ Atrasado')
+    expect(wrapper.get('button.order-card').attributes()).toMatchObject({
+      type: 'button',
+      'aria-label': 'Pedido 7, Confirmados, Entrega, há 18 min'
+    })
+  })
+})
+
+describe('organização temporal do board', () => {
+  it('ordena imediatos pelos mais recentes e agendados pelo horário prometido', () => {
+    const older = { ...summary('1'), createdAt: '2026-09-29T10:00:00Z' }
+    const newer = { ...summary('2'), createdAt: '2026-09-29T11:00:00Z' }
+    const later = { ...summary('3'), scheduledAtUtc: '2026-09-29T15:00:00Z' }
+    const sooner = { ...summary('4'), scheduledAtUtc: '2026-09-29T14:00:00Z' }
+    expect(sortImmediateOrders([older, newer]).map(order => order.id)).toEqual(['2', '1'])
+    expect(sortScheduledOrders([later, sooner]).map(order => order.id)).toEqual(['4', '3'])
+  })
+
+  it('promove visualmente o agendado quando chega a janela de produção', () => {
+    const scheduled = { ...summary('5'), scheduledAtUtc: '2026-09-29T14:00:00Z' }
+    expect(isProductionDue(scheduled, Date.parse('2026-09-29T14:00:00Z'))).toBe(true)
+    expect(isProductionDue(scheduled, Date.parse('2026-09-29T13:59:59Z'))).toBe(false)
   })
 })
 
@@ -223,6 +283,32 @@ describe('tempo real com reconciliação', () => {
     })
 
     expect(fallback.refresh).toHaveBeenCalledOnce()
+  })
+})
+
+describe('estado de sincronização', () => {
+  it('mantém fallback, defasagem, última sincronização e recuperação na mesma hierarquia', async () => {
+    const passthrough = { template: '<div><slot /><slot name="action" /></div>' }
+    const wrapper = mount(OperationsSyncStatus, {
+      props: {
+        hasUnit: true, realtimeState: 'reconnecting', stale: true,
+        error: 'API temporariamente indisponível.', lastSuccessLabel: '14:30'
+      },
+      global: {
+        stubs: {
+          QBanner: passthrough,
+          QBtn: {
+            props: ['label'], emits: ['click'],
+            template: '<button type="button" @click="$emit(\'click\')">{{ label }}</button>'
+          }
+        }
+      }
+    })
+    expect(wrapper.text()).toContain('Dados possivelmente desatualizados')
+    expect(wrapper.text()).toContain('A fila carregada foi preservada')
+    expect(wrapper.text()).toContain('Última sincronização: 14:30')
+    await wrapper.get('button').trigger('click')
+    expect(wrapper.emitted('retry')).toHaveLength(1)
   })
 })
 

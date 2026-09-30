@@ -21,18 +21,22 @@ export function contrast(first: string, second: string) {
   if (a === null || b === null) return 0
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
 }
-export function applyPublicTheme(value: PublicContext) {
+export function publicThemeSurface() {
+  return document.querySelector<HTMLElement>('[data-surface="public"]')
+}
+export function applyPublicTheme(value: PublicContext, surface = publicThemeSurface()) {
+  if (!surface) return false
   const background = hex(value.theme.backgroundColor) ? value.theme.backgroundColor : defaults.background
   const fallbackText = contrast(background, defaults.text) >= 4.5 ? defaults.text : '#ffffff'
   const text = contrast(background, value.theme.textColor) >= 4.5 ? value.theme.textColor : fallbackText
   const primary = contrast(value.theme.primaryColor, '#ffffff') >= 4.5 ? value.theme.primaryColor : defaults.primary
   const fallbackSecondary = contrast(defaults.secondary, background) >= 3 ? defaults.secondary : text
   const secondary = contrast(value.theme.secondaryColor, background) >= 3 ? value.theme.secondaryColor : fallbackSecondary
-  const root = document.documentElement
-  root.style.setProperty('--oh-color-primary', primary)
-  root.style.setProperty('--oh-color-secondary', secondary)
-  root.style.setProperty('--oh-color-background', background)
-  root.style.setProperty('--oh-color-text', text)
-  root.style.setProperty('--oh-font-family', /^[\w ,'-]+$/.test(value.theme.fontFamily)
+  surface.style.setProperty('--oh-brand-primary', primary)
+  surface.style.setProperty('--oh-brand-secondary', secondary)
+  surface.style.setProperty('--oh-surface-page', background)
+  surface.style.setProperty('--oh-text-primary', text)
+  surface.style.setProperty('--oh-font-family', /^[\w ,'-]+$/.test(value.theme.fontFamily)
     ? value.theme.fontFamily : 'system-ui, sans-serif')
+  return true
 }

@@ -1,4 +1,5 @@
 using Dapper;
+using System.Text.Json;
 using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Application.Abstractions.Persistence;
 using OrderHub.Domain.Ordering;
@@ -19,7 +20,18 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
               and (@Status is null or o.status=@Status) and (@Number is null or o.number=@Number)
               and (@ServiceType is null or o.service_type=@ServiceType);
             select o.id,o.number,o.service_type as ServiceType,o.status,o.customer_name as CustomerName,o.customer_phone as CustomerPhone,o.total,o.created_at as CreatedAt,
-                   o.scheduled_at_utc as ScheduledAtUtc,o.scheduled_time_zone_id as ScheduledTimeZoneId
+                   o.scheduled_at_utc as ScheduledAtUtc,o.scheduled_time_zone_id as ScheduledTimeZoneId,
+                   coalesce((
+                       select jsonb_agg(jsonb_build_object(
+                           'Quantity', i.quantity,
+                           'ProductName', i.product_name,
+                           'VariationName', i.variation_name
+                       ) order by i.id)
+                       from orders.order_item i
+                       where i.tenant_id=o.tenant_id
+                         and i.establishment_id=o.establishment_id
+                         and i.order_id=o.id
+                   ), '[]'::jsonb)::text as ItemsJson
             from orders."order" o
             where o.tenant_id=@TenantId and o.establishment_id=@EstablishmentId
               and (@From is null or o.created_at>=@From) and (@To is null or o.created_at<@To)
@@ -30,7 +42,7 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
         var parameters = new { TenantId = tenantId, EstablishmentId = establishmentId, From = from, To = to, Status = status?.ToString(), Number = number, ServiceType = serviceType?.ToString(), Offset = (page - 1) * pageSize, PageSize = pageSize };
         await using var connection = await connectionFactory.OpenConnectionAsync(cancellationToken); using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, parameters, cancellationToken: cancellationToken));
         var total = await grid.ReadSingleAsync<int>(); var rows = (await grid.ReadAsync<SummaryRow>()).ToArray();
-        return new(total, rows.Select(x => new OrderSummaryReadModel(x.Id, x.Number, Enum.Parse<OrderServiceType>(x.ServiceType), Enum.Parse<OrderStatus>(x.Status), x.CustomerName, x.CustomerPhone, x.Total, new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc)), ToUtcOffset(x.ScheduledAtUtc), x.ScheduledTimeZoneId)).ToArray());
+        return new(total, rows.Select(x => new OrderSummaryReadModel(x.Id, x.Number, Enum.Parse<OrderServiceType>(x.ServiceType), Enum.Parse<OrderStatus>(x.Status), x.CustomerName, x.CustomerPhone, x.Total, new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAt, DateTimeKind.Utc)), ToUtcOffset(x.ScheduledAtUtc), x.ScheduledTimeZoneId, JsonSerializer.Deserialize<SummaryItemRow[]>(x.ItemsJson)?.Select(item => new OrderSummaryItemReadModel(item.Quantity, item.ProductName, item.VariationName)).ToArray() ?? [])).ToArray());
     }
 
     /// <summary>
@@ -117,7 +129,8 @@ public sealed class OrderReadGateway(IReadConnectionFactory connectionFactory) :
     private sealed record ModifierOptionRow(Guid SnapshotId, Guid OptionId, string Name, decimal UnitPrice, decimal Quantity, int? PortionNumerator, int? PortionDenominator);
 
     private sealed class SummaryRow
-    { public Guid Id { get; set; } public long Number { get; set; } public string ServiceType { get; set; } = string.Empty; public string Status { get; set; } = string.Empty; public string? CustomerName { get; set; } public string? CustomerPhone { get; set; } public decimal Total { get; set; } public DateTime CreatedAt { get; set; } public DateTime? ScheduledAtUtc { get; set; } public string? ScheduledTimeZoneId { get; set; } }
+    { public Guid Id { get; set; } public long Number { get; set; } public string ServiceType { get; set; } = string.Empty; public string Status { get; set; } = string.Empty; public string? CustomerName { get; set; } public string? CustomerPhone { get; set; } public decimal Total { get; set; } public DateTime CreatedAt { get; set; } public DateTime? ScheduledAtUtc { get; set; } public string? ScheduledTimeZoneId { get; set; } public string ItemsJson { get; set; } = "[]"; }
+    private sealed record SummaryItemRow(decimal Quantity, string ProductName, string? VariationName);
 
     private sealed class HistoryRow
     {

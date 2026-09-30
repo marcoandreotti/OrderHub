@@ -7,6 +7,7 @@
 
 - [ ] 2.1 Expor contratos paginados/agregados e exportação limitada; verificar autorização e equivalência de filtros.
 - [ ] 2.2 Construir dashboard com filtros, séries, comparações e estados vazios; verificar responsividade e acessibilidade.
+- [ ] 2.3 Integrar a composição visual do dashboard à experiência administrativa remodelada após os contratos de 1.1 e 2.1 estarem disponíveis, consumindo os indicadores retornados sem duplicar cálculos financeiros no frontend.
 
 ## 3. Interfaces and Verification
 

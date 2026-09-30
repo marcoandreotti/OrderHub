@@ -20,6 +20,13 @@ export interface OrderSummary {
   createdAt: string
   scheduledAtUtc?: string | null
   scheduledTimeZoneId?: string | null
+  items?: OrderSummaryItem[]
+}
+
+export interface OrderSummaryItem {
+  quantity: number
+  productName: string
+  variationName: string | null
 }
 
 export interface OrderAdditional {

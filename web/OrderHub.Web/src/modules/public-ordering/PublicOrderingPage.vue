@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ProblemBanner from '../../components/ProblemBanner.vue'
 import { ApiError } from '../../http/client'
+import PublicCatalogSearch from './PublicCatalogSearch.vue'
+import PublicCartAccess from './PublicCartAccess.vue'
+import PublicCategoryNavigation from './PublicCategoryNavigation.vue'
+import PublicProductCard from './PublicProductCard.vue'
+import PublicUnitContext from './PublicUnitContext.vue'
 import { publicOrderingClient } from './client'
 import { hydrateCartFromCatalog, loadCart, orderItems, receiptStorage, usePublicCart } from './cart'
 import { applyPublicTheme } from './theme'
@@ -22,6 +27,8 @@ const catalog = ref<PublicCatalog>()
 const loading = ref(true)
 const error = ref<unknown>(null)
 const step = ref<Step>('catalog')
+const catalogSearch = ref('')
+const activeCategoryId = ref<string | null>(null)
 const selected = ref<Product>()
 const quantity = ref(1)
 const variationId = ref<string | null>(null)
@@ -29,6 +36,7 @@ const notes = ref('')
 const selections = reactive<Record<string, string[]>>({})
 const selectionQuantities = reactive<Record<string, number>>({})
 const compositionError = ref('')
+const composerGroupElements: Record<string, HTMLElement> = {}
 const cart = usePublicCart()
 const simulation = ref<Simulation>()
 const scheduling = ref<SchedulingSlots>()
@@ -65,6 +73,21 @@ const pricingLabel = (strategy?: string) => ({
 const sortedCategories = computed(() => [...(catalog.value?.categories ?? [])]
   .filter(category => category.isActive)
   .sort((a, b) => a.order - b.order))
+const normalizedSearch = computed(() => catalogSearch.value.trim().toLocaleLowerCase('pt-BR'))
+const visibleCategories = computed(() => sortedCategories.value
+  .filter(category => activeCategoryId.value === null || category.id === activeCategoryId.value)
+  .map(category => ({
+    ...category,
+    products: category.products.filter(product => {
+      if (!product.isActive) return false
+      if (!normalizedSearch.value) return true
+      return [product.name, product.description, product.code]
+        .some(value => value?.toLocaleLowerCase('pt-BR').includes(normalizedSearch.value))
+    })
+  }))
+  .filter(category => !normalizedSearch.value || category.products.length > 0))
+const visibleProductCount = computed(() => visibleCategories.value
+  .reduce((total, category) => total + category.products.length, 0))
 const availableServices = computed(() => context.value?.availability ?? [])
 const selectedServiceAvailability = computed(() =>
   availableServices.value.find(item => item.serviceType === checkout.serviceType))
@@ -170,7 +193,38 @@ function setSelectionQuantity(groupId: string, additionalId: string, value: stri
   const otherCount = selectedCount(groupId) - (selectionQuantities[`${groupId}:${additionalId}`] ?? 1)
   selectionQuantities[`${groupId}:${additionalId}`] = Math.min(Math.floor(parsed), max - otherCount)
 }
-function addProduct() {
+function setComposerGroupElement(groupId: string, element: unknown) {
+  if (element instanceof HTMLElement) composerGroupElements[groupId] = element
+}
+const composerGroups = computed(() => selected.value?.additionalGroups
+  .filter(group => group.isActive).sort((a, b) => a.order - b.order) ?? [])
+const requiredComposerGroups = computed(() => composerGroups.value
+  .filter(group => group.minimumSelection > 0))
+const completedComposerGroups = computed(() => requiredComposerGroups.value.filter(group => {
+  const count = selectedCount(group.id)
+  return count >= group.minimumSelection && count <= group.maximumSelection
+}).length)
+const composerUnitPrice = computed(() => {
+  const product = selected.value
+  if (!product) return 0
+  const variation = product.variations.find(item => item.id === variationId.value)
+  const chosen = product.additionalGroups.flatMap(group =>
+    group.items.filter(item => selections[group.id]?.includes(item.id)).map(item => ({ group, item })))
+  const compositionGroup = product.additionalGroups.find(group =>
+    group.pricingStrategy === 'HighestPrice' || group.pricingStrategy === 'Proportional')
+  const compositionOptions = chosen.filter(item => item.group.id === compositionGroup?.id)
+  const base = compositionGroup?.pricingStrategy === 'HighestPrice'
+    ? Math.max(...compositionOptions.map(item => item.item.price), 0)
+    : compositionGroup?.pricingStrategy === 'Proportional'
+      ? compositionOptions.reduce((sum, item) => sum + item.item.price /
+        Math.max(compositionOptions.length, 1), 0)
+      : variation?.price ?? product.basePrice
+  return base + chosen
+    .filter(item => (item.group.pricingStrategy ?? 'Additive') === 'Additive')
+    .reduce((sum, item) => sum + item.item.price *
+      (selectionQuantities[`${item.group.id}:${item.item.id}`] ?? 1), 0)
+})
+async function addProduct() {
   const product = selected.value
   if (!product || product.isAvailable === false) return
   const invalid = product.additionalGroups.filter(group => group.isActive).find(group => {
@@ -180,6 +234,8 @@ function addProduct() {
   if (invalid) {
     compositionError.value = invalid.name + ': selecione entre ' +
       invalid.minimumSelection + ' e ' + invalid.maximumSelection + '.'
+    await nextTick()
+    composerGroupElements[invalid.id]?.focus()
     return
   }
   const chosenPairs = new Set(product.additionalGroups.flatMap(group =>
@@ -353,14 +409,9 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
       <q-btn label="Tentar novamente" color="primary" @click="load" />
     </div>
     <template v-else>
-      <header class="ordering-hero">
-        <img v-if="context.theme.logoUrl" :src="context.theme.logoUrl" alt="" class="ordering-logo">
-        <div><p class="eyebrow">Cardápio digital</p><h1>{{ context.establishmentName }}</h1>
-          <p v-if="context.table">Mesa {{ context.table.code }}</p>
-        </div>
-        <q-btn v-if="step === 'catalog'" :label="'Carrinho (' + cart.count.value + ')'"
-          color="primary" :disable="cart.state.items.length === 0" @click="step = 'cart'; simulate()" />
-      </header>
+      <PublicUnitContext
+        :context="context"
+      />
       <aside v-if="step === 'catalog' && previousReference" class="resume-order">
         <span>Você tem um pedido recente.</span>
         <q-btn flat label="Retomar acompanhamento"
@@ -377,21 +428,35 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
       </q-banner>
 
       <main v-if="step === 'catalog'" aria-label="Cardápio">
-        <section v-for="category in sortedCategories" :key="category.id" class="category">
+        <div class="catalog-controls">
+          <PublicCatalogSearch v-model="catalogSearch" />
+          <PublicCategoryNavigation v-model="activeCategoryId" :categories="sortedCategories" />
+        </div>
+        <section v-for="category in visibleCategories" :key="category.id" class="category">
           <h2>{{ category.name }}</h2><p v-if="category.description">{{ category.description }}</p>
           <div class="product-grid">
-            <button v-for="product in category.products.filter(x => x.isActive)" :key="product.id"
-              class="product-card" type="button" :disabled="product.isAvailable === false"
-              @click="openProduct(product)">
-              <img v-if="product.images[0]" :src="product.images.slice().sort((a,b) => a.order-b.order)[0]!.url" alt="">
-              <span><strong>{{ product.name }}</strong><small>{{ product.description }}</small>
-                <b v-if="product.isAvailable !== false">A partir de {{ money(product.basePrice) }}</b>
-                <b v-else>Indisponível<span v-if="product.unavailabilityReason"> · {{ product.unavailabilityReason }}</span></b></span>
-            </button>
+            <PublicProductCard
+              v-for="product in category.products"
+              :key="product.id"
+              :product="product"
+              :formatted-price="money(product.basePrice)"
+              @select="openProduct"
+            />
           </div>
         </section>
-        <p v-if="!sortedCategories.length" class="state-panel">Nenhum item disponível no momento.</p>
+        <div v-if="visibleProductCount === 0" class="state-panel" role="status">
+          <p>{{ normalizedSearch ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum item disponível no momento.' }}</p>
+          <q-btn v-if="normalizedSearch" flat label="Limpar busca" @click="catalogSearch = ''" />
+          <q-btn v-else flat label="Atualizar cardápio" @click="load" />
+        </div>
       </main>
+      <PublicCartAccess
+        v-if="step === 'catalog'"
+        :count="cart.count.value"
+        :total="money(cart.displayedTotal.value)"
+        :disabled="cart.state.items.length === 0"
+        @open="step = 'cart'; simulate()"
+      />
 
       <main v-else-if="step === 'cart'" class="flow-panel">
         <h2>Seu carrinho</h2>
@@ -483,16 +548,27 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
 
     <q-dialog :model-value="!!selected" @update:model-value="value => { if (!value) selected = undefined }">
       <q-card v-if="selected" class="composition-card">
-        <q-card-section><h2>{{ selected.name }}</h2><p>{{ selected.description }}</p></q-card-section>
-        <q-card-section>
-          <fieldset v-if="selected.variations.filter(x => x.isActive).length"><legend>Escolha uma opção</legend>
+        <q-card-section class="composer-summary">
+          <p class="eyebrow">Monte seu item</p>
+          <h2>{{ selected.name }}</h2>
+          <p>{{ selected.description }}</p>
+          <p v-if="requiredComposerGroups.length" role="status">
+            {{ completedComposerGroups }} de {{ requiredComposerGroups.length }} requisitos concluídos
+          </p>
+        </q-card-section>
+        <q-card-section class="composition-body">
+          <fieldset v-if="selected.variations.filter(x => x.isActive).length"><legend>Escolha uma opção · obrigatório</legend>
             <label v-for="variation in selected.variations.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="variation.id">
               <input v-model="variationId" type="radio" :value="variation.id" :disabled="variation.isAvailable === false">
               {{ variation.name }} — {{ money(variation.price) }}<small v-if="variation.isAvailable === false"> · indisponível</small>
             </label>
           </fieldset>
-          <fieldset v-for="group in selected.additionalGroups.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="group.id">
-            <legend>{{ group.name }} ({{ group.minimumSelection }}–{{ group.maximumSelection }}) · {{ pricingLabel(group.pricingStrategy) }}</legend>
+          <fieldset v-for="group in composerGroups" :id="`composer-group-${group.id}`" :key="group.id"
+            :ref="element => setComposerGroupElement(group.id, element)" tabindex="-1">
+            <legend>
+              {{ group.name }} · {{ group.minimumSelection > 0 ? 'obrigatório' : 'opcional' }}
+              ({{ selectedCount(group.id) }}/{{ group.maximumSelection }}) · {{ pricingLabel(group.pricingStrategy) }}
+            </legend>
             <label v-for="item in group.items.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="item.id">
               <input type="checkbox" :checked="selections[group.id]?.includes(item.id)"
                 :disabled="item.isAvailable === false || (!selections[group.id]?.includes(item.id) && selectedCount(group.id) >= group.maximumSelection)"
@@ -505,8 +581,14 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
           <q-input v-model.number="quantity" label="Quantidade" type="number" min="1" />
           <p v-if="compositionError" role="alert" class="text-negative">{{ compositionError }}</p>
         </q-card-section>
-        <q-card-actions align="right"><q-btn flat label="Cancelar" @click="selected = undefined" />
-          <q-btn color="primary" label="Adicionar" @click="addProduct" /></q-card-actions>
+        <q-card-actions align="right" class="composer-actions">
+          <div class="composer-total">
+            <span>{{ quantity }} × {{ money(composerUnitPrice) }}</span>
+            <strong>{{ money(composerUnitPrice * Math.max(quantity, 1)) }}</strong>
+          </div>
+          <q-btn flat label="Cancelar" @click="selected = undefined" />
+          <q-btn color="primary" label="Adicionar" @click="addProduct" />
+        </q-card-actions>
       </q-card>
     </q-dialog>
   </q-page>

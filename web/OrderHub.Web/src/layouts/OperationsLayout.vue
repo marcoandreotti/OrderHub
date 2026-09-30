@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { nextTick, watch } from 'vue'
+import { computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../modules/session/store'
 
 const session = useSessionStore()
 const router = useRouter()
 const route = useRoute()
+const isKitchen = computed(() => route.path.endsWith('/kitchen'))
 
 watch(
   () => route.fullPath,
@@ -25,12 +26,12 @@ async function logout() {
 </script>
 
 <template>
-  <q-layout view="hHh lpR fFf">
+  <q-layout view="hHh lpR fFf" data-surface="operations" :class="{ 'operations-layout--kds': isKitchen }">
     <q-header bordered class="bg-white text-dark">
       <a class="skip-link" href="#operations-content">Ir para o conteúdo</a>
       <q-toolbar class="q-px-md q-py-sm operations-toolbar">
         <q-toolbar-title class="brand-wordmark">
-          OrderHub <span>OPERAÇÃO</span>
+          OrderHub <span>{{ isKitchen ? 'COZINHA' : 'OPERAÇÃO' }}</span>
         </q-toolbar-title>
         <q-select
           :model-value="session.unitId"
@@ -48,13 +49,13 @@ async function logout() {
           class="operations-unit"
         />
         <q-btn
-          v-if="session.can('order-kitchen')"
+          v-if="!isKitchen && session.can('order-kitchen')"
           flat
           no-caps
           label="Cozinha"
           to="/operations/kitchen"
         />
-        <q-btn v-if="session.can('order-delivery')" flat no-caps label="Entregas" to="/operations/delivery" />
+        <q-btn v-if="!isKitchen && session.can('order-delivery')" flat no-caps label="Entregas" to="/operations/delivery" />
         <q-btn
           flat
           no-caps
@@ -62,7 +63,7 @@ async function logout() {
           to="/operations"
         />
         <q-btn
-          v-if="session.can('management')"
+          v-if="!isKitchen && session.can('management')"
           flat
           no-caps
           label="Administração"

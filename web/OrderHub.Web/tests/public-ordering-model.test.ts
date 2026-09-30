@@ -107,6 +107,9 @@ describe('cliente HTTP público', () => {
 })
 
 it('mantém contraste mínimo ao aplicar tema público inseguro', () => {
+  const publicSurface = document.createElement('div')
+  publicSurface.dataset.surface = 'public'
+  document.body.append(publicSurface)
   applyPublicTheme({
     establishmentName: 'Unit', slug: 'unit', table: null, paymentMethods: [],
     theme: {
@@ -115,10 +118,37 @@ it('mantém contraste mínimo ao aplicar tema público inseguro', () => {
       fontFamily: '<script>', logoUrl: null
     }
   })
-  const style = document.documentElement.style
-  expect(contrast(style.getPropertyValue('--oh-color-primary'), '#ffffff')).toBeGreaterThanOrEqual(4.5)
-  expect(contrast(style.getPropertyValue('--oh-color-text'), '#ffffff')).toBeGreaterThanOrEqual(4.5)
+  const style = publicSurface.style
+  expect(contrast(style.getPropertyValue('--oh-brand-primary'), '#ffffff')).toBeGreaterThanOrEqual(4.5)
+  expect(contrast(style.getPropertyValue('--oh-text-primary'), '#ffffff')).toBeGreaterThanOrEqual(4.5)
   expect(style.getPropertyValue('--oh-font-family')).toBe('system-ui, sans-serif')
+  expect(document.documentElement.style.getPropertyValue('--oh-brand-primary')).toBe('')
+  publicSurface.remove()
+})
+
+it('isola o tema público ao navegar para outra superfície', () => {
+  const publicSurface = document.createElement('div')
+  publicSurface.dataset.surface = 'public'
+  const administrationSurface = document.createElement('div')
+  administrationSurface.dataset.surface = 'administration'
+  document.body.append(publicSurface, administrationSurface)
+
+  applyPublicTheme({
+    establishmentName: 'Expressiva', slug: 'expressiva', table: null, paymentMethods: [],
+    theme: {
+      primaryColor: '#7f1d1d', secondaryColor: '#14532d',
+      backgroundColor: '#fff7ed', textColor: '#431407',
+      fontFamily: 'Georgia, serif', logoUrl: null
+    }
+  }, publicSurface)
+
+  expect(publicSurface.style.getPropertyValue('--oh-font-family')).toBe('Georgia, serif')
+  expect(administrationSurface.style.getPropertyValue('--oh-font-family')).toBe('')
+  expect(administrationSurface.style.getPropertyValue('--oh-brand-primary')).toBe('')
+  expect(document.documentElement.style.getPropertyValue('--oh-font-family')).toBe('')
+
+  publicSurface.remove()
+  administrationSurface.remove()
 })
 
 it('aplica backoff limitado e reconhece estados terminais do acompanhamento', () => {

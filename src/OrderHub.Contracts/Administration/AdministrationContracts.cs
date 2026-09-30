@@ -7,7 +7,8 @@ public sealed record CustomerAddressUpsertRequest(string Label, string Street, s
 public sealed record CustomerResponse(Guid Id, string Name, string Phone, string? Email, IReadOnlyList<CustomerAddressResponse> Addresses);
 public sealed record CustomerAddressResponse(Guid Id, string Label, string Street, string Number, string? Complement, string Neighborhood, string City, string State, string PostalCode, bool IsPrimary);
 
-public sealed record OrderSummaryResponse(Guid Id, long Number, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ScheduledAtUtc = null, string? ScheduledTimeZoneId = null);
+public sealed record OrderSummaryItemResponse(decimal Quantity, string ProductName, string? VariationName);
+public sealed record OrderSummaryResponse(Guid Id, long Number, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, decimal Total, DateTimeOffset CreatedAt, DateTimeOffset? ScheduledAtUtc = null, string? ScheduledTimeZoneId = null, IReadOnlyList<OrderSummaryItemResponse>? Items = null);
 public sealed record OrderTransitionRequest(string? Note);
 public sealed record OrderDetailResponse(Guid Id, long? Number, string? PublicReference, string ServiceType, string Status, string? CustomerName, string? CustomerPhone, string? TableCode, decimal Subtotal, decimal Discount, decimal Fees, decimal Total, string? CouponCode, decimal ConfirmedAmount, bool IsFullyPaid, IReadOnlyList<AdminOrderItemResponse> Items, IReadOnlyList<AdminOrderHistoryResponse> History,
     AdminDeliveryAddressResponse? DeliveryAddress = null, Guid? DeliveryRegionId = null, string? DeliveryRegionName = null, decimal DeliveryFee = 0, int? DeliveryEstimatedMinutes = null, DateTimeOffset? ScheduledAtUtc = null, string? ScheduledTimeZoneId = null);

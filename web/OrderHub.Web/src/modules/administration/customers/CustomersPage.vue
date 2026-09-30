@@ -149,9 +149,20 @@ onMounted(load)
 onUnmounted(() => request?.abort())
 </script>
 <template>
-  <q-page class="q-pa-lg">
-    <h1 class="text-h4">Clientes</h1>
-    <p>Contatos e endereços da unidade selecionada.</p>
+  <q-page class="admin-page">
+    <header class="admin-page-header">
+      <div>
+        <p class="admin-page-eyebrow">RELACIONAMENTO</p>
+        <h1 class="text-h4 q-my-sm">Clientes</h1>
+        <p>Contatos e endereços da unidade selecionada.</p>
+      </div>
+      <q-btn
+        color="primary"
+        label="Cadastrar cliente"
+        :disable="!session.unitId"
+        @click="open()"
+      />
+    </header>
     <q-banner v-if="!session.unitId" class="bg-amber-1"
       >Selecione uma unidade autorizada.</q-banner
     >
@@ -167,12 +178,8 @@ onUnmounted(() => request?.abort())
         maxlength="150"
         class="col-12 col-md-7" />
       <div class="col-12 col-md-5 q-gutter-sm">
-        <q-btn type="submit" flat label="Pesquisar" :loading="loading" /><q-btn
-          color="primary"
-          label="Cadastrar cliente"
-          :disable="!session.unitId"
-          @click="open()"
-        /></div
+        <q-btn type="submit" flat label="Pesquisar" :loading="loading" />
+      </div
     ></q-form>
     <q-markup-table flat bordered wrap-cells :aria-busy="loading"
       ><thead>

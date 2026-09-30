@@ -45,10 +45,11 @@ export interface Product {
 }
 export interface PublicCatalog {
   establishmentId: string; establishmentName: string; slug: string
-  categories: {
-    id: string; parentId: string | null; name: string; description: string | null
-    order: number; imageUrl: string | null; isActive: boolean; products: Product[]
-  }[]
+  categories: PublicCategory[]
+}
+export interface PublicCategory {
+  id: string; parentId: string | null; name: string; description: string | null
+  order: number; imageUrl: string | null; isActive: boolean; products: Product[]
 }
 export interface Address {
   label: string; street: string; number: string; complement: string | null

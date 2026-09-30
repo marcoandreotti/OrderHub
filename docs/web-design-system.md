@@ -112,6 +112,11 @@ Prioridades:
 - `OperationsLayout.vue`: shell de pedidos, entrega e cozinha.
 - `PlatformLayout.vue`: shell global de provisionamento.
 
+Cada shell expõe um identificador estável no seu elemento raiz: `data-surface="public"`,
+`data-surface="administration"`, `data-surface="operations"` ou
+`data-surface="platform"`. Temas de Tenant são aplicados somente ao subtree
+`public`; nunca devem escrever variáveis em `document.documentElement`.
+
 Não criar um layout genérico para unificar superfícies com propósitos diferentes. Extrações compartilhadas são aceitáveis quando preservam identidade, navegação e densidade próprias.
 
 ## Tokens
@@ -120,11 +125,27 @@ Não criar um layout genérico para unificar superfícies com propósitos difere
 
 `_tokens.scss` define atualmente:
 
-- cores primary, secondary, accent, background, surface e text;
+- marca: `--oh-brand-primary`, `--oh-brand-secondary` e `--oh-brand-accent`;
+- superfícies: `--oh-surface-page` e `--oh-surface-raised`;
+- texto: `--oh-text-primary` e `--oh-text-muted`;
+- borda: `--oh-border-subtle`;
+- foco: `--oh-focus-ring`;
+- estados: `--oh-status-success`, `--oh-status-warning`,
+  `--oh-status-danger` e `--oh-status-urgency`;
 - raio-base;
 - família tipográfica.
 
 Esses tokens são oficiais enquanto existirem no código, mas formam apenas a fundação inicial.
+Os estados de urgência e erro devem ser acompanhados por texto ou ícone; a cor nunca
+é o único sinal.
+
+### Compatibilidade
+
+Os aliases legados `--oh-color-*` foram removidos depois da migração dos últimos
+consumidores e da verificação das quatro superfícies. Todo estilo novo usa diretamente
+os tokens semânticos implementados. Antes de remover ou renomear um token oficial,
+pesquisar todos os consumidores e verificar Public, Administration, Operations, KDS e
+Platform.
 
 ### Critérios para novos tokens
 
@@ -144,12 +165,11 @@ Valores locais continuam aceitáveis para ajustes intrínsecos e não reutilizá
 
 As categorias abaixo são candidatas, não tokens já implementados:
 
-- cores semânticas de success, warning, danger, info e estados operacionais;
+- cor semântica de info e novos estados operacionais que tenham consumidor real;
 - escala de spacing;
 - escala tipográfica;
 - raios por papel;
-- bordas e elevações;
-- foco;
+- elevações;
 - motion e duração;
 - camadas e z-index;
 - densidades public, administration e operations.
@@ -199,10 +219,34 @@ Não existem atualmente `AppButton`, `AppCard`, `AppDialog`, `AppStatus`, `AppPa
 
 ### Componentes de feature identificados
 
-- `CatalogPicker.vue`: seleção paginada de vínculos dentro do catálogo administrativo.
-- `AccessStep.vue`: etapa de acesso no onboarding administrativo.
+- Public ordering:
+  - `PublicUnitContext.vue`: identidade e contexto público da unidade;
+  - `PublicCatalogSearch.vue`: busca rotulada do cardápio;
+  - `PublicCategoryNavigation.vue`: navegação horizontal e seleção de categoria;
+  - `PublicProductCard.vue`: apresentação e seleção de oferta pública;
+  - `PublicCartAccess.vue`: acesso persistente ao carrinho com quantidade e total.
+- Administration:
+  - `CatalogPicker.vue`: seleção paginada de vínculos dentro do catálogo;
+  - `CatalogCompactTable.vue`: manutenção compacta dos recursos do catálogo;
+  - `CatalogProductVisualGrid.vue`: reconhecimento visual de produtos sobre o mesmo estado da visão compacta;
+  - `AccessStep.vue`: etapa de acesso no onboarding administrativo.
+- Operations:
+  - `OperationsOrderCard.vue`: resumo executável do pedido e sua próxima ação;
+  - `OperationsSyncStatus.vue`: conexão, fallback, defasagem e recuperação da fila.
+- KDS:
+  - `KitchenColumn.vue`: agrupamento de tickets por etapa de produção;
+  - `KitchenTicketCard.vue`: ticket de produção com prioridade, atraso, composição e ação touch.
 
 Eles permanecem próximos aos módulos porque suas responsabilidades são específicas. Reuso fora desses domínios exige nova avaliação, não simples movimentação de pasta.
+
+### Padrões administrativos comprovados
+
+As classes `admin-page`, `admin-page-header` e `admin-page-eyebrow` normalizam
+contenção, hierarquia e ação principal nas páginas administrativas. Elas são política
+visual da superfície, não um componente global configurável. Catálogo, clientes,
+usuários, cupons, pagamentos, disponibilidade, entregas, onboarding e visão geral são
+consumidores concretos. Não criar `AppPageHeader` enquanto não houver comportamento
+compartilhado além dessa composição semântica e responsiva.
 
 ### Layouts
 

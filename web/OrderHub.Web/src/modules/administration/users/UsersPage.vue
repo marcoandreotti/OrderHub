@@ -163,11 +163,12 @@ onUnmounted(() => {
 })
 </script>
 <template>
-  <q-page class="q-pa-lg">
-    <div class="row items-center justify-between q-mb-lg">
+  <q-page class="admin-page">
+    <header class="admin-page-header">
       <div>
+        <p class="admin-page-eyebrow">ACESSOS</p>
         <h1 class="text-h4 q-my-sm">Usuários</h1>
-        <p class="text-grey-8">
+        <p>
           Pessoas do Tenant, papéis e acesso à unidade selecionada.
         </p>
       </div>
@@ -178,7 +179,7 @@ onUnmounted(() => {
         :disable="!session.unitId"
         @click="open(null)"
       />
-    </div>
+    </header>
     <q-banner v-if="!session.unitId" class="bg-amber-1"
       >Selecione uma unidade autorizada.</q-banner
     >

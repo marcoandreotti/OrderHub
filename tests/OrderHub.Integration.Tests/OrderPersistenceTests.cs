@@ -42,7 +42,8 @@ public sealed class OrderPersistenceTests : IAsyncLifetime
         Assert.Equal(2, result.History.Count); Assert.Equal("Rua A", result.DeliveryAddress!.Street);
         Assert.Null(await gateway.GetAsync(Guid.NewGuid(), establishmentId, orderId, CancellationToken.None));
         var filtered=await gateway.SearchAsync(tenantId,establishmentId,null,null,OrderStatus.Preparing,1,OrderServiceType.Delivery,1,20,CancellationToken.None);
-        Assert.Equal(1,filtered.Total);Assert.Equal(orderId,Assert.Single(filtered.Items).Id);
+        Assert.Equal(1,filtered.Total);var summary=Assert.Single(filtered.Items);Assert.Equal(orderId,summary.Id);
+        var summaryItem=Assert.Single(summary.Items!);Assert.Equal(2,summaryItem.Quantity);Assert.Equal("Produto antigo",summaryItem.ProductName);Assert.Null(summaryItem.VariationName);
         Assert.Empty((await gateway.SearchAsync(Guid.NewGuid(),establishmentId,null,null,null,null,null,1,20,CancellationToken.None)).Items);
         Assert.Empty((await gateway.SearchAsync(tenantId,establishmentId,null,null,OrderStatus.Completed,null,null,1,20,CancellationToken.None)).Items);
     }

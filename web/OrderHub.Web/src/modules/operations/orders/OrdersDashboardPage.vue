@@ -3,6 +3,9 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../../session/store'
 import { availableActions, serviceLabels, statusLabels, type OrderAction } from './actions'
+import OperationsOrderCard from './OperationsOrderCard.vue'
+import OperationsSyncStatus from './OperationsSyncStatus.vue'
+import { isProductionDue, sortImmediateOrders, sortScheduledOrders } from './board'
 import { PollingCoordinator } from './polling'
 import {
   createOrderRealtimeConnection,
@@ -39,8 +42,8 @@ const grouped = computed(() =>
     .map((item) => ({
       status: item,
       orders: store.orders.filter((order) => order.status === item),
-      immediate: store.orders.filter((order) => order.status === item && !order.scheduledAtUtc),
-      scheduled: store.orders.filter((order) => order.status === item && !!order.scheduledAtUtc)
+      immediate: sortImmediateOrders(store.orders.filter((order) => order.status === item && !order.scheduledAtUtc)),
+      scheduled: sortScheduledOrders(store.orders.filter((order) => order.status === item && !!order.scheduledAtUtc))
     }))
 )
 const selected = computed(() =>
@@ -51,6 +54,8 @@ const selectedActions = computed(() =>
     ? availableActions(selected.value, session.context?.capabilities ?? [])
     : []
 )
+const cardAction = (order: OrderSummary) =>
+  availableActions(order, session.context?.capabilities ?? [])[0]
 const interval = Math.max(
   5_000,
   Number(import.meta.env.VITE_OPERATIONS_POLL_INTERVAL_MS) || 15_000
@@ -116,6 +121,11 @@ function requestAction(action: OrderAction) {
     pendingAction.value = action
     note.value = ''
   } else void execute(action)
+}
+
+async function requestCardAction(order: OrderSummary, action: OrderAction) {
+  await openOrder(order)
+  requestAction(action)
 }
 
 function setConfirmation(open: boolean) {
@@ -190,30 +200,14 @@ function elapsed(value: string) {
       />
     </header>
 
-    <q-banner
-      v-if="store.stale"
-      class="bg-orange-1 text-brown-9 q-mb-md"
-      role="alert"
-    >
-      <strong>⚠ Dados possivelmente desatualizados.</strong>
-      {{ store.error }}
-      <template #action>
-        <q-btn flat no-caps label="Tentar novamente" @click="poller.refresh(true)" />
-      </template>
-    </q-banner>
-    <q-banner
-      v-if="session.unitId && realtimeState !== 'connected'"
-      class="bg-blue-1 text-primary q-mb-md"
-      aria-live="polite"
-    >
-      <strong>{{ realtimeState === 'reconnecting' ? 'Reconectando ao tempo real.' : 'Canal em tempo real indisponível.' }}</strong>
-      Os dados permanecem visíveis e o painel está usando atualização periódica sem sobreposição.
-    </q-banner>
-    <p class="sync-status" aria-live="polite">
-      <span v-if="realtimeState === 'connected'">● Tempo real conectado. </span>
-      <span v-if="store.lastSuccessAt">✓ Última sincronização: {{ time(store.lastSuccessAt) }}</span>
-      <span v-else>Sincronização ainda não concluída.</span>
-    </p>
+    <OperationsSyncStatus
+      :has-unit="!!session.unitId"
+      :realtime-state="realtimeState"
+      :stale="store.stale"
+      :error="store.error"
+      :last-success-label="store.lastSuccessAt ? time(store.lastSuccessAt) : null"
+      @retry="poller.refresh(true)"
+    />
 
     <section class="operations-filters" aria-label="Filtros de pedidos">
       <q-select
@@ -258,40 +252,41 @@ function elapsed(value: string) {
             <q-badge :label="group.orders.length" color="grey-8" />
           </h2>
           <h3 v-if="group.immediate.length" class="queue-subheading">Imediatos</h3>
-          <button
+          <OperationsOrderCard
             v-for="order in group.immediate"
             :key="order.id"
-            type="button"
-            class="order-card"
-            :class="{ selected: store.selectedId === order.id }"
-            @click="openOrder(order)"
-          >
-            <span class="order-card-title">
-              <strong>#{{ order.number }}</strong>
-              <span>{{ elapsed(order.createdAt) }}</span>
-            </span>
-            <span>{{ serviceLabels[order.serviceType] }}</span>
-            <span v-if="order.customerName">{{ order.customerName }}</span>
-            <span>{{ money(order.total) }}</span>
-            <span v-if="store.isNew(order.id)" class="signal new">✦ Novo</span>
-            <span v-if="store.isLate(order)" class="signal late">⚠ Atrasado</span>
-          </button>
+            :order="order"
+            :status-label="statusLabels[order.status]"
+            :service-label="serviceLabels[order.serviceType]"
+            :time-label="elapsed(order.createdAt)"
+            :total-label="money(order.total)"
+            :selected="store.selectedId === order.id"
+            :is-new="store.isNew(order.id)"
+            :is-late="store.isLate(order)"
+            :production-due="isProductionDue(order)"
+            late-label="Atrasado"
+            :next-action="cardAction(order)"
+            @select="openOrder"
+            @action="requestCardAction"
+          />
           <h3 v-if="group.scheduled.length" class="queue-subheading">Agendados</h3>
-          <button
+          <OperationsOrderCard
             v-for="order in group.scheduled"
             :key="order.id"
-            type="button"
-            class="order-card scheduled-order"
-            :class="{ selected: store.selectedId === order.id }"
-            @click="openOrder(order)"
-          >
-            <span class="order-card-title"><strong>#{{ order.number }}</strong><span>{{ promisedTime(order) }}</span></span>
-            <span>{{ serviceLabels[order.serviceType] }} · Horário prometido</span>
-            <span v-if="order.customerName">{{ order.customerName }}</span>
-            <span>{{ money(order.total) }}</span>
-            <span v-if="store.isNew(order.id)" class="signal new">✦ Novo</span>
-            <span v-if="store.isLate(order)" class="signal late">⚠ Horário ultrapassado</span>
-          </button>
+            :order="order"
+            :status-label="statusLabels[order.status]"
+            :service-label="serviceLabels[order.serviceType]"
+            :time-label="promisedTime(order)"
+            :total-label="money(order.total)"
+            :selected="store.selectedId === order.id"
+            :is-new="store.isNew(order.id)"
+            :is-late="store.isLate(order)"
+            :production-due="isProductionDue(order)"
+            late-label="Horário ultrapassado"
+            :next-action="cardAction(order)"
+            @select="openOrder"
+            @action="requestCardAction"
+          />
           <p v-if="!group.orders.length" class="empty-state">Nenhum pedido nesta etapa.</p>
         </article>
       </section>
@@ -388,42 +383,36 @@ function elapsed(value: string) {
 </template>
 
 <style scoped>
-.operations-page { padding: 24px; background: #f6f7fb; min-height: calc(100vh - 72px); }
-.operations-heading, .detail-heading, .order-card-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.operations-page { padding: 24px; background: var(--oh-surface-page); min-height: calc(100vh - 72px); }
+.operations-heading, .detail-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .operations-heading { margin-bottom: 16px; }
-.sync-status { color: #475569; min-height: 24px; }
 .operations-filters { display: grid; grid-template-columns: repeat(3, minmax(160px, 240px)); gap: 12px; margin-bottom: 20px; }
 .operations-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 20px; align-items: start; }
-.status-board { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 16px; overflow-x: auto; padding-bottom: 12px; }
-.status-column { min-height: 240px; padding: 12px; border-radius: 12px; background: #e9edf5; }
+.status-board { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 16px; padding-bottom: 12px; }
+.status-column { min-height: 240px; padding: 12px; border-radius: var(--oh-border-radius); background: color-mix(in srgb, var(--oh-border-subtle) 42%, var(--oh-surface-page)); }
 .status-column h2 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 12px; font-size: 1rem; }
-.empty-state { color: #64748b; font-size: .875rem; }
-.order-card { display: grid; gap: 7px; width: 100%; margin-bottom: 10px; padding: 14px; border: 2px solid transparent; border-radius: 10px; background: white; color: #172033; text-align: left; cursor: pointer; box-shadow: 0 1px 3px #1720331a; }
-.order-card:hover, .order-card.selected { border-color: var(--oh-color-primary); }
-.scheduled-order { border-left-color: #7c3aed; background: #faf7ff; }
-.queue-subheading { margin: 12px 0 8px; font-size: .9rem; color: #475569; }
-.signal { width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
-.signal.new { background: #dbeafe; color: #1d4ed8; }
-.signal.late { background: #ffedd5; color: #9a3412; }
-.order-detail { position: sticky; top: 92px; max-height: calc(100vh - 116px); overflow: auto; padding: 20px; border-radius: 12px; background: white; box-shadow: 0 8px 30px #17203320; }
+.empty-state { color: var(--oh-text-muted); font-size: .875rem; }
+.queue-subheading { margin: 12px 0 8px; font-size: .9rem; color: var(--oh-text-muted); }
+.order-detail { position: sticky; top: 92px; max-height: calc(100vh - 116px); overflow: auto; padding: 20px; border-radius: var(--oh-border-radius); background: var(--oh-surface-raised); box-shadow: 0 8px 30px color-mix(in srgb, var(--oh-text-primary) 12%, transparent); }
 .detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.detail-facts div { padding: 10px; border-radius: 8px; background: #f1f5f9; }
-.detail-facts dt { color: #64748b; font-size: .75rem; }
+.detail-facts div { padding: 10px; border-radius: 8px; background: var(--oh-surface-page); }
+.detail-facts dt { color: var(--oh-text-muted); font-size: .75rem; }
 .detail-facts dd { margin: 3px 0 0; font-weight: 700; }
 .detail-items, .order-history { padding-left: 20px; }
 .detail-items li, .order-history li { margin-bottom: 12px; }
-.detail-items small, .order-history time, .order-history span { display: block; color: #64748b; }
-.item-note { margin: 5px 0; padding: 7px; border-left: 3px solid #f59e0b; background: #fffbeb; }
-.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; bottom: -20px; margin: 20px -20px -20px; padding: 16px 20px; background: white; border-top: 1px solid #e2e8f0; }
+.detail-items small, .order-history time, .order-history span { display: block; color: var(--oh-text-muted); }
+.item-note { margin: 5px 0; padding: 7px; border-left: 3px solid var(--oh-status-warning); background: color-mix(in srgb, var(--oh-status-warning) 9%, var(--oh-surface-raised)); }
+.detail-actions { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; bottom: -20px; margin: 20px -20px -20px; padding: 16px 20px; background: var(--oh-surface-raised); border-top: 1px solid var(--oh-border-subtle); }
 .confirmation-card { width: min(92vw, 520px); }
 @media (max-width: 1100px) {
   .operations-workspace { grid-template-columns: 1fr; }
-  .status-board { grid-template-columns: repeat(4, minmax(260px, 1fr)); }
+  .status-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .order-detail { position: static; max-height: none; }
 }
 @media (max-width: 700px) {
   .operations-page { padding: 16px; }
   .operations-heading { align-items: flex-start; flex-direction: column; }
   .operations-filters { grid-template-columns: 1fr; }
+  .status-board { grid-template-columns: 1fr; }
 }
 </style>

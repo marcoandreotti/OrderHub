@@ -46,11 +46,13 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <q-page class="q-pa-md">
-    <header class="q-mb-lg">
-      <p class="text-overline text-primary q-mb-xs">ENTREGAS</p>
-      <h1 class="text-h4 q-my-none">Regiões de entrega</h1>
-      <p class="text-grey-7">Configure faixas de CEP, tarifa e prazo estimado. A cobertura é validada no servidor.</p>
+  <q-page class="admin-page">
+    <header class="admin-page-header">
+      <div>
+        <p class="admin-page-eyebrow">ENTREGAS</p>
+        <h1 class="text-h4 q-my-sm">Regiões de entrega</h1>
+        <p>Configure faixas de CEP, tarifa e prazo estimado. A cobertura é validada no servidor.</p>
+      </div>
     </header>
     <ProblemBanner :error="error"><q-btn flat label="Tentar novamente" @click="refresh" /></ProblemBanner>
     <q-banner v-if="saved" class="bg-green-1 text-positive q-mb-md" rounded>Região salva.</q-banner>

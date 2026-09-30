@@ -5,6 +5,8 @@ import { ApiError } from '../../../http/client'
 import ProblemBanner from '../../../components/ProblemBanner.vue'
 import { useSessionStore } from '../../session/store'
 import CatalogPicker from './CatalogPicker.vue'
+import CatalogCompactTable from './CatalogCompactTable.vue'
+import CatalogProductVisualGrid from './CatalogProductVisualGrid.vue'
 import {
   catalogClient,
   groupPayload,
@@ -20,6 +22,7 @@ import {
 } from './client'
 const session = useSessionStore()
 const kind = ref<Resource>('categories'),
+  view = ref<'compact' | 'visual'>('compact'),
   search = ref(''),
   state = ref('all'),
   page = ref(1),
@@ -85,6 +88,11 @@ const labels: Record<Resource, string> = {
   'additional-groups': 'Grupos de adicionais'
 }
 const maxPage = computed(() => Math.max(1, Math.ceil(total.value / 20)))
+const products = computed(() => rows.value as Product[])
+const categoryName = (productId: string) =>
+  catalog.value?.categories.find((item) =>
+    item.products.some((product) => product.id === productId)
+  )?.name ?? 'Sem categoria'
 const modifierTargets = computed(() => (catalog.value?.categories ?? []).flatMap(category => category.products.flatMap(product => product.additionalGroups.flatMap(targetGroup => targetGroup.items.map(target => ({ groupId: targetGroup.id, groupName: targetGroup.name, optionId: target.id, optionName: target.name }))))))
 const targetOptions = (groupId: string) => modifierTargets.value.filter(target => target.groupId === groupId).map(target => ({ label: `${target.groupName} — ${target.optionName}`, value: target.optionId }))
 const draft = computed(() =>
@@ -275,9 +283,20 @@ onMounted(load)
 onUnmounted(() => request?.abort())
 </script>
 <template>
-  <q-page class="q-pa-lg">
-    <h1 class="text-h4">Catálogo</h1>
-    <p>Organize os produtos e complementos da unidade selecionada.</p>
+  <q-page class="admin-page">
+    <header class="admin-page-header">
+      <div>
+        <p class="admin-page-eyebrow">GESTÃO</p>
+        <h1 class="text-h4 q-my-sm">Catálogo</h1>
+        <p>Organize os produtos e complementos da unidade selecionada.</p>
+      </div>
+      <q-btn
+        color="primary"
+        label="Cadastrar"
+        :disable="!session.unitId"
+        @click="open()"
+      />
+    </header>
     <q-banner v-if="!session.unitId" class="bg-amber-1"
       >Selecione uma unidade autorizada.</q-banner
     >
@@ -315,36 +334,21 @@ onUnmounted(() => request?.abort())
         ]"
         class="col-12 col-md-3" />
       <div class="col-12 col-md-4 q-gutter-sm">
-        <q-btn type="submit" flat label="Pesquisar" :loading="loading" /><q-btn
-          color="primary"
-          label="Cadastrar"
-          :disable="!session.unitId"
-          @click="open()"
-        /></div
+        <q-btn type="submit" flat label="Pesquisar" :loading="loading" />
+      </div
     ></q-form>
-    <q-markup-table flat bordered wrap-cells :aria-busy="loading"
-      ><thead>
-        <tr>
-          <th class="text-left">Nome</th>
-          <th>Estado</th>
-          <th>Ações</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in rows" :key="row.id">
-          <td>{{ row.name }}</td>
-          <td class="text-center">{{ row.isActive ? 'Ativo' : 'Inativo' }}</td>
-          <td class="text-center">
-            <q-btn
-              flat
-              label="Editar"
-              :aria-label="`Editar ${row.name}`"
-              :disable="loading"
-              @click="open(row)"
-            />
-          </td>
-        </tr></tbody
-    ></q-markup-table>
+    <div v-if="kind === 'products'" class="admin-view-switcher" aria-label="Visualização dos produtos">
+      <button type="button" :aria-pressed="view === 'visual'" @click="view = 'visual'">Visual</button>
+      <button type="button" :aria-pressed="view === 'compact'" @click="view = 'compact'">Compacta</button>
+    </div>
+    <CatalogProductVisualGrid
+      v-if="kind === 'products' && view === 'visual'"
+      :products="products"
+      :loading="loading"
+      :category-name="categoryName"
+      @edit="open"
+    />
+    <CatalogCompactTable v-else :rows="rows" :loading="loading" @edit="open" />
     <p v-if="loading" role="status">Carregando catálogo…</p>
     <p v-else-if="!rows.length && !error" role="status">
       Nenhum resultado para os filtros informados.
