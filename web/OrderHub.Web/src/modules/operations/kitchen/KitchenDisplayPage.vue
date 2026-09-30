@@ -81,7 +81,7 @@ function time(value: number) {
     </header>
 
     <q-banner v-if="store.stale" class="bg-orange-1 text-brown-9 q-mb-md" role="alert">
-      <strong>⚠ Fila possivelmente desatualizada.</strong> {{ store.error }}
+      <strong>Fila possivelmente desatualizada.</strong> {{ store.error }}
       <template #action>
         <q-btn flat no-caps label="Tentar novamente" @click="poller.refresh(true)" />
       </template>
@@ -94,12 +94,12 @@ function time(value: number) {
     </q-banner>
 
     <p class="sync-status" aria-live="polite">
-      <span v-if="realtimeState === 'connected'">● Tempo real conectado. </span>
-      <span v-else>◷ Atualização periódica ativa. </span>
+      <span v-if="realtimeState === 'connected'">Tempo real conectado. </span>
+      <span v-else>Atualização periódica ativa. </span>
       <span v-if="store.lastSuccessAt">Última sincronização: {{ time(store.lastSuccessAt) }}</span>
     </p>
 
-    <q-banner v-if="!session.unitId" class="bg-blue-1 text-primary">
+    <q-banner v-if="!session.unitId" class="bg-blue-1 text-info">
       Selecione uma unidade autorizada para abrir a fila da cozinha.
     </q-banner>
 

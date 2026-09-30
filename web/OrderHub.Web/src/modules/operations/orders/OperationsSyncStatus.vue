@@ -15,20 +15,20 @@ defineEmits<{ retry: [] }>()
 <template>
   <section v-if="hasUnit" class="operations-sync" aria-label="Atualização da fila">
     <q-banner v-if="stale" class="bg-orange-1 text-brown-9" role="alert">
-      <strong>⚠ Dados possivelmente desatualizados.</strong>
+      <strong>Dados possivelmente desatualizados.</strong>
       {{ error }} A fila carregada foi preservada.
       <template #action>
         <q-btn flat no-caps label="Tentar novamente" @click="$emit('retry')" />
       </template>
     </q-banner>
-    <q-banner v-else-if="realtimeState !== 'connected'" class="bg-blue-1 text-primary" aria-live="polite">
+    <q-banner v-else-if="realtimeState !== 'connected'" class="bg-blue-1 text-info" aria-live="polite">
       <strong>{{ realtimeState === 'reconnecting' ? 'Reconectando ao tempo real.' : 'Canal em tempo real indisponível.' }}</strong>
       A fila permanece visível e usa atualização periódica como fallback.
     </q-banner>
     <p class="sync-status" aria-live="polite">
-      <span v-if="realtimeState === 'connected'">● Tempo real conectado. </span>
-      <span v-else>◷ Atualização periódica ativa. </span>
-      <span v-if="lastSuccessLabel">✓ Última sincronização: {{ lastSuccessLabel }}</span>
+      <span v-if="realtimeState === 'connected'">Tempo real conectado. </span>
+      <span v-else>Atualização periódica ativa. </span>
+      <span v-if="lastSuccessLabel">Última sincronização: {{ lastSuccessLabel }}</span>
       <span v-else>Sincronização ainda não concluída.</span>
     </p>
   </section>

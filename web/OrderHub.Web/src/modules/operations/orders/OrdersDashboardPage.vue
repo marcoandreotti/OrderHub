@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../../session/store'
-import { availableActions, serviceLabels, statusLabels, type OrderAction } from './actions'
+import { availableActions, orderStatusTone, serviceLabels, statusLabels, type OrderAction } from './actions'
 import OperationsOrderCard from './OperationsOrderCard.vue'
 import OperationsSyncStatus from './OperationsSyncStatus.vue'
 import { isProductionDue, sortImmediateOrders, sortScheduledOrders } from './board'
@@ -240,14 +240,14 @@ function elapsed(value: string) {
       />
     </section>
 
-    <q-banner v-if="!session.unitId" class="bg-blue-1 text-primary">
+    <q-banner v-if="!session.unitId" class="bg-blue-1 text-info">
       Selecione uma unidade autorizada para acompanhar os pedidos.
     </q-banner>
 
     <div v-else class="operations-workspace">
       <section class="status-board" aria-label="Pedidos por estado" :aria-busy="store.loading">
         <article v-for="group in grouped" :key="group.status" class="status-column">
-          <h2>
+          <h2 :class="`status-heading--${orderStatusTone[group.status]}`">
             {{ statusLabels[group.status] }}
             <q-badge :label="group.orders.length" color="grey-8" />
           </h2>
@@ -307,7 +307,7 @@ function elapsed(value: string) {
         </div>
 
         <q-banner v-if="store.conflict" class="bg-orange-1 text-brown-9 q-my-md" role="alert">
-          ⚠ {{ store.conflict }}
+          {{ store.conflict }}
         </q-banner>
         <q-banner v-if="store.actionError" class="bg-red-1 text-negative q-my-md" role="alert">
           {{ store.actionError }}
@@ -317,7 +317,7 @@ function elapsed(value: string) {
           <div v-if="selected.scheduledAtUtc"><dt>Agendado para</dt><dd>{{ promisedTime(selected) }} · {{ selected.scheduledTimeZoneId }}</dd></div>
           <div><dt>Atendimento</dt><dd>{{ serviceLabels[selected.serviceType] }}</dd></div>
           <div v-if="selected.tableCode"><dt>Mesa</dt><dd>{{ selected.tableCode }}</dd></div>
-          <div><dt>Pagamento</dt><dd>{{ selected.isFullyPaid ? '✓ Pago' : '◷ Pendente' }}</dd></div>
+          <div><dt>Pagamento</dt><dd>{{ selected.isFullyPaid ? 'Pago' : 'Pendente' }}</dd></div>
           <div><dt>Confirmado</dt><dd>{{ money(selected.confirmedAmount) }} de {{ money(selected.total) }}</dd></div>
         </dl>
         <section v-if="selected.serviceType === 'Delivery' && selected.deliveryAddress" class="q-mb-md" aria-label="Endereço de entrega">
@@ -335,7 +335,7 @@ function elapsed(value: string) {
             <small v-if="item.additionals.length">
               + {{ item.additionals.map((value) => value.name).join(', ') }}
             </small>
-            <p v-if="item.notes" class="item-note">📝 {{ item.notes }}</p>
+            <p v-if="item.notes" class="item-note"><strong>Observação:</strong> {{ item.notes }}</p>
           </li>
         </ul>
 
@@ -391,6 +391,12 @@ function elapsed(value: string) {
 .status-board { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 16px; padding-bottom: 12px; }
 .status-column { min-height: 240px; padding: 12px; border-radius: var(--oh-border-radius); background: color-mix(in srgb, var(--oh-border-subtle) 42%, var(--oh-surface-page)); }
 .status-column h2 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 12px; font-size: 1rem; }
+.status-heading--confirmed { color: var(--oh-status-confirmed); }
+.status-heading--preparing { color: var(--oh-status-warning-text); }
+.status-heading--ready { color: var(--oh-status-success-text); }
+.status-heading--success { color: var(--oh-status-success-text); }
+.status-heading--info { color: var(--oh-status-info); }
+.status-heading--danger { color: var(--oh-status-cancelled); }
 .empty-state { color: var(--oh-text-muted); font-size: .875rem; }
 .queue-subheading { margin: 12px 0 8px; font-size: .9rem; color: var(--oh-text-muted); }
 .order-detail { position: sticky; top: 92px; max-height: calc(100vh - 116px); overflow: auto; padding: 20px; border-radius: var(--oh-border-radius); background: var(--oh-surface-raised); box-shadow: 0 8px 30px color-mix(in srgb, var(--oh-text-primary) 12%, transparent); }
@@ -401,7 +407,7 @@ function elapsed(value: string) {
 .detail-items, .order-history { padding-left: 20px; }
 .detail-items li, .order-history li { margin-bottom: 12px; }
 .detail-items small, .order-history time, .order-history span { display: block; color: var(--oh-text-muted); }
-.item-note { margin: 5px 0; padding: 7px; border-left: 3px solid var(--oh-status-warning); background: color-mix(in srgb, var(--oh-status-warning) 9%, var(--oh-surface-raised)); }
+.item-note { margin: 5px 0; padding: 7px; border-radius: 8px; background: color-mix(in srgb, var(--oh-status-warning) 12%, var(--oh-surface-raised)); }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; position: sticky; bottom: -20px; margin: 20px -20px -20px; padding: 16px 20px; background: var(--oh-surface-raised); border-top: 1px solid var(--oh-border-subtle); }
 .confirmation-card { width: min(92vw, 520px); }
 @media (max-width: 1100px) {

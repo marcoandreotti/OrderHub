@@ -19,6 +19,10 @@ const statusLabel: Record<string, string> = {
   OutForDelivery: 'Saiu para entrega', Completed: 'Concluído',
   Cancelled: 'Cancelado', Rejected: 'Não aceito'
 }
+const statusTone: Record<string, string> = {
+  Confirmed: 'confirmed', Preparing: 'preparing', Ready: 'ready',
+  OutForDelivery: 'info', Completed: 'success', Cancelled: 'danger', Rejected: 'danger'
+}
 const canCancel = computed(() => order.value?.status === 'Confirmed')
 const money = (value: number) => new Intl.NumberFormat('pt-BR', {
   style: 'currency', currency: 'BRL'
@@ -63,7 +67,7 @@ onBeforeUnmount(() => { clearTimeout(timer); document.removeEventListener('visib
       <div v-if="loading" role="status">Buscando pedido…</div>
       <template v-else-if="order">
         <p class="eyebrow">Pedido nº {{ order.number }}</p>
-        <h2>{{ statusLabel[order.status] ?? order.status }}</h2>
+        <h2 :class="`tracking-status--${statusTone[order.status] ?? 'info'}`">{{ statusLabel[order.status] ?? order.status }}</h2>
         <p>Total <strong>{{ money(order.total) }}</strong></p>
         <p v-if="order.serviceType === 'Delivery' && order.deliveryEstimatedMinutes">
           Previsão de entrega: <strong>{{ order.deliveryEstimatedMinutes }} min</strong>
@@ -71,7 +75,7 @@ onBeforeUnmount(() => { clearTimeout(timer); document.removeEventListener('visib
         </p>
         <ol class="timeline" aria-label="Histórico do pedido">
           <li v-for="event in order.history" :key="event.occurredAt + event.status">
-            <strong>{{ statusLabel[event.status] ?? event.status }}</strong>
+            <strong :class="`tracking-status--${statusTone[event.status] ?? 'info'}`">{{ statusLabel[event.status] ?? event.status }}</strong>
             <time :datetime="event.occurredAt">{{ new Date(event.occurredAt).toLocaleString('pt-BR') }}</time>
             <span v-if="event.note">{{ event.note }}</span>
           </li>
@@ -89,3 +93,10 @@ onBeforeUnmount(() => { clearTimeout(timer); document.removeEventListener('visib
     </main>
   </q-page>
 </template>
+
+<style scoped>
+.tracking-status--confirmed, .tracking-status--info { color: var(--oh-status-info); }
+.tracking-status--preparing { color: var(--oh-status-warning-text); }
+.tracking-status--ready, .tracking-status--success { color: var(--oh-status-success-text); }
+.tracking-status--danger { color: var(--oh-status-danger); }
+</style>

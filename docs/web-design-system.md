@@ -125,15 +125,46 @@ Não criar um layout genérico para unificar superfícies com propósitos difere
 
 `_tokens.scss` define atualmente:
 
-- marca: `--oh-brand-primary`, `--oh-brand-secondary` e `--oh-brand-accent`;
+- marca: `--oh-brand-primary`, `--oh-brand-primary-hover`,
+  `--oh-brand-primary-text`, `--oh-brand-on-primary`, `--oh-brand-soft`,
+  `--oh-brand-secondary` e `--oh-brand-accent`;
+- navegação: `--oh-navigation-background`, `--oh-navigation-text` e
+  `--oh-navigation-muted`;
 - superfícies: `--oh-surface-page` e `--oh-surface-raised`;
 - texto: `--oh-text-primary` e `--oh-text-muted`;
 - borda: `--oh-border-subtle`;
 - foco: `--oh-focus-ring`;
-- estados: `--oh-status-success`, `--oh-status-warning`,
-  `--oh-status-danger` e `--oh-status-urgency`;
+- estados: `--oh-status-success`, `--oh-status-success-text`,
+  `--oh-status-warning`, `--oh-status-warning-text`, `--oh-status-danger`,
+  `--oh-status-urgency`, `--oh-status-info`, `--oh-status-confirmed`,
+  `--oh-status-preparing`, `--oh-status-ready` e `--oh-status-cancelled`;
 - raio-base;
 - família tipográfica.
+
+### Paleta do produto
+
+| Papel | Valor | Aplicação |
+| --- | --- | --- |
+| Primary | `#F97316` | CTAs, seleção e detalhes de marca |
+| Primary hover | `#EA580C` | Interação de CTAs |
+| Primary text | `#C2410C` | Texto de marca legível em fundo claro |
+| Primary on-color | `#111827` | Texto em fundo primary/hover, preservando contraste |
+| Primary soft | `#FFF7ED` | Seleções e realces suaves |
+| Graphite | `#1F2937` | Navegação administrativa e estrutura |
+| Text / muted | `#374151` / `#6B7280` | Conteúdo e apoio |
+| Page / surface / border | `#F8FAFC` / `#FFFFFF` / `#E5E7EB` | Superfícies de trabalho |
+| Success / warning / danger / info | `#16A34A` / `#F59E0B` / `#DC2626` / `#2563EB` | Estados semânticos |
+
+O laranja é uma cor de ação e marca, não um fundo geral. Administration prioriza
+grafite e neutros, usando laranja de forma pontual. Public mantém tema de Tenant
+isolado e prioriza identidade, imagens e descoberta. Operações/KDS distinguem os
+estados do pedido independentemente da cor de marca: confirmado em azul/índigo,
+preparo em âmbar, pronto/concluído em verde e cancelado/rejeitado em vermelho.
+
+Texto dentro de CTAs laranja usa grafite escuro. Labels sobre tons warning/success
+usam variantes textuais mais escuras (`--oh-status-warning-text` e
+`--oh-status-success-text`), enquanto os valores semânticos base podem ser usados
+em fundos suaves, bordas ou indicadores. Cor nunca é o único sinal do estado.
 
 Esses tokens são oficiais enquanto existirem no código, mas formam apenas a fundação inicial.
 Os estados de urgência e erro devem ser acompanhados por texto ou ícone; a cor nunca

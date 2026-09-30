@@ -1,8 +1,8 @@
 import type { PublicContext } from './types'
 
 const defaults = {
-  primary: '#4f46e5', secondary: '#0f766e',
-  background: '#f8fafc', text: '#0f172a'
+  primary: '#f97316', onPrimary: '#111827', secondary: '#1f2937',
+  background: '#f8fafc', text: '#374151'
 }
 function hex(value: string) {
   if (!/^#[0-9a-f]{6}$/i.test(value)) return null
@@ -27,12 +27,20 @@ export function publicThemeSurface() {
 export function applyPublicTheme(value: PublicContext, surface = publicThemeSurface()) {
   if (!surface) return false
   const background = hex(value.theme.backgroundColor) ? value.theme.backgroundColor : defaults.background
-  const fallbackText = contrast(background, defaults.text) >= 4.5 ? defaults.text : '#ffffff'
+  const fallbackText = contrast(background, defaults.text) >= 4.5 ? defaults.text : '#111827'
   const text = contrast(background, value.theme.textColor) >= 4.5 ? value.theme.textColor : fallbackText
-  const primary = contrast(value.theme.primaryColor, '#ffffff') >= 4.5 ? value.theme.primaryColor : defaults.primary
+  const suppliedPrimary = hex(value.theme.primaryColor) ? value.theme.primaryColor : defaults.primary
+  const suppliedOnPrimary = contrast(suppliedPrimary, defaults.onPrimary) >= 4.5
+    ? defaults.onPrimary
+    : '#ffffff'
+  const primary = contrast(suppliedPrimary, suppliedOnPrimary) >= 4.5 ? suppliedPrimary : defaults.primary
+  const onPrimary = primary === suppliedPrimary ? suppliedOnPrimary : defaults.onPrimary
+  const primaryText = contrast(primary, '#ffffff') >= 4.5 ? primary : '#c2410c'
   const fallbackSecondary = contrast(defaults.secondary, background) >= 3 ? defaults.secondary : text
   const secondary = contrast(value.theme.secondaryColor, background) >= 3 ? value.theme.secondaryColor : fallbackSecondary
   surface.style.setProperty('--oh-brand-primary', primary)
+  surface.style.setProperty('--oh-brand-primary-text', primaryText)
+  surface.style.setProperty('--oh-brand-on-primary', onPrimary)
   surface.style.setProperty('--oh-brand-secondary', secondary)
   surface.style.setProperty('--oh-surface-page', background)
   surface.style.setProperty('--oh-text-primary', text)

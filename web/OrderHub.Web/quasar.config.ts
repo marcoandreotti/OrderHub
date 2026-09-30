@@ -29,11 +29,13 @@ export default defineConfig(() => ({
     iconSet: 'svg-material-icons',
     config: {
       brand: {
-        primary: '#4f46e5',
-        secondary: '#0f766e',
-        accent: '#f59e0b',
-        positive: '#166534',
-        negative: '#b91c1c'
+        primary: '#f97316',
+        secondary: '#1f2937',
+        accent: '#ea580c',
+        positive: '#15803d',
+        negative: '#dc2626',
+        warning: '#92400e',
+        info: '#2563eb'
       }
     },
     plugins: []

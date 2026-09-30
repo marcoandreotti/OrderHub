@@ -85,7 +85,7 @@ onUnmounted(() => controller?.abort())
     <header class="admin-page-header"><div><p class="admin-page-eyebrow">OPERAÇÃO</p><h1 class="text-h4 q-my-sm">Disponibilidade</h1>
       <p>Controle fuso, exceções de calendário, pausas por modalidade e ofertas temporariamente indisponíveis.</p></div></header>
     <ProblemBanner :error="error" />
-    <q-banner v-if="message" class="bg-positive text-white q-mb-md">{{ message }}</q-banner>
+    <q-banner v-if="message" class="bg-green-1 text-positive q-mb-md">{{ message }}</q-banner>
     <div v-if="loading" role="status">Carregando disponibilidade…</div>
     <div v-else-if="configuration" class="q-gutter-lg">
       <q-card flat bordered><q-card-section><h2 class="text-h6">Fuso da unidade</h2>

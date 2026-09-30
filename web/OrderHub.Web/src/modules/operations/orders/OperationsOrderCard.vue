@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { OrderAction } from './actions'
+import { orderStatusTone, type OrderAction } from './actions'
 import type { OrderSummary } from './types'
 
 defineProps<{
@@ -31,7 +31,7 @@ defineEmits<{
         <strong>#{{ order.number }}</strong>
         <span>{{ timeLabel }}</span>
       </span>
-      <span class="order-card-state">{{ statusLabel }}</span>
+      <span class="order-card-state" :class="`status-${orderStatusTone[order.status]}`">{{ statusLabel }}</span>
       <span>{{ serviceLabel }}<span v-if="order.scheduledAtUtc"> · Horário prometido</span></span>
       <span v-if="order.customerName">{{ order.customerName }}</span>
       <span class="order-card-items">
@@ -40,9 +40,9 @@ defineEmits<{
         </span>
       </span>
       <strong>{{ totalLabel }}</strong>
-      <span v-if="isNew" class="signal new">✦ Novo</span>
-      <span v-if="productionDue" class="signal due">▶ Produzir agora</span>
-      <span v-if="isLate" class="signal late">⚠ {{ lateLabel }}</span>
+      <span v-if="isNew" class="signal new">Novo pedido</span>
+      <span v-if="productionDue" class="signal due">Produzir agora</span>
+      <span v-if="isLate" class="signal late">{{ lateLabel }}</span>
     </button>
     <q-btn
       v-if="nextAction"
@@ -66,7 +66,7 @@ defineEmits<{
 }
 .order-card-shell:hover, .order-card-shell.selected { border-color: var(--oh-brand-primary); }
 .order-card-shell.late { border-color: var(--oh-status-urgency); }
-.order-card-shell.scheduled { border-left-color: #7c3aed; background: #faf7ff; }
+.order-card-shell.scheduled { background: color-mix(in srgb, var(--oh-status-confirmed) 6%, white); }
 .order-card-shell.due { border-color: var(--oh-status-warning); }
 .order-card {
   display: grid;
@@ -82,11 +82,17 @@ defineEmits<{
 }
 .order-card-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .order-card-state { color: var(--oh-text-muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
+.order-card-state.status-confirmed { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-confirmed) 12%, white); color: var(--oh-status-confirmed); }
+.order-card-state.status-info { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-info) 12%, white); color: var(--oh-status-info); }
+.order-card-state.status-preparing { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-warning) 22%, white); color: var(--oh-status-warning-text); }
+.order-card-state.status-ready { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-ready) 12%, white); color: var(--oh-status-success-text); }
+.order-card-state.status-success { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-success) 12%, white); color: var(--oh-status-success-text); }
+.order-card-state.status-danger { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-cancelled) 10%, white); color: var(--oh-status-cancelled); }
 .order-card-items { display: grid; gap: 3px; padding: 8px 0; border-block: 1px solid var(--oh-border-subtle); }
 .order-card-items small { color: var(--oh-text-muted); }
 .order-card-action { width: calc(100% - 20px); min-height: 44px; margin: 0 10px 10px; }
 .signal { width: fit-content; padding: 2px 7px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
-.signal.new { background: #dbeafe; color: #1d4ed8; }
-.signal.due { background: color-mix(in srgb, var(--oh-status-warning) 14%, var(--oh-surface-raised)); color: var(--oh-status-warning); }
+.signal.new { background: color-mix(in srgb, var(--oh-status-info) 12%, white); color: var(--oh-status-info); }
+.signal.due { background: color-mix(in srgb, var(--oh-status-warning) 14%, var(--oh-surface-raised)); color: var(--oh-status-warning-text); }
 .signal.late { background: color-mix(in srgb, var(--oh-status-urgency) 10%, var(--oh-surface-raised)); color: var(--oh-status-urgency); }
 </style>

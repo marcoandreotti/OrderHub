@@ -420,7 +420,7 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
       <ProblemBanner :error="error">
         <q-btn v-if="step !== 'catalog'" flat label="Recalcular" @click="simulate" />
       </ProblemBanner>
-      <q-banner v-if="selectedServiceAvailability?.isAvailable === false" class="bg-orange-1 text-dark q-mb-md" role="status">
+      <q-banner v-if="selectedServiceAvailability?.isAvailable === false" class="bg-amber-1 text-brown-9 q-mb-md" role="status">
         <strong>{{ selectedServiceAvailability.message || availabilityMessage(selectedServiceAvailability.reason) }}</strong>
         <span v-if="selectedServiceAvailability.nextOpening">
           Próxima abertura: {{ formatOpening(selectedServiceAvailability.nextOpening) }}.
@@ -537,7 +537,7 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
       </main>
 
       <main v-else class="flow-panel receipt" aria-live="polite">
-        <p class="receipt-mark" aria-hidden="true">✓</p><h2>Pedido confirmado</h2>
+        <h2>Pedido confirmado</h2>
         <p>Pedido nº <strong>{{ confirmation?.number }}</strong></p>
         <p>Total {{ money(confirmation?.total ?? 0) }}</p>
         <p class="public-reference">Referência: {{ confirmation?.reference }}</p>

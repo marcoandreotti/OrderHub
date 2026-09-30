@@ -57,6 +57,16 @@ export const statusLabels: Record<OrderStatus, string> = {
   Rejected: 'Rejeitados'
 }
 
+export const orderStatusTone: Record<OrderStatus, string> = {
+  Confirmed: 'confirmed',
+  Preparing: 'preparing',
+  Ready: 'ready',
+  OutForDelivery: 'info',
+  Completed: 'success',
+  Cancelled: 'danger',
+  Rejected: 'danger'
+}
+
 export const serviceLabels: Record<OrderServiceType, string> = {
   Table: 'Mesa',
   Pickup: 'Retirada',

@@ -51,9 +51,9 @@ async function logout() {
       show-if-above
       bordered
       :width="256"
-      class="bg-white"
+      class="administration-drawer"
     >
-      <nav aria-label="Administração" class="q-pa-md">
+      <nav aria-label="Administração" class="administration-navigation q-pa-md">
         <div class="text-overline text-grey-7 q-mb-md">ÁREA ADMINISTRATIVA</div>
         <q-select
           :model-value="session.unitId"
@@ -74,58 +74,58 @@ async function logout() {
             v-if="session.context?.isPlatformUser"
             clickable
             @click="returnToPlatform"
-            class="rounded-borders"
+            class="admin-nav-link rounded-borders"
           >
             <q-item-section>Voltar à plataforma</q-item-section>
           </q-item>
-          <q-item v-if="session.can('administration')" clickable to="/administration/onboarding" active-class="bg-indigo-1 text-primary" class="rounded-borders"><q-item-section>Configurar unidade</q-item-section></q-item>
+          <q-item v-if="session.can('administration')" clickable to="/administration/onboarding" active-class="admin-nav-item--active" class="admin-nav-link rounded-borders"><q-item-section>Configurar unidade</q-item-section></q-item>
           <q-item
             v-if="session.can('management')"
             clickable
             to="/administration/catalog"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Catálogo</q-item-section></q-item
           >
           <q-item
             v-if="session.can('administration')"
             clickable
             to="/administration/availability"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Disponibilidade</q-item-section></q-item
           >
-          <q-item v-if="session.can('management')" clickable to="/administration/delivery-regions" active-class="bg-indigo-1 text-primary" class="rounded-borders"><q-item-section>Regiões de entrega</q-item-section></q-item>
+          <q-item v-if="session.can('management')" clickable to="/administration/delivery-regions" active-class="admin-nav-item--active" class="admin-nav-link rounded-borders"><q-item-section>Regiões de entrega</q-item-section></q-item>
           <q-item
             v-if="session.can('administration')"
             clickable
             to="/administration/users"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Usuários</q-item-section></q-item
           >
           <q-item
             v-if="session.can('customer-operations')"
             clickable
             to="/administration/customers"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Clientes</q-item-section></q-item
           >
           <q-item
             v-if="session.can('promotion-management')"
             clickable
             to="/administration/coupons"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Cupons</q-item-section></q-item
           >
           <q-item
             v-if="session.can('payment-management')"
             clickable
             to="/administration/payment-methods"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Formas de pagamento</q-item-section></q-item
           >
           <q-item
@@ -133,16 +133,16 @@ async function logout() {
             clickable
             to="/administration"
             exact
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Visão geral</q-item-section></q-item
           >
           <q-item
             v-if="session.can('management')"
             clickable
             to="/administration/foundation"
-            active-class="bg-indigo-1 text-primary"
-            class="rounded-borders"
+            active-class="admin-nav-item--active"
+            class="admin-nav-link rounded-borders"
             ><q-item-section>Fundação do projeto</q-item-section></q-item
           >
         </q-list>
@@ -154,3 +154,29 @@ async function logout() {
     ></q-page-container>
   </q-layout>
 </template>
+
+<style scoped>
+:global(.q-drawer.administration-drawer) {
+  background-color: var(--oh-navigation-background) !important;
+  color: var(--oh-navigation-text);
+}
+
+:global(.q-drawer.administration-drawer .q-drawer__content) {
+  background-color: var(--oh-navigation-background) !important;
+  color: var(--oh-navigation-text);
+}
+.administration-navigation :deep(.text-overline) { color: var(--oh-navigation-muted) !important; }
+.administration-navigation :deep(.q-item) { color: var(--oh-navigation-text); }
+.administration-navigation :deep(.q-field__label),
+.administration-navigation :deep(.q-field__native),
+.administration-navigation :deep(.q-field__marginal) { color: var(--oh-navigation-text); }
+.administration-navigation :deep(.q-field--outlined .q-field__control:before) { border-color: color-mix(in srgb, var(--oh-navigation-muted) 45%, var(--oh-navigation-background)); }
+.administration-navigation :deep(.q-field--outlined .q-field__control:hover:before) { border-color: var(--oh-brand-primary); }
+.administration-navigation :deep(.admin-nav-link) { min-height: 44px; margin: 3px 0; }
+.administration-navigation :deep(.admin-nav-link:hover) { background: rgb(255 255 255 / 8%); }
+.administration-navigation :deep(.admin-nav-item--active) {
+  background: rgb(255 255 255 / 12%);
+  color: var(--oh-brand-primary) !important;
+  font-weight: 700;
+}
+</style>

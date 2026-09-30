@@ -10,12 +10,12 @@ export interface TenantTheme {
 }
 
 export const defaultTenantTheme: TenantTheme = {
-  primary: '#4f46e5',
-  secondary: '#0f766e',
-  accent: '#f59e0b',
+  primary: '#f97316',
+  secondary: '#1f2937',
+  accent: '#ea580c',
   background: '#f8fafc',
   surface: '#ffffff',
-  text: '#0f172a',
+  text: '#374151',
   borderRadius: '12px',
   fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 }

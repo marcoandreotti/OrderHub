@@ -1,18 +1,32 @@
 :root {
   /* Semantic source tokens. Surface themes override these, never :root. */
-  --oh-brand-primary: #4f46e5;
-  --oh-brand-secondary: #0f766e;
-  --oh-brand-accent: #f59e0b;
+  --oh-brand-primary: #f97316;
+  --oh-brand-primary-hover: #ea580c;
+  --oh-brand-primary-text: #c2410c;
+  --oh-brand-on-primary: #111827;
+  --oh-brand-soft: #fff7ed;
+  --oh-brand-secondary: #1f2937;
+  --oh-brand-accent: #ea580c;
+  --oh-navigation-background: #1f2937;
+  --oh-navigation-text: #f8fafc;
+  --oh-navigation-muted: #d1d5db;
   --oh-surface-page: #f8fafc;
   --oh-surface-raised: #ffffff;
-  --oh-text-primary: #0f172a;
-  --oh-text-muted: #475569;
-  --oh-border-subtle: #cbd5e1;
-  --oh-focus-ring: #0f766e;
-  --oh-status-success: #166534;
-  --oh-status-warning: #92400e;
-  --oh-status-danger: #9f1239;
+  --oh-text-primary: #374151;
+  --oh-text-muted: #6b7280;
+  --oh-border-subtle: #e5e7eb;
+  --oh-focus-ring: #c2410c;
+  --oh-status-success: #16a34a;
+  --oh-status-success-text: #15803d;
+  --oh-status-warning: #f59e0b;
+  --oh-status-warning-text: #92400e;
+  --oh-status-danger: #dc2626;
   --oh-status-urgency: #b91c1c;
+  --oh-status-info: #2563eb;
+  --oh-status-confirmed: #4f46e5;
+  --oh-status-preparing: #f59e0b;
+  --oh-status-ready: #16a34a;
+  --oh-status-cancelled: #dc2626;
   --oh-border-radius: 12px;
   --oh-font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
