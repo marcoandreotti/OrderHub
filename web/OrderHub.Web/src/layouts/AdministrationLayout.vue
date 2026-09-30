@@ -156,12 +156,7 @@ async function logout() {
 </template>
 
 <style scoped>
-:global(.q-drawer.administration-drawer) {
-  background-color: var(--oh-navigation-background) !important;
-  color: var(--oh-navigation-text);
-}
-
-:global(.q-drawer.administration-drawer .q-drawer__content) {
+:global(.q-drawer__content.administration-drawer) {
   background-color: var(--oh-navigation-background) !important;
   color: var(--oh-navigation-text);
 }
