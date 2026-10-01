@@ -26,6 +26,8 @@ using OrderHub.Application.Delivery;
 using OrderHub.Application.Abstractions.Delivery;
 using OrderHub.Application.Abstractions.Reporting;
 using OrderHub.Application.Reporting;
+using OrderHub.Application.Communications;
+using OrderHub.Application.Abstractions.Communications;
 
 namespace OrderHub.Application;
 
@@ -36,6 +38,17 @@ public static class DependencyInjection
         services.AddScoped<ICommandDispatcher, CommandDispatcher>();
         services.AddScoped<IQueryDispatcher, QueryDispatcher>();
         services.AddScoped<EstablishmentScopeResolver>();
+        services.AddScoped<ICommandHandler<UpsertNotificationTemplateCommand, Guid>, UpsertNotificationTemplateHandler>();
+        services.AddScoped<IValidator<UpsertNotificationTemplateCommand>, UpsertNotificationTemplateValidator>();
+        services.AddScoped<ICommandHandler<SetNotificationConsentCommand>, SetNotificationConsentHandler>();
+        services.AddScoped<IValidator<SetNotificationConsentCommand>, SetNotificationConsentValidator>();
+        services.AddScoped<ICommandHandler<RequestNotificationCommand, Guid>, RequestNotificationHandler>();
+        services.AddScoped<IValidator<RequestNotificationCommand>, RequestNotificationValidator>();
+        services.AddScoped<IQueryHandler<ListNotificationTemplatesQuery, IReadOnlyList<NotificationTemplateView>>, ListNotificationTemplatesHandler>();
+        services.AddScoped<IQueryHandler<ListNotificationConsentsQuery, IReadOnlyList<NotificationConsentView>>, ListNotificationConsentsHandler>();
+        services.AddScoped<IQueryHandler<ListNotificationHistoryQuery, IReadOnlyList<NotificationHistoryView>>, ListNotificationHistoryHandler>();
+        services.AddScoped<IValidator<ListNotificationHistoryQuery>, ListNotificationHistoryValidator>();
+        services.AddScoped<IQueryHandler<ListNotificationAttemptsQuery, IReadOnlyList<NotificationAttemptView>>, ListNotificationAttemptsHandler>();
         services.AddScoped<AdministrativeUserManagement>();
         services.AddScoped<IQueryHandler<SearchAdministrativeUsersQuery, AdministrativeUserSearchResult>, SearchAdministrativeUsersQueryHandler>();
         services.AddScoped<IValidator<SearchAdministrativeUsersQuery>, SearchAdministrativeUsersQueryValidator>();

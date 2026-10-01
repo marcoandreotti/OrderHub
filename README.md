@@ -39,9 +39,19 @@ docker compose up --build
 
 Serviços locais:
 
-- Web: `http://localhost:9000`
+- Web (Quasar em modo desenvolvimento com hot reload): `http://localhost:9000`
 - API: `http://localhost:8080`
 - PostgreSQL: `localhost:5432`
+
+O `docker-compose.override.yml` é carregado automaticamente no desenvolvimento:
+ele monta `web/OrderHub.Web` no container e inicia `quasar dev`, refletindo
+alterações de Vue/TypeScript sem reconstruir a imagem. Em hosts Windows, o watcher
+usa polling para detectar alterações nos arquivos montados. Para executar o
+frontend estático de produção definido no `docker-compose.yml`, use explicitamente:
+
+```powershell
+docker compose -f docker-compose.yml up --build
+```
 
 ## Arquitetura
 

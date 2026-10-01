@@ -20,6 +20,9 @@ using OrderHub.Application.Abstractions.PublicOrdering;
 using OrderHub.Application.Abstractions.Delivery;
 using OrderHub.Application.Identity.Authentication;
 using OrderHub.Application.Abstractions.Reporting;
+using Microsoft.Extensions.Hosting;
+using OrderHub.Application.Abstractions.Communications;
+using OrderHub.Infrastructure.Communications;
 
 namespace OrderHub.Infrastructure;
 
@@ -39,6 +42,38 @@ public static class DependencyInjection
         services.AddDbContext<OrderHubDbContext>(options =>
             options.UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsAssembly("OrderHub.Infrastructure.Migrations")));
+        services.AddOptions<OutboxProcessingOptions>()
+            .Bind(configuration.GetSection(OutboxProcessingOptions.SectionName))
+            .Validate(options => options.IsValid(), "Outbox processing options are invalid.")
+            .ValidateOnStart();
+        services.AddScoped<IOutboxMessageStager, OutboxMessageStager>();
+        services.AddScoped(provider => new OutboxMessageStore(
+            provider.GetRequiredService<OrderHubDbContext>(),
+            provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<OutboxProcessingOptions>>().Value));
+        services.AddHostedService<OutboxProcessingWorker>();
+        services.AddOptions<NotificationDeliveryOptions>()
+            .Bind(configuration.GetSection(NotificationDeliveryOptions.SectionName))
+            .Validate(options => options.IsValid(), "Notification delivery options are invalid.")
+            .ValidateOnStart();
+        services.AddOptions<NotificationSmtpOptions>()
+            .Bind(configuration.GetSection(NotificationSmtpOptions.SectionName))
+            .Validate(options => options.IsValid(), "Notification SMTP options are invalid.")
+            .ValidateOnStart();
+        services.AddOptions<MetaWhatsAppOptions>()
+            .Bind(configuration.GetSection(MetaWhatsAppOptions.SectionName))
+            .Validate(options => options.IsValid(), "Meta WhatsApp options are invalid.")
+            .ValidateOnStart();
+        services.AddScoped<NotificationRequestOutboxStager>();
+        services.AddScoped<INotificationWriteRepository, NotificationWriteRepository>();
+        services.AddScoped<INotificationReadGateway, NotificationReadGateway>();
+        services.AddScoped<IOutboxMessageHandler, NotificationOutboxHandler>();
+        services.AddScoped<INotificationChannelSender, SmtpNotificationSender>();
+        services.AddHttpClient<MetaWhatsAppCloudSender>((provider, client) =>
+        {
+            var settings = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<MetaWhatsAppOptions>>().Value;
+            client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+        });
+        services.AddScoped<INotificationChannelSender>(provider => provider.GetRequiredService<MetaWhatsAppCloudSender>());
         services.AddScoped<IReadConnectionFactory, NpgsqlReadConnectionFactory>();
         services.AddScoped<IEstablishmentRepository, EstablishmentRepository>();
         services.AddScoped<IEstablishmentReadGateway, EstablishmentReadGateway>();

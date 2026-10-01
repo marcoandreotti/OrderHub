@@ -14,6 +14,9 @@ export default defineConfig(() => ({
   devServer: {
     open: false,
     port: 9000,
+    watch: {
+      usePolling: process.env.VITE_USE_POLLING === 'true'
+    },
     proxy: {
       '/api': {
         target: process.env.API_PROXY_TARGET ?? 'http://localhost:8080',

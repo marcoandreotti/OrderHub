@@ -28,6 +28,7 @@ internal static class AdministrationEndpoints
     {
         var root=endpoints.MapGroup("/api/admin/establishments/{establishmentId:guid}").WithTags("Administration");
         MapCustomers(root); MapOrders(root); MapCoupons(root); MapPayments(root); MapDelivery(root); MapOrderScheduling(root); MapBusinessDashboard(root);
+        NotificationEndpoints.MapNotifications(root);
         return endpoints;
     }
 

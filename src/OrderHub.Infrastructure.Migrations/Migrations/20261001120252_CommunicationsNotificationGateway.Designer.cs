@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using OrderHub.Infrastructure.Persistence.Write;
@@ -11,9 +12,11 @@ using OrderHub.Infrastructure.Persistence.Write;
 namespace OrderHub.Infrastructure.Migrations.Migrations
 {
     [DbContext(typeof(OrderHubDbContext))]
-    partial class OrderHubDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261001120252_CommunicationsNotificationGateway")]
+    partial class CommunicationsNotificationGateway
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -2386,7 +2389,8 @@ namespace OrderHub.Infrastructure.Migrations.Migrations
 
                     b.HasAlternateKey("TenantId", "EstablishmentId", "Id");
 
-                    b.HasIndex("TenantId", "EstablishmentId", "Channel", "Purpose", "NormalizedDestination", "CapturedAtUtc");
+                    b.HasIndex("TenantId", "EstablishmentId", "Channel", "Purpose", "NormalizedDestination")
+                        .IsUnique();
 
                     b.ToTable("notification_consent", "communications");
                 });

@@ -32,6 +32,12 @@ public sealed class OrderHubDbContext(DbContextOptions<OrderHubDbContext> option
     public DbSet<OrderHub.Domain.Payments.Payment> Payments => Set<OrderHub.Domain.Payments.Payment>();
     public DbSet<OrderHub.Domain.Payments.PaymentIdempotency> PaymentIdempotencies => Set<OrderHub.Domain.Payments.PaymentIdempotency>();
     public DbSet<OrderHub.Domain.Ordering.PublicOrderRequest> PublicOrderRequests => Set<OrderHub.Domain.Ordering.PublicOrderRequest>();
+    internal DbSet<OutboxMessageRecord> OutboxMessages => Set<OutboxMessageRecord>();
+    internal DbSet<OutboxConsumerReceiptRecord> OutboxConsumerReceipts => Set<OutboxConsumerReceiptRecord>();
+    internal DbSet<NotificationTemplateRecord> NotificationTemplates => Set<NotificationTemplateRecord>();
+    internal DbSet<NotificationConsentRecord> NotificationConsents => Set<NotificationConsentRecord>();
+    internal DbSet<NotificationRecord> Notifications => Set<NotificationRecord>();
+    internal DbSet<NotificationAttemptRecord> NotificationAttempts => Set<NotificationAttemptRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

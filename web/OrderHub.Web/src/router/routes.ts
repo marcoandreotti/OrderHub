@@ -146,6 +146,12 @@ export const routes: RouteRecordRaw[] = [
           import('../modules/administration/payment-methods/PaymentMethodsPage.vue')
       },
       {
+        path: 'communications',
+        meta: { capability: 'management' },
+        component: () =>
+          import('../modules/administration/communications/CommunicationsPage.vue')
+      },
+      {
         path: 'foundation',
         component: () => import('../pages/FoundationPage.vue')
       }

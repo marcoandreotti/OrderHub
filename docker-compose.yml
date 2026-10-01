@@ -18,6 +18,13 @@ services:
       retries: 10
     networks: [orderhub]
 
+  mailpit:
+    image: axllent/mailpit:v1.31.3
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+    networks: [orderhub]
+
   api:
     build:
       context: .
@@ -35,6 +42,20 @@ services:
       AuthenticationEmail__Password: ${AUTHENTICATION_EMAIL_PASSWORD:-}
       AuthenticationEmail__FromAddress: ${AUTHENTICATION_EMAIL_FROM_ADDRESS:-}
       AuthenticationEmail__EnableSsl: ${AUTHENTICATION_EMAIL_ENABLE_SSL:-true}
+      NotificationSmtp__Host: ${NOTIFICATION_SMTP_HOST:-mailpit}
+      NotificationSmtp__Port: ${NOTIFICATION_SMTP_PORT:-1025}
+      NotificationSmtp__Username: ${NOTIFICATION_SMTP_USERNAME:-}
+      NotificationSmtp__Password: ${NOTIFICATION_SMTP_PASSWORD:-}
+      NotificationSmtp__FromAddress: ${NOTIFICATION_SMTP_FROM_ADDRESS:-no-reply@orderhub.test}
+      NotificationSmtp__EnableSsl: ${NOTIFICATION_SMTP_ENABLE_SSL:-false}
+      NotificationSmtp__TimeoutSeconds: ${NOTIFICATION_SMTP_TIMEOUT_SECONDS:-15}
+      MetaWhatsApp__GraphApiVersion: ${META_WHATSAPP_GRAPH_API_VERSION:-}
+      MetaWhatsApp__PhoneNumberId: ${META_WHATSAPP_PHONE_NUMBER_ID:-}
+      MetaWhatsApp__AccessToken: ${META_WHATSAPP_ACCESS_TOKEN:-}
+      MetaWhatsApp__TimeoutSeconds: ${META_WHATSAPP_TIMEOUT_SECONDS:-20}
+      NotificationDelivery__MaximumAttempts: ${NOTIFICATION_MAXIMUM_ATTEMPTS:-5}
+      NotificationDelivery__InitialRetryDelaySeconds: ${NOTIFICATION_INITIAL_RETRY_DELAY_SECONDS:-30}
+      NotificationDelivery__MaximumRetryDelaySeconds: ${NOTIFICATION_MAXIMUM_RETRY_DELAY_SECONDS:-1800}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:9000}
       RealtimeOrders__ClientTimeoutSeconds: ${REALTIME_CLIENT_TIMEOUT_SECONDS:-30}
       RealtimeOrders__KeepAliveSeconds: ${REALTIME_KEEP_ALIVE_SECONDS:-15}
@@ -44,6 +65,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && grep -q \"200 OK\" <&3'"]
       interval: 10s

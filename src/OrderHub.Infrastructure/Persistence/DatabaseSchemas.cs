@@ -14,4 +14,6 @@ public static class DatabaseSchemas
     public const string Promotions = "promotions";
     public const string Payments = "payments";
     public const string Delivery = "delivery";
+    public const string Integration = "integration";
+    public const string Communications = "communications";
 }
