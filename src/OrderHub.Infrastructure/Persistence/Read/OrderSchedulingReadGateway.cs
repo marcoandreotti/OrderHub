@@ -59,7 +59,7 @@ public sealed class OrderSchedulingReadGateway(IReadConnectionFactory connection
               and cancelled_at is null and starts_at <= @Latest and (ends_at is null or ends_at > @Now);
             select scheduled_at_utc as StartsAt, count(*)::int as Reserved
             from orders."order"
-            where tenant_id = @TenantId and establishment_id = @EstablishmentId and service_type = @ServiceType
+            where tenant_id = @TenantId and establishment_id = @EstablishmentId and service_type = @ServiceTypeName
               and scheduled_at_utc between @Earliest and @Latest and status not in ('Cancelled', 'Rejected')
             group by scheduled_at_utc;
             """;
@@ -70,6 +70,7 @@ public sealed class OrderSchedulingReadGateway(IReadConnectionFactory connection
             TenantId = tenantId,
             EstablishmentId = establishmentId,
             ServiceType = (short)serviceType,
+            ServiceTypeName = serviceType.ToString(),
             Now = now,
             Earliest = now,
             Latest = latest,
@@ -93,8 +94,10 @@ public sealed class OrderSchedulingReadGateway(IReadConnectionFactory connection
             : ServiceScheduleException.CreateClosed(x.TenantId, x.EstablishmentId, x.Date,
                 x.ServiceType is null ? null : (OrderServiceType)x.ServiceType, x.Reason)).ToArray();
         var pauses = (await grid.ReadAsync<PauseRow>())
-            .Select(x => ServicePause.Create(x.TenantId, x.EstablishmentId, (OrderServiceType)x.ServiceType, x.StartsAt, x.EndsAt, x.Reason)).ToArray();
-        var reserved = (await grid.ReadAsync<CapacityRow>()).ToDictionary(x => x.StartsAt, x => x.Reserved);
+            .Select(x => ServicePause.Create(x.TenantId, x.EstablishmentId, (OrderServiceType)x.ServiceType,
+                ToUtcOffset(x.StartsAt), x.EndsAt is { } endsAt ? ToUtcOffset(endsAt) : null, x.Reason)).ToArray();
+        var reserved = (await grid.ReadAsync<CapacityRow>())
+            .ToDictionary(x => ToUtcOffset(x.StartsAt), x => x.Reserved);
         var zone = establishment?.TimeZoneId ?? "UTC";
         var slots = OrderSchedulingEvaluator.GetSlots(policy, establishment?.IsActive == true, zone, hours, exceptions, pauses, reserved, now);
         return new(serviceType, policy.IsEnabled, zone, policy.SlotIntervalMinutes, policy.MinimumAdvanceMinutes, policy.HorizonDays, slots);
@@ -103,8 +106,11 @@ public sealed class OrderSchedulingReadGateway(IReadConnectionFactory connection
     private sealed record EstablishmentRow(bool IsActive, string TimeZoneId);
     private sealed record PolicyRow(short ServiceType, bool IsEnabled, int MinimumAdvanceMinutes, int HorizonDays, int? MaximumOrdersPerSlot);
     private sealed record PolicyDetailsRow(bool IsEnabled, int MinimumAdvanceMinutes, int HorizonDays, int? MaximumOrdersPerSlot);
-    private sealed record CapacityRow(DateTimeOffset StartsAt, int Reserved);
+    private sealed record CapacityRow(DateTime StartsAt, int Reserved);
     private sealed record HoursRow(Guid TenantId, Guid EstablishmentId, short DayOfWeek, TimeOnly OpensAt, TimeOnly ClosesAt);
     private sealed record ExceptionRow(Guid TenantId, Guid EstablishmentId, DateOnly Date, short? ServiceType, bool IsOpen, TimeOnly? OpensAt, TimeOnly? ClosesAt, string? Reason);
-    private sealed record PauseRow(Guid TenantId, Guid EstablishmentId, short ServiceType, DateTimeOffset StartsAt, DateTimeOffset? EndsAt, string? Reason);
+    private sealed record PauseRow(Guid TenantId, Guid EstablishmentId, short ServiceType, DateTime StartsAt, DateTime? EndsAt, string? Reason);
+
+    private static DateTimeOffset ToUtcOffset(DateTime value) =>
+        new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
 }

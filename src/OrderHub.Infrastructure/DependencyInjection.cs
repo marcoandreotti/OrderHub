@@ -23,6 +23,7 @@ using OrderHub.Application.Abstractions.Reporting;
 using Microsoft.Extensions.Hosting;
 using OrderHub.Application.Abstractions.Communications;
 using OrderHub.Infrastructure.Communications;
+using Dapper;
 
 namespace OrderHub.Infrastructure;
 
@@ -30,6 +31,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
+        SqlMapper.AddTypeHandler(new DateOnlyDapperTypeHandler());
+
         var section = configuration.GetRequiredSection(DatabaseOptions.SectionName);
         services.AddOptions<DatabaseOptions>()
             .Bind(section)
