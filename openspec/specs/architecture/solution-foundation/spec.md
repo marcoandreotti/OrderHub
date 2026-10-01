@@ -151,3 +151,22 @@ As migrations PostgreSQL SHALL residir em projeto dedicado da camada Infrastruct
 #### Scenario: Validação de referências
 - **WHEN** testes arquiteturais analisarem o projeto de migrations
 - **THEN** referências das camadas Domain ou Application ao projeto de migrations SHALL ser rejeitadas
+
+### Requirement: Aplicação de migrations antes da API no Docker Compose
+O ambiente local Docker Compose SHALL aplicar todas as migrations PostgreSQL pendentes antes de a API começar a atender requisições e SHALL reportar uma falha de migration como dependência de inicialização malsucedida.
+
+#### Scenario: Banco novo ou com migrations pendentes
+- **WHEN** um desenvolvedor iniciar o ambiente Docker Compose com o serviço PostgreSQL saudável
+- **THEN** o processo de migrations SHALL concluir com sucesso antes de a API iniciar
+- **AND** a API SHALL iniciar usando o schema migrado
+
+#### Scenario: Schema do banco já atualizado
+- **WHEN** um desenvolvedor iniciar o ambiente sem migrations pendentes
+- **THEN** a etapa de migrations SHALL concluir com sucesso sem alterar o schema
+- **AND** a API SHALL iniciar normalmente
+
+#### Scenario: Falha ao aplicar migration
+- **WHEN** o processo de migrations não conseguir aplicar uma migration pendente
+- **THEN** o serviço de migrations SHALL encerrar sem sucesso
+- **AND** a API SHALL não iniciar
+- **AND** a falha SHALL estar visível na saída dos serviços do Compose

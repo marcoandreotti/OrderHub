@@ -37,6 +37,23 @@ Copie `.env.example` para `.env`, ajuste apenas valores locais e execute:
 docker compose up --build
 ```
 
+O serviço `migrations` aplica as migrations pendentes no PostgreSQL antes da
+API iniciar. Não é necessário executar `dotnet ef database update` manualmente
+para o fluxo local do Compose. O mesmo vale para banco recém-criado e para banco
+já atualizado.
+
+Se a API não iniciar por falha de migration, consulte a saída com:
+
+```powershell
+docker compose ps -a migrations
+docker compose logs migrations
+```
+
+Corrija a migration ou a configuração indicada no log e inicie novamente com
+`docker compose up --build`. A API só inicia depois que o serviço `migrations`
+terminar com sucesso. Para executar migrations manualmente fora do Compose,
+consulte [as instruções do projeto de migrations](src/OrderHub.Infrastructure/Persistence/Write/Migrations/README.md).
+
 Serviços locais:
 
 - Web (Quasar em modo desenvolvimento com hot reload): `http://localhost:9000`

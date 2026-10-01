@@ -25,6 +25,18 @@ services:
       - "${MAILPIT_UI_PORT:-8025}:8025"
     networks: [orderhub]
 
+  migrations:
+    build:
+      context: .
+      dockerfile: src/OrderHub.Infrastructure.Migrations/Dockerfile
+    environment:
+      Database__ConnectionString: Host=postgres;Port=5432;Database=${POSTGRES_DB:-orderhub};Username=${POSTGRES_USER:-orderhub};Password=${POSTGRES_PASSWORD:-orderhub_dev}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [orderhub]
+
   api:
     build:
       context: .
@@ -67,6 +79,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      migrations:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf \"GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && grep -q \"200 OK\" <&3'"]
       interval: 10s

@@ -9,6 +9,7 @@
       "composeLaunchUrl": "http://localhost:{ServicePort}",
       "serviceActions": {
         "postgres": "StartWithoutDebugging",
+        "migrations": "StartWithoutDebugging",
         "api": "StartDebugging",
         "web": "StartWithoutDebugging"
       }
