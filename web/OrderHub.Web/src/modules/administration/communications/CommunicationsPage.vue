@@ -222,6 +222,12 @@ onUnmounted(() => request?.abort())
 
         <q-form class="q-gutter-md" @submit.prevent="saveTemplate">
           <q-input v-model="template.purpose" outlined label="Finalidade *" maxlength="100" required hint="Ex.: order.update" />
+          <q-banner v-pre class="bg-blue-1 text-body2">
+            <strong>Automação de pedidos públicos:</strong> use order.confirmed, order.preparing, order.ready,
+            order.out_for_delivery, order.completed, order.cancelled ou order.rejected. Placeholders disponíveis:
+            {{name}}, {{orderNumber}}, {{status}}, {{statusLabel}}, {{trackingReference}}, {{trackingUrl}},
+            {{total}} e {{serviceType}}.
+          </q-banner>
           <q-select v-model="template.channel" outlined label="Canal *" :options="channelOptions" />
           <q-input v-model="template.language" outlined label="Idioma *" maxlength="16" required hint="Ex.: pt_BR" />
           <q-input v-if="template.channel === 'Email'" v-model="template.subject" outlined label="Assunto do e-mail *" maxlength="250" required />

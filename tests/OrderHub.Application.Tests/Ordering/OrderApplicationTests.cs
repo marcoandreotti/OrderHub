@@ -1,4 +1,5 @@
 using OrderHub.Application.Abstractions.Ordering;
+using OrderHub.Application.Abstractions.Communications;
 using OrderHub.Application.Abstractions.Tenancy;
 using OrderHub.Application.Exceptions;
 using OrderHub.Application.Ordering;
@@ -81,7 +82,7 @@ public sealed class OrderApplicationTests
     {
         var order=DraftWithItem();order.Confirm(1,Clock.Now);var repository=new Repository(order);
         var publisher = new Publisher();
-        var handler=new TransitionOrderCommandHandler(Resolver(),repository,publisher,new Clock());
+        var handler=new TransitionOrderCommandHandler(Resolver(),repository,new CustomerNotificationStager(),publisher,new Clock());
         await handler.HandleAsync(new(EstablishmentId,order.Id,OrderStatus.Preparing),CancellationToken.None);
         Assert.Equal(UserId,order.History.Last().ActorId);Assert.True(repository.Saved);
         Assert.Equal(OrderUpdateKind.StatusChanged, Assert.Single(publisher.Signals).ChangeType);
@@ -96,6 +97,7 @@ public sealed class OrderApplicationTests
         var handler = new TransitionOrderCommandHandler(
             Resolver(),
             new Repository(order),
+            new CustomerNotificationStager(),
             new Publisher(),
             new Clock());
 
@@ -144,6 +146,7 @@ public sealed class OrderApplicationTests
     { public bool Executed { get; private set; } public async Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken) { Executed = true; await operation(cancellationToken); if (failAfterOperation) throw new InvalidOperationException("Transaction rolled back."); } }
     private sealed class Publisher : IOrderUpdatePublisher
     { public List<OrderUpdateSignal> Signals { get; } = []; public Task PublishAsync(Guid tenantId, OrderUpdateSignal signal, CancellationToken cancellationToken) { Assert.Equal(TenantId, tenantId); Signals.Add(signal); return Task.CompletedTask; } }
+    private sealed class CustomerNotificationStager : ICustomerOrderNotificationStager { public Task StageAsync(Order order, CancellationToken cancellationToken) => Task.CompletedTask; }
     private sealed class ReadGateway : IOrderReadGateway
     { public Guid TenantId { get; private set; } public Guid EstablishmentId { get; private set; } public Task<OrderReadModel?> GetAsync(Guid tenantId, Guid establishmentId, Guid orderId, CancellationToken cancellationToken) { TenantId = tenantId; EstablishmentId = establishmentId; return Task.FromResult<OrderReadModel?>(new(orderId, null, null, OrderServiceType.Pickup, OrderStatus.Draft, null, null, null, null, 0, 0, 0, 0, null, 0, 0, false, [], [])); } public Task<OrderSearchResult> SearchAsync(Guid tenantId, Guid establishmentId, DateTimeOffset? from, DateTimeOffset? to, OrderStatus? status, long? number, OrderServiceType? serviceType, int page, int pageSize, CancellationToken cancellationToken)=>Task.FromResult(new OrderSearchResult(0,[])); }
     private sealed class CouponRepository : ICouponRepository

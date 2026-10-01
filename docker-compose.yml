@@ -69,6 +69,7 @@ services:
       NotificationDelivery__InitialRetryDelaySeconds: ${NOTIFICATION_INITIAL_RETRY_DELAY_SECONDS:-30}
       NotificationDelivery__MaximumRetryDelaySeconds: ${NOTIFICATION_MAXIMUM_RETRY_DELAY_SECONDS:-1800}
       Cors__AllowedOrigins__0: ${WEB_ORIGIN:-http://localhost:9000}
+      CustomerOrderNotifications__PublicBaseUrl: ${WEB_ORIGIN:-http://localhost:9000}
       RealtimeOrders__ClientTimeoutSeconds: ${REALTIME_CLIENT_TIMEOUT_SECONDS:-30}
       RealtimeOrders__KeepAliveSeconds: ${REALTIME_KEEP_ALIVE_SECONDS:-15}
       RealtimeOrders__MaximumReceiveMessageBytes: ${REALTIME_MAX_MESSAGE_BYTES:-32768}

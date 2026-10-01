@@ -64,6 +64,7 @@ public static class DependencyInjection
             .Validate(options => options.IsValid(), "Meta WhatsApp options are invalid.")
             .ValidateOnStart();
         services.AddScoped<NotificationRequestOutboxStager>();
+        services.AddScoped<ICustomerOrderNotificationStager, CustomerOrderNotificationStager>();
         services.AddScoped<INotificationWriteRepository, NotificationWriteRepository>();
         services.AddScoped<INotificationReadGateway, NotificationReadGateway>();
         services.AddScoped<IOutboxMessageHandler, NotificationOutboxHandler>();

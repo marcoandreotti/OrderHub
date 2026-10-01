@@ -47,6 +47,37 @@ Consulte a documentação oficial da [WhatsApp Cloud API](https://developers.fac
 - Consentimento deve corresponder a um evento verificável de opt-in. Informar a origem no formulário administrativo e registrar uma nova entrada (`isGranted=false`) quando houver opt-out; decisões anteriores não são sobrescritas, e somente a mais recente vale para autorização do envio.
 - Reutilizar a mesma chave idempotente retorna a solicitação existente; reutilizá-la para conteúdo ou destino diferente retorna conflito.
 
+## Notificações automáticas de pedidos públicos
+
+Os pedidos públicos com e-mail cadastrado podem receber notificações transacionais. Cada evento usa um template de e-mail ativo, idioma `pt_BR` e a finalidade exata abaixo; a ausência de e-mail ou template apenas ignora a solicitação e não altera o pedido:
+
+| Evento | Finalidade |
+| --- | --- |
+| Pedido confirmado | `order.confirmed` |
+| Em preparo | `order.preparing` |
+| Pronto | `order.ready` |
+| Saiu para entrega | `order.out_for_delivery` |
+| Concluído | `order.completed` |
+| Cancelado | `order.cancelled` |
+| Recusado | `order.rejected` |
+
+Placeholders aceitos nesses templates: `{{name}}`, `{{orderNumber}}`, `{{status}}`, `{{statusLabel}}`, `{{trackingReference}}`, `{{trackingUrl}}`, `{{total}}` e `{{serviceType}}`. Não use IDs internos do pedido, do cliente, do Tenant ou da unidade. `trackingUrl` aponta para `/order/track/{referência}` na origem web configurada (`CustomerOrderNotifications:PublicBaseUrl`; localmente `http://localhost:9000`).
+
+Exemplo de template para `order.confirmed`:
+
+- Assunto: `Pedido {{orderNumber}} confirmado`
+- Corpo: `Olá, {{name}}! Seu pedido {{orderNumber}} foi {{statusLabel}}. Acompanhe: {{trackingUrl}}`
+
+Para verificar o fluxo local:
+
+1. Inicie a composição Docker com PostgreSQL, API, web e Mailpit (`docker compose up --build`).
+2. Em `http://localhost:9000/administration/communications`, crie o template `order.confirmed` acima e outro ativo para `order.preparing`, ambos no canal Email e idioma `pt_BR`. Deixe “Exige consentimento” desligado para este ensaio sem opt-in. A configuração SMTP local envia para Mailpit.
+3. Abra um pedido público em `/order/{slug}`, preencha o cliente com um e-mail de teste, adicione um produto e confirme. Acesse `http://localhost:8025` e procure `Pedido {número} confirmado`; o link recebido deve abrir `/order/track/{referência}`.
+4. Na tela de Operações, inicie o preparo desse pedido. Uma segunda mensagem deve aparecer no Mailpit com estado “em preparo” e o mesmo link público.
+5. Em Administration → Comunicações, atualize o histórico. “Aceito pelo provedor” indica aceitação do SMTP local; não é confirmação de entrega final.
+
+O commit do pedido e a solicitação de notificação são atômicos via EF Core e outbox. A identidade idempotente do evento combina o pedido e a finalidade do evento (`customer-order:{orderId}:{purpose}`), permitindo avisos distintos para estados diferentes sem duplicar o mesmo estado. Falhas e retries do SMTP são processados depois e não revertem a confirmação nem as transições.
+
 Estados de notificação: `Queued`, `AcceptedByProvider`, `BlockedByConsent`, `RetryScheduled`, `Failed` e `Uncertain`. Códigos de erro são seguros para suporte e não contêm conteúdo da mensagem, destino nem credenciais.
 
 ## Manutenção

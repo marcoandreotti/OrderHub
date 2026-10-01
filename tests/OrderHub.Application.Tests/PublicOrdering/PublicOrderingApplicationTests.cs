@@ -1,4 +1,5 @@
 using OrderHub.Application.Abstractions.Catalog;
+using OrderHub.Application.Abstractions.Communications;
 using OrderHub.Application.Abstractions.Customers;
 using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Application.Abstractions.Payments;
@@ -87,10 +88,11 @@ public sealed class PublicOrderingApplicationTests
     {
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository(); var requests=new RequestRepository();
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),new DeliveryGateway(),new SchedulingRepository(),new Publisher(),TimeProvider.System);
+        var customerNotifications = new CustomerNotificationStager();
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),requests,new Transaction(),new AvailabilityGateway(),new DeliveryGateway(),new SchedulingRepository(),customerNotifications,new Publisher(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","confirmation-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
         var first=await handler.HandleAsync(command,CancellationToken.None); var replay=await handler.HandleAsync(command,CancellationToken.None);
-        Assert.Equal(first,replay); Assert.Equal(1,orders.AddCount);
+        Assert.Equal(first,replay); Assert.Equal(1,orders.AddCount); Assert.Equal(1, customerNotifications.Calls);
     }
 
     [Fact]
@@ -108,7 +110,7 @@ public sealed class PublicOrderingApplicationTests
             new ContextGateway(scope), new OfferResolver(20m), new CustomerResolver(), new TableResolver(),
             new CouponRepository(), new ActivePaymentMethodRepository(method), new PaymentRepository(), orders,
             new Sequence(), new RequestRepository(), new Transaction(), new AvailabilityClosedUntilFutureGateway(), new DeliveryGateway(),
-            scheduling, new Publisher(), TimeProvider.System);
+            scheduling, new CustomerNotificationStager(), new Publisher(), TimeProvider.System);
         var command = new ConfirmPublicOrderCommand("unit-a", "scheduled-order-key-123", OrderServiceType.Pickup,
             null, null, null, null, null, method.Id, null, [new(Guid.NewGuid(), null, 1, null, [])],
             ScheduledAtUtc: slot);
@@ -126,7 +128,7 @@ public sealed class PublicOrderingApplicationTests
         var method = PaymentMethod.Create(scope.TenantId, scope.EstablishmentId, "PIX", "Pix", true, false, DateTimeOffset.UtcNow);
         var regionId = Guid.NewGuid();
         var quote = new DeliveryQuote(regionId, "Centro", new Money(7.50m), 35);
-        var handler = new ConfirmPublicOrderCommandHandler(new ContextGateway(scope), new OfferResolver(20m), new CustomerResolver(), new TableResolver(), new CouponRepository(), new ActivePaymentMethodRepository(method), new PaymentRepository(), new OrderRepository(), new Sequence(), new RequestRepository(), new Transaction(), new AvailabilityGateway(), new DeliveryGateway(quote), new SchedulingRepository(), new Publisher(), TimeProvider.System);
+        var handler = new ConfirmPublicOrderCommandHandler(new ContextGateway(scope), new OfferResolver(20m), new CustomerResolver(), new TableResolver(), new CouponRepository(), new ActivePaymentMethodRepository(method), new PaymentRepository(), new OrderRepository(), new Sequence(), new RequestRepository(), new Transaction(), new AvailabilityGateway(), new DeliveryGateway(quote), new SchedulingRepository(), new CustomerNotificationStager(), new Publisher(), TimeProvider.System);
         var address = new PublicAddress("Casa", "Rua A", "1", null, "Centro", "São Paulo", "SP", "01000-000");
         var command = new ConfirmPublicOrderCommand("unit-a", "delivery-quote-key-123", OrderServiceType.Delivery, null, null, null, address, null, method.Id, null,
             [new(Guid.NewGuid(), null, 1, null, [])], regionId, 3m, 35, DateTimeOffset.UtcNow);
@@ -143,7 +145,7 @@ public sealed class PublicOrderingApplicationTests
         var scope=Scope(); var method=PaymentMethod.Create(scope.TenantId,scope.EstablishmentId,"PIX","Pix",true,false,DateTimeOffset.UtcNow);
         var orders=new OrderRepository();
         var unavailable=new AvailabilityGateway(new(false,AvailabilityReason.ServicePaused,"Pickup paused.",DateTimeOffset.UtcNow.AddHours(1)));
-        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,new DeliveryGateway(),new SchedulingRepository(),new Publisher(),TimeProvider.System);
+        var handler=new ConfirmPublicOrderCommandHandler(new ContextGateway(scope),new OfferResolver(20m),new CustomerResolver(),new TableResolver(),new CouponRepository(),new ActivePaymentMethodRepository(method),new PaymentRepository(),orders,new Sequence(),new RequestRepository(),new Transaction(),unavailable,new DeliveryGateway(),new SchedulingRepository(),new CustomerNotificationStager(),new Publisher(),TimeProvider.System);
         var command=new ConfirmPublicOrderCommand("unit-a","stale-cart-key-123",OrderServiceType.Pickup,null,null,null,null,null,method.Id,null,[new(Guid.NewGuid(),null,1,null,[])]);
 
         var exception=await Assert.ThrowsAsync<AvailabilityConflictException>(()=>handler.HandleAsync(command,CancellationToken.None));
@@ -153,6 +155,7 @@ public sealed class PublicOrderingApplicationTests
     }
 
     private static PublicOrderingContext Scope()=>new(Guid.NewGuid(),Guid.NewGuid(),"Unit","unit-a","#1","#2","#3","#4","Arial",null,null,null,null,[]);
+    private sealed class CustomerNotificationStager : ICustomerOrderNotificationStager { public int Calls { get; private set; } public Task StageAsync(Order order, CancellationToken cancellationToken) { Calls++; return Task.CompletedTask; } }
     private sealed class ContextGateway(PublicOrderingContext? value):IPublicOrderingContextGateway { public Task<PublicOrderingContext?> ResolveAsync(string normalizedSlug,string? tableToken,CancellationToken cancellationToken)=>Task.FromResult(value); }
     private sealed class OfferResolver(decimal price):IOrderOfferResolver { public Task<OrderOfferSnapshot?> ResolveAsync(Guid tenantId,Guid establishmentId,Guid productId,Guid? variationId,IReadOnlyCollection<OrderAdditionalSelection> additionals,DateTimeOffset instant,CancellationToken cancellationToken)=>Task.FromResult<OrderOfferSnapshot?>(new(productId,variationId,"Pizza",null,new Money(price),[])); }
     private sealed class CustomerResolver:IOrderCustomerResolver { public Task<OrderCustomerSnapshot?> ResolveAsync(Guid tenantId,Guid establishmentId,Guid customerId,Guid? addressId,CancellationToken cancellationToken)=>Task.FromResult<OrderCustomerSnapshot?>(null); }

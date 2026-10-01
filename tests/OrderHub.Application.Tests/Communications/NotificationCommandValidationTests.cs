@@ -32,6 +32,28 @@ public sealed class NotificationCommandValidationTests
     }
 
     [Fact]
+    public async Task Customer_order_template_accepts_supported_placeholders()
+    {
+        var command = new UpsertNotificationTemplateCommand(Guid.NewGuid(), null, "order.confirmed", NotificationChannel.Email,
+            "pt_BR", "Pedido {{orderNumber}}", "Olá {{name}}: {{statusLabel}} {{trackingUrl}}", null, false, true);
+
+        var result = await new UpsertNotificationTemplateValidator().ValidateAsync(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public async Task Customer_order_template_rejects_unavailable_placeholders()
+    {
+        var command = new UpsertNotificationTemplateCommand(Guid.NewGuid(), null, "order.ready", NotificationChannel.Email,
+            "pt_BR", "Pedido {{orderId}}", "Pronto", null, false, true);
+
+        var result = await new UpsertNotificationTemplateValidator().ValidateAsync(command);
+
+        Assert.Contains(result.Errors, error => error.PropertyName == nameof(command.Subject));
+    }
+
+    [Fact]
     public async Task Consent_change_requires_a_verifiable_source()
     {
         var command = new SetNotificationConsentCommand(Guid.NewGuid(), NotificationChannel.Email, "order.update",

@@ -1,5 +1,6 @@
 using OrderHub.Application.Abstractions.Persistence;
 using OrderHub.Application.Tenancy;
+using OrderHub.Domain.Ordering;
 
 namespace OrderHub.Application.Abstractions.Communications;
 
@@ -67,6 +68,35 @@ public sealed record NotificationRequestDraft(
     string IdempotencyKey);
 
 public sealed record NotificationRequestResult(Guid Id, bool Created);
+
+public static class CustomerOrderNotificationPurposes
+{
+    public const string Confirmed = "order.confirmed";
+    public const string Preparing = "order.preparing";
+    public const string Ready = "order.ready";
+    public const string OutForDelivery = "order.out_for_delivery";
+    public const string Completed = "order.completed";
+    public const string Cancelled = "order.cancelled";
+    public const string Rejected = "order.rejected";
+
+    public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        Confirmed, Preparing, Ready, OutForDelivery, Completed, Cancelled, Rejected
+    };
+}
+
+public static class CustomerOrderNotificationParameters
+{
+    public static IReadOnlySet<string> All { get; } = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "name", "orderNumber", "status", "statusLabel", "trackingReference", "trackingUrl", "total", "serviceType"
+    };
+}
+
+public interface ICustomerOrderNotificationStager
+{
+    Task StageAsync(Order order, CancellationToken cancellationToken);
+}
 
 public sealed record NotificationHistoryView(
     Guid Id,

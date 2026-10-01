@@ -7,6 +7,7 @@ using OrderHub.Domain.Ordering;
 using OrderHub.Domain.SharedKernel;
 using FluentValidation.Results;
 using OrderHub.Application.Abstractions.Promotions;
+using OrderHub.Application.Abstractions.Communications;
 using OrderHub.Domain.Promotions;
 using OrderHub.Domain.Operations;
 using OrderHub.Domain.Exceptions;
@@ -153,6 +154,7 @@ public sealed class ConfirmOrderCommandHandler(
 public sealed class TransitionOrderCommandHandler(
     EstablishmentScopeResolver scopeResolver,
     IOrderRepository repository,
+    ICustomerOrderNotificationStager customerNotifications,
     IOrderUpdatePublisher updatePublisher,
     TimeProvider timeProvider) : ICommandHandler<TransitionOrderCommand>
 {
@@ -179,6 +181,7 @@ public sealed class TransitionOrderCommandHandler(
         {
             throw new ConflictException($"Order state no longer allows this transition. {exception.Message}");
         }
+        await customerNotifications.StageAsync(order, cancellationToken);
         await repository.SaveChangesAsync(cancellationToken);
         await updatePublisher.PublishAsync(
             scope.TenantId,

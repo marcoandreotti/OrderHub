@@ -20,9 +20,19 @@ public sealed class UpsertNotificationTemplateValidator : AbstractValidator<Upse
         RuleFor(x => x.Language).NotEmpty().MaximumLength(16);
         RuleFor(x => x.Subject).MaximumLength(250);
         RuleFor(x => x.Body).NotEmpty().MaximumLength(10000);
+        RuleFor(x => x.Body).Must((command, body) => HasSupportedOrderParameters(command.Purpose, body))
+            .WithMessage("Customer order templates can only use supported order placeholders.");
+        RuleFor(x => x.Subject).Must((command, subject) => HasSupportedOrderParameters(command.Purpose, subject))
+            .WithMessage("Customer order templates can only use supported order placeholders.");
         RuleFor(x => x.ProviderTemplateName).NotEmpty().MaximumLength(200).When(x => x.Channel == NotificationChannel.WhatsApp && x.IsActive);
         RuleFor(x => x.Subject).NotEmpty().When(x => x.Channel == NotificationChannel.Email && x.IsActive);
     }
+
+    private static bool HasSupportedOrderParameters(string purpose, string? value) =>
+        !CustomerOrderNotificationPurposes.All.Contains(purpose)
+        || System.Text.RegularExpressions.Regex.Matches(value ?? string.Empty, "\\{\\{([a-zA-Z0-9_.-]{1,50})\\}\\}")
+            .Select(match => match.Groups[1].Value)
+            .All(CustomerOrderNotificationParameters.All.Contains);
 }
 
 public sealed class UpsertNotificationTemplateHandler(EstablishmentScopeResolver scopes, INotificationWriteRepository repository, TimeProvider clock)

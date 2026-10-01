@@ -1,4 +1,5 @@
 using Dapper;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -9,11 +10,25 @@ using OrderHub.Application.Abstractions.Communications;
 using OrderHub.Application.Abstractions.Persistence;
 using OrderHub.Application.Tenancy;
 using OrderHub.Domain.Tenancy;
+using OrderHub.Domain.Customers;
+using OrderHub.Domain.Ordering;
+using OrderHub.Domain.SharedKernel;
 using OrderHub.Infrastructure;
+using OrderHub.Infrastructure.Communications;
 using OrderHub.Infrastructure.Persistence.Write;
 using Testcontainers.PostgreSql;
 
 namespace OrderHub.Integration.Tests;
+
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class LocalMailpitFactAttribute : FactAttribute
+{
+    public LocalMailpitFactAttribute()
+    {
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("ORDERHUB_MAILPIT_BASE_URL")))
+            Skip = "Set ORDERHUB_MAILPIT_BASE_URL to run the local Mailpit end-to-end smoke test.";
+    }
+}
 
 public sealed class NotificationGatewayTests : IAsyncLifetime
 {
@@ -156,6 +171,338 @@ public sealed class NotificationGatewayTests : IAsyncLifetime
         Assert.Single(await reads.ListHistoryAsync(scopeA, 1, 10, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Customer_order_notifications_use_public_data_and_stage_status_events_once()
+    {
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Database:ConnectionString"] = database.GetConnectionString(),
+            ["CustomerOrderNotifications:PublicBaseUrl"] = "https://orders.example.test"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddInfrastructure(configuration);
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.confirmed", "Olá {{name}}, pedido {{orderNumber}} {{statusLabel}}: {{trackingUrl}} ({{trackingReference}})", true, true);
+
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            var stager = scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>();
+            await stager.StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            await stager.StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+        }
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        var connection = verifyContext.Database.GetDbConnection();
+        var notification = await connection.QuerySingleAsync<(string Destination, string Purpose, string IdempotencyKey, string ParametersJson)>(
+            "select destination as Destination, purpose as Purpose, idempotency_key as IdempotencyKey, parameters_json::text as ParametersJson from communications.notification where tenant_id = @TenantId and establishment_id = @EstablishmentId",
+            new { fixture.TenantId, fixture.EstablishmentId });
+        Assert.Equal("customer@example.test", notification.Destination);
+        Assert.Equal("order.confirmed", notification.Purpose);
+        Assert.Equal($"customer-order:{fixture.OrderId:N}:order.confirmed", notification.IdempotencyKey);
+        Assert.Contains("https://orders.example.test/order/track/", notification.ParametersJson);
+        Assert.Contains("trackingReference", notification.ParametersJson);
+        Assert.DoesNotContain(fixture.OrderId.ToString(), notification.ParametersJson);
+        Assert.DoesNotContain(fixture.TenantId.ToString(), notification.ParametersJson);
+        Assert.Equal(1, await connection.QuerySingleAsync<int>(
+            "select count(*) from integration.outbox_message where tenant_id = @TenantId", new { fixture.TenantId }));
+
+        var orderModel = await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+        var repository = verifyScope.ServiceProvider.GetRequiredService<INotificationWriteRepository>();
+        await repository.UpsertTemplateAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId),
+            new(null, "order.preparing", NotificationChannel.Email, "pt_BR", "Pedido em preparo", "Pedido {{orderNumber}}: {{statusLabel}}", null, false, true),
+            DateTimeOffset.UtcNow, CancellationToken.None);
+        orderModel.StartPreparation(DateTimeOffset.UtcNow.AddMinutes(1), Guid.NewGuid());
+        await verifyScope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(orderModel, CancellationToken.None);
+        await verifyContext.SaveChangesAsync();
+        Assert.Equal(OrderStatus.Preparing, orderModel.Status);
+        Assert.Equal(2, await connection.QuerySingleAsync<int>(
+            "select count(*) from communications.notification where tenant_id = @TenantId", new { fixture.TenantId }));
+    }
+
+    [LocalMailpitFact]
+    public async Task Customer_order_confirmation_and_status_email_are_visible_in_local_mailpit()
+    {
+        var mailpitUrl = Environment.GetEnvironmentVariable("ORDERHUB_MAILPIT_BASE_URL");
+        Assert.False(string.IsNullOrWhiteSpace(mailpitUrl));
+
+        var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Database:ConnectionString"] = database.GetConnectionString(),
+            ["CustomerOrderNotifications:PublicBaseUrl"] = "http://localhost:9000",
+            ["NotificationSmtp:Host"] = "localhost",
+            ["NotificationSmtp:Port"] = "1025",
+            ["NotificationSmtp:FromAddress"] = "no-reply@orderhub.test",
+            ["NotificationSmtp:EnableSsl"] = "false",
+            ["NotificationSmtp:TimeoutSeconds"] = "15",
+            ["Outbox:PollingIntervalSeconds"] = "1",
+            ["Outbox:CleanupIntervalHours"] = "24",
+            ["NotificationDelivery:MaximumAttempts"] = "2",
+            ["NotificationDelivery:InitialRetryDelaySeconds"] = "1",
+            ["NotificationDelivery:MaximumRetryDelaySeconds"] = "2"
+        }).Build();
+        var services = new ServiceCollection();
+        services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
+        services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddInfrastructure(configuration);
+        services.RemoveAll<INotificationChannelSender>();
+        services.AddSingleton<INotificationChannelSender>(new SmtpNotificationSender(Microsoft.Extensions.Options.Options.Create(
+            new NotificationSmtpOptions { Host = "localhost", Port = 1025, FromAddress = "no-reply@orderhub.test", EnableSsl = false, TimeoutSeconds = 15 })));
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.confirmed", "Pedido {{orderNumber}}", true, true);
+        var scopeModel = new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId);
+        Guid confirmationNotificationId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            var repository = scope.ServiceProvider.GetRequiredService<INotificationWriteRepository>();
+            await repository.UpsertTemplateAsync(scopeModel,
+                new(null, "order.confirmed", NotificationChannel.Email, "pt_BR", "Pedido {{orderNumber}}: {{statusLabel}}",
+                    "Olá {{name}}, pedido {{orderNumber}} está {{statusLabel}}. Acompanhe em {{trackingUrl}}.", null, false, true),
+                DateTimeOffset.UtcNow, CancellationToken.None);
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            confirmationNotificationId = await context.Database.GetDbConnection().QuerySingleAsync<Guid>(
+                "select id from communications.notification where tenant_id = @TenantId and purpose = 'order.confirmed'", new { fixture.TenantId });
+        }
+
+        var worker = provider.GetServices<IHostedService>().Single(item => item.GetType().Name == "OutboxProcessingWorker");
+        await worker.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForStatusAsync(provider, scopeModel, confirmationNotificationId, NotificationDeliveryStatus.AcceptedByProvider);
+            await WaitForMailpitSubjectAsync(mailpitUrl, $"Pedido {fixture.OrderNumber}: confirmado", "customer@example.test");
+
+            await using var scope = provider.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            var repository = scope.ServiceProvider.GetRequiredService<INotificationWriteRepository>();
+            await repository.UpsertTemplateAsync(scopeModel,
+                new(null, "order.preparing", NotificationChannel.Email, "pt_BR", "Pedido {{orderNumber}}: {{statusLabel}}",
+                    "Olá {{name}}, pedido {{orderNumber}} está {{statusLabel}}. Acompanhe em {{trackingUrl}}.", null, false, true),
+                DateTimeOffset.UtcNow, CancellationToken.None);
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            order.StartPreparation(DateTimeOffset.UtcNow.AddMinutes(1), Guid.NewGuid());
+            await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            var preparingNotificationId = await context.Database.GetDbConnection().QuerySingleAsync<Guid>(
+                "select id from communications.notification where tenant_id = @TenantId and purpose = 'order.preparing'", new { fixture.TenantId });
+            await WaitForStatusAsync(provider, scopeModel, preparingNotificationId, NotificationDeliveryStatus.AcceptedByProvider);
+            await WaitForMailpitSubjectAsync(mailpitUrl, $"Pedido {fixture.OrderNumber}: em preparo", "customer@example.test");
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        Assert.Equal(OrderStatus.Preparing, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task Customer_order_notification_is_skipped_when_email_or_matching_template_is_missing(bool hasEmail, bool hasTemplate)
+    {
+        var services = CreateServices(new FakeNotificationSender(NotificationChannel.Email,
+            new NotificationProviderResult(NotificationProviderOutcome.Accepted, "unused", null)));
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.confirmed", "Pedido {{orderNumber}}", hasEmail, hasTemplate);
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+        await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+        await context.SaveChangesAsync();
+        Assert.Equal(0, await context.Database.GetDbConnection().QuerySingleAsync<int>(
+            "select count(*) from communications.notification where tenant_id = @TenantId", new { fixture.TenantId }));
+    }
+
+    [Fact]
+    public async Task Public_order_status_and_notification_request_roll_back_together()
+    {
+        var services = CreateServices(new FakeNotificationSender(NotificationChannel.Email,
+            new NotificationProviderResult(NotificationProviderOutcome.Accepted, "unused", null)));
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.preparing", "Pedido {{orderNumber}}: {{statusLabel}}", true, true);
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            order.StartPreparation(DateTimeOffset.UtcNow.AddMinutes(1), Guid.NewGuid());
+            await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            await transaction.RollbackAsync();
+        }
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        var connection = verifyContext.Database.GetDbConnection();
+        Assert.Equal(OrderStatus.Confirmed, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
+        Assert.Equal(0, await connection.QuerySingleAsync<int>(
+            "select count(*) from communications.notification where tenant_id = @TenantId", new { fixture.TenantId }));
+        Assert.Equal(0, await connection.QuerySingleAsync<int>(
+            "select count(*) from integration.outbox_message where tenant_id = @TenantId and message_type = 'communications.notification.requested'", new { fixture.TenantId }));
+    }
+
+    [Fact]
+    public async Task Customer_order_delivery_retry_does_not_change_order_state()
+    {
+        var sender = new FakeNotificationSender(NotificationChannel.Email,
+            new NotificationProviderResult(NotificationProviderOutcome.RetryableFailure, null, "smtp_421"),
+            new NotificationProviderResult(NotificationProviderOutcome.Accepted, "accepted-after-retry", null));
+        var services = CreateServices(sender, retryDelaySeconds: 1);
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.confirmed", "Pedido {{orderNumber}}: {{trackingUrl}}", true, true);
+        Guid notificationId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            notificationId = await context.Database.GetDbConnection().QuerySingleAsync<Guid>(
+                "select id from communications.notification where tenant_id = @TenantId", new { fixture.TenantId });
+        }
+
+        var worker = provider.GetServices<IHostedService>().Single(item => item.GetType().Name == "OutboxProcessingWorker");
+        await worker.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForStatusAsync(provider, new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), notificationId,
+                NotificationDeliveryStatus.AcceptedByProvider);
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        Assert.Equal(OrderStatus.Confirmed, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
+        var history = await verifyScope.ServiceProvider.GetRequiredService<INotificationReadGateway>()
+            .ListHistoryAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), 1, 10, CancellationToken.None);
+        Assert.Equal(NotificationDeliveryStatus.AcceptedByProvider, Assert.Single(history).Status);
+        Assert.Equal(2, sender.Calls);
+    }
+
+    [Fact]
+    public async Task Customer_order_notification_without_consent_is_recorded_as_blocked_without_changing_order()
+    {
+        var sender = new FakeNotificationSender(NotificationChannel.Email,
+            new NotificationProviderResult(NotificationProviderOutcome.Accepted, "must-not-send", null));
+        var services = CreateServices(sender);
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.confirmed", "Pedido {{orderNumber}}", true, true, requiresConsent: true);
+        Guid notificationId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            notificationId = await context.Database.GetDbConnection().QuerySingleAsync<Guid>(
+                "select id from communications.notification where tenant_id = @TenantId", new { fixture.TenantId });
+        }
+
+        var worker = provider.GetServices<IHostedService>().Single(item => item.GetType().Name == "OutboxProcessingWorker");
+        await worker.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForStatusAsync(provider, new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), notificationId,
+                NotificationDeliveryStatus.BlockedByConsent);
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        Assert.Equal(OrderStatus.Confirmed, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
+        Assert.Equal(0, sender.Calls);
+    }
+
+    [Theory]
+    [InlineData(NotificationProviderOutcome.PermanentFailure, NotificationDeliveryStatus.Failed)]
+    [InlineData(NotificationProviderOutcome.Uncertain, NotificationDeliveryStatus.Uncertain)]
+    public async Task Customer_order_terminal_or_uncertain_delivery_is_visible_without_changing_order(
+        NotificationProviderOutcome outcome, NotificationDeliveryStatus expectedStatus)
+    {
+        var sender = new FakeNotificationSender(NotificationChannel.Email,
+            new NotificationProviderResult(outcome, null, "smtp_result"));
+        var services = CreateServices(sender);
+        await using var provider = services.BuildServiceProvider();
+        var fixture = await CreatePublicOrderAsync(provider, "order.confirmed", "Pedido {{orderNumber}}", true, true);
+        Guid notificationId;
+        await using (var scope = provider.CreateAsyncScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+            var order = await context.Orders.SingleAsync(item => item.Id == fixture.OrderId);
+            await scope.ServiceProvider.GetRequiredService<ICustomerOrderNotificationStager>().StageAsync(order, CancellationToken.None);
+            await context.SaveChangesAsync();
+            notificationId = await context.Database.GetDbConnection().QuerySingleAsync<Guid>(
+                "select id from communications.notification where tenant_id = @TenantId", new { fixture.TenantId });
+        }
+
+        var worker = provider.GetServices<IHostedService>().Single(item => item.GetType().Name == "OutboxProcessingWorker");
+        await worker.StartAsync(CancellationToken.None);
+        try
+        {
+            await WaitForStatusAsync(provider, new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), notificationId, expectedStatus);
+        }
+        finally
+        {
+            await worker.StopAsync(CancellationToken.None);
+        }
+
+        await using var verifyScope = provider.CreateAsyncScope();
+        var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        Assert.Equal(OrderStatus.Confirmed, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
+        var history = await verifyScope.ServiceProvider.GetRequiredService<INotificationReadGateway>()
+            .ListHistoryAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), 1, 10, CancellationToken.None);
+        Assert.Equal(expectedStatus, Assert.Single(history).Status);
+    }
+
+    private async Task<CustomerOrderFixture> CreatePublicOrderAsync(IServiceProvider provider, string purpose, string body, bool hasEmail, bool hasTemplate, bool requiresConsent = false)
+    {
+        await using var scope = provider.CreateAsyncScope();
+        var context = scope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
+        await context.Database.MigrateAsync();
+        var now = DateTimeOffset.UtcNow;
+        var tenant = Tenant.Create("Customer notifications", now);
+        var establishment = Establishment.Create(tenant.Id, "Customer notification unit", new Slug("customer-notify-" + Guid.NewGuid().ToString("N")), now);
+        var customer = Customer.Create(tenant.Id, establishment.Id, "Ana Silva", "+5511999999999", hasEmail ? "customer@example.test" : null, now);
+        var order = Order.Create(tenant.Id, establishment.Id, OrderServiceType.Pickup, customer.Id, customer.Name, customer.Phone, null, null, now);
+        order.AddItem(Guid.NewGuid(), null, "Pizza", null, new Money(45.90m), new Quantity(1), [], null, now);
+        var number = Random.Shared.Next(100000, 999999);
+        order.Confirm(number, now);
+        context.AddRange(tenant, establishment, customer, order);
+        await context.SaveChangesAsync();
+        context.PublicOrderRequests.Add(PublicOrderRequest.Create(tenant.Id, establishment.Id,
+            "customer-order-key-" + Guid.NewGuid().ToString("N"), new string('a', 64), order.Id, now));
+        await context.SaveChangesAsync();
+        if (hasTemplate)
+        {
+            var repository = scope.ServiceProvider.GetRequiredService<INotificationWriteRepository>();
+            await repository.UpsertTemplateAsync(new OperationalScope(tenant.Id, Guid.NewGuid(), establishment.Id),
+                new(null, purpose, NotificationChannel.Email, "pt_BR", "Atualização do pedido", body, null, requiresConsent, true), now, CancellationToken.None);
+        }
+
+        return new CustomerOrderFixture(tenant.Id, establishment.Id, customer.Id, order.Id, order.PublicReference!, number);
+    }
+
+    private sealed record CustomerOrderFixture(Guid TenantId, Guid EstablishmentId, Guid CustomerId, Guid OrderId, string PublicReference, long OrderNumber);
+
     private ServiceCollection CreateServices(FakeNotificationSender sender, int retryDelaySeconds = 30)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
@@ -170,6 +517,7 @@ public sealed class NotificationGatewayTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddLogging(logging => logging.SetMinimumLevel(LogLevel.Warning));
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<IConfiguration>(configuration);
         services.AddInfrastructure(configuration);
         services.RemoveAll<INotificationChannelSender>();
         services.AddSingleton<INotificationChannelSender>(sender);
@@ -220,6 +568,42 @@ public sealed class NotificationGatewayTests : IAsyncLifetime
             await Task.Delay(100);
         }
         Assert.Fail($"Notification did not reach status {expected}.");
+    }
+
+    private static async Task WaitForMailpitSubjectAsync(string mailpitUrl, string subject, string recipient)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(mailpitUrl.TrimEnd('/') + "/") };
+        var until = DateTimeOffset.UtcNow.AddSeconds(15);
+        while (DateTimeOffset.UtcNow < until)
+        {
+            using var response = await client.GetAsync("api/v1/messages?limit=100");
+            response.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (TryGetProperty(document.RootElement, "messages", out var messages) && messages.ValueKind == JsonValueKind.Array
+                && messages.EnumerateArray().Any(message =>
+                    TryGetProperty(message, "subject", out var messageSubject) && messageSubject.GetString() == subject
+                    && TryGetProperty(message, "to", out var recipients) && recipients.ValueKind == JsonValueKind.Array
+                    && recipients.EnumerateArray().Any(address => TryGetProperty(address, "address", out var value) && value.GetString() == recipient)
+                    && TryGetProperty(message, "snippet", out var snippet)
+                    && snippet.GetString()?.Contains("http://localhost:9000/order/track/", StringComparison.Ordinal) == true))
+                return;
+            await Task.Delay(250);
+        }
+        Assert.Fail($"Mailpit did not show the expected customer order message: {subject}.");
+    }
+
+    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+        }
+        value = default;
+        return false;
     }
 
     private sealed class FakeNotificationSender(NotificationChannel channel, params NotificationProviderResult[] results) : INotificationChannelSender
