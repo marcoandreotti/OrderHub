@@ -19,6 +19,7 @@ using OrderHub.Application.Abstractions.Payments;
 using OrderHub.Application.Abstractions.PublicOrdering;
 using OrderHub.Application.Abstractions.Delivery;
 using OrderHub.Application.Identity.Authentication;
+using OrderHub.Application.Abstractions.Reporting;
 
 namespace OrderHub.Infrastructure;
 
@@ -91,6 +92,7 @@ public static class DependencyInjection
         services.AddScoped<IPublicOrderTransaction, PublicOrderTransaction>();
         services.AddScoped<IDeliveryRegionRepository, DeliveryRegionRepository>();
         services.AddScoped<IDeliveryReadGateway, DeliveryReadGateway>();
+        services.AddScoped<IBusinessDashboardReadGateway, BusinessDashboardReadGateway>();
         services.AddHealthChecks().AddDbContextCheck<OrderHubDbContext>("postgresql", tags: ["ready"]);
 
         services.AddScoped<IEstablishmentConfigurationRepository, EstablishmentConfigurationRepository>();

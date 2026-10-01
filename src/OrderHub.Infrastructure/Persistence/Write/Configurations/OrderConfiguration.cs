@@ -132,6 +132,9 @@ internal sealed class OrderStatusHistoryConfiguration : IEntityTypeConfiguration
     public void Configure(EntityTypeBuilder<OrderStatusHistory> builder)
     {
         builder.ToTable("order_status_history", DatabaseSchemas.Orders); builder.HasKey(x => x.Id); builder.Property(x => x.Id).HasColumnName("id").ValueGeneratedNever(); builder.Property(x => x.TenantId).HasColumnName("tenant_id"); builder.Property(x => x.EstablishmentId).HasColumnName("establishment_id"); builder.Property(x => x.OrderId).HasColumnName("order_id"); builder.Property(x => x.PreviousStatus).HasColumnName("previous_status").HasConversion<string>().HasMaxLength(30); builder.Property(x => x.NewStatus).HasColumnName("new_status").HasConversion<string>().HasMaxLength(30); builder.Property(x => x.OccurredAt).HasColumnName("occurred_at"); builder.Property(x => x.ActorId).HasColumnName("actor_id"); builder.Property(x => x.Note).HasColumnName("note").HasMaxLength(500); builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.OrderId, x.OccurredAt });
+        builder.HasIndex(x => new { x.TenantId, x.EstablishmentId, x.NewStatus, x.OccurredAt })
+            .IncludeProperties(x => x.OrderId)
+            .HasDatabaseName("ix_order_status_history_reporting");
     }
 }
 

@@ -2,6 +2,7 @@ using OrderHub.Application.Abstractions.Commands;
 using OrderHub.Application.Abstractions.Customers;
 using OrderHub.Application.Abstractions.Ordering;
 using OrderHub.Application.Abstractions.Payments;
+using OrderHub.Application.Abstractions.Reporting;
 using OrderHub.Application.Abstractions.Promotions;
 using OrderHub.Application.Abstractions.Queries;
 using OrderHub.Application.Customers;
@@ -10,10 +11,13 @@ using OrderHub.Application.Ordering;
 using OrderHub.Application.Payments;
 using OrderHub.Application.Delivery;
 using OrderHub.Application.Abstractions.Delivery;
+using OrderHub.Application.Reporting;
 using OrderHub.Application.Promotions;
 using OrderHub.Contracts.Administration;
 using OrderHub.Domain.Ordering;
 using OrderHub.Domain.Promotions;
+using System.Globalization;
+using System.Text;
 
 namespace OrderHub.Api.Administration;
 
@@ -23,8 +27,115 @@ internal static class AdministrationEndpoints
     public static IEndpointRouteBuilder MapAdministrationEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var root=endpoints.MapGroup("/api/admin/establishments/{establishmentId:guid}").WithTags("Administration");
-        MapCustomers(root); MapOrders(root); MapCoupons(root); MapPayments(root); MapDelivery(root); MapOrderScheduling(root);
+        MapCustomers(root); MapOrders(root); MapCoupons(root); MapPayments(root); MapDelivery(root); MapOrderScheduling(root); MapBusinessDashboard(root);
         return endpoints;
+    }
+
+    private static void MapBusinessDashboard(RouteGroupBuilder root)
+    {
+        var group = root.MapGroup("/reports/dashboard").RequireAuthorization(AdministrativePolicies.Management);
+        group.MapGet("", GetBusinessDashboardAsync).Produces<BusinessDashboardResponse>();
+        group.MapGet("/export", ExportBusinessDashboardAsync);
+    }
+
+    private static async Task<IResult> GetBusinessDashboardAsync(
+        Guid establishmentId,
+        DateOnly from,
+        DateOnly to,
+        string? serviceType,
+        int? productPage,
+        int? productPageSize,
+        IQueryDispatcher dispatcher,
+        CancellationToken cancellationToken)
+    {
+        var report = await dispatcher.DispatchAsync<GetBusinessDashboardQuery, BusinessDashboardReadModel>(
+            new(establishmentId, from, to, ParseServiceType(serviceType), productPage ?? 1, productPageSize ?? 10),
+            cancellationToken);
+        return Results.Ok(Map(report));
+    }
+
+    private static async Task<IResult> ExportBusinessDashboardAsync(
+        Guid establishmentId,
+        DateOnly from,
+        DateOnly to,
+        string? serviceType,
+        IQueryDispatcher dispatcher,
+        CancellationToken cancellationToken)
+    {
+        var report = await dispatcher.DispatchAsync<GetBusinessDashboardQuery, BusinessDashboardReadModel>(
+            new(establishmentId, from, to, ParseServiceType(serviceType), ProductPage: 1, ProductPageSize: 100),
+            cancellationToken);
+        var content = BuildBusinessDashboardCsv(report);
+        var filename = $"relatorio-{from:yyyyMMdd}-{to:yyyyMMdd}.csv";
+        return Results.File(content, "text/csv; charset=utf-8", filename);
+    }
+
+    private static OrderServiceType? ParseServiceType(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        return Enum.TryParse<OrderServiceType>(value, true, out var parsed)
+            ? parsed
+            : (OrderServiceType)(-1);
+    }
+
+    private static BusinessDashboardResponse Map(BusinessDashboardReadModel report) => new(
+        report.TimeZoneId,
+        Map(report.Current),
+        Map(report.Previous),
+        report.Series.Select(day => new BusinessDashboardDayResponse(
+            day.Date, day.PeriodOffset, day.IsComparison, day.Revenue, day.CompletedOrders, day.ConfirmedPayments)).ToArray(),
+        new BusinessDashboardProductPageResponse(
+            report.Products.Total,
+            report.Products.Page,
+            report.Products.PageSize,
+            report.Products.Items.Select(product => new BusinessDashboardProductResponse(
+                product.Name, product.QuantitySold, product.Revenue)).ToArray()));
+
+    private static BusinessDashboardPeriodResponse Map(BusinessDashboardPeriodReadModel period) => new(
+        period.From, period.To, period.Revenue, period.ReceivedOrders, period.CompletedOrders,
+        period.AverageTicket, period.ConfirmedPayments, period.CancelledOrders, period.RejectedOrders);
+
+    private static byte[] BuildBusinessDashboardCsv(BusinessDashboardReadModel report)
+    {
+        var culture = CultureInfo.GetCultureInfo("pt-BR");
+        var csv = new StringBuilder("\uFEFFSeção;Data;Indicador;Valor\r\n");
+        AddPeriod("Período atual", report.Current);
+        AddPeriod("Período anterior", report.Previous);
+        foreach (var day in report.Series)
+        {
+            var period = day.IsComparison ? "Série anterior" : "Série atual";
+            AddRow(period, day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "Faturamento concluído", day.Revenue.ToString("0.00", culture));
+            AddRow(period, day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "Pedidos concluídos", day.CompletedOrders.ToString(culture));
+            AddRow(period, day.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), "Pagamentos confirmados", day.ConfirmedPayments.ToString("0.00", culture));
+        }
+        foreach (var product in report.Products.Items)
+        {
+            AddRow("Produtos", "", product.Name, product.QuantitySold.ToString("0.###", culture));
+            AddRow("Produtos", "", $"Faturamento — {product.Name}", product.Revenue.ToString("0.00", culture));
+        }
+        return Encoding.UTF8.GetBytes(csv.ToString());
+
+        void AddPeriod(string label, BusinessDashboardPeriodReadModel period)
+        {
+            AddRow(label, $"{period.From:yyyy-MM-dd} a {period.To:yyyy-MM-dd}", "Faturamento concluído", period.Revenue.ToString("0.00", culture));
+            AddRow(label, "", "Pedidos recebidos", period.ReceivedOrders.ToString(culture));
+            AddRow(label, "", "Pedidos concluídos", period.CompletedOrders.ToString(culture));
+            AddRow(label, "", "Ticket médio", period.AverageTicket.ToString("0.00", culture));
+            AddRow(label, "", "Pagamentos confirmados", period.ConfirmedPayments.ToString("0.00", culture));
+            AddRow(label, "", "Pedidos cancelados", period.CancelledOrders.ToString(culture));
+            AddRow(label, "", "Pedidos rejeitados", period.RejectedOrders.ToString(culture));
+        }
+
+        void AddRow(string section, string date, string metric, string value) =>
+            csv.Append(Csv(section)).Append(';').Append(Csv(date)).Append(';').Append(Csv(metric)).Append(';').Append(Csv(value)).Append("\r\n");
+
+        static string Csv(string value)
+        {
+            var safe = value.Length > 0 && value[0] is '=' or '+' or '-' or '@' or '\t' or '\r'
+                ? "'" + value
+                : value;
+            return '"' + safe.Replace("\"", "\"\"") + '"';
+        }
     }
 
     private static void MapOrderScheduling(RouteGroupBuilder root)

@@ -24,6 +24,8 @@ using OrderHub.Application.Identity.Management;
 using OrderHub.Application.Availability;
 using OrderHub.Application.Delivery;
 using OrderHub.Application.Abstractions.Delivery;
+using OrderHub.Application.Abstractions.Reporting;
+using OrderHub.Application.Reporting;
 
 namespace OrderHub.Application;
 
@@ -184,6 +186,8 @@ public static class DependencyInjection
         services.AddScoped<IValidator<UpsertDeliveryRegionCommand>, UpsertDeliveryRegionValidator>();
         services.AddScoped<IValidator<SetDeliveryRegionActiveCommand>, SetDeliveryRegionActiveValidator>();
         services.AddScoped<IValidator<ListDeliveryRegionsQuery>, ListDeliveryRegionsValidator>();
+        services.AddScoped<IQueryHandler<GetBusinessDashboardQuery, BusinessDashboardReadModel>, GetBusinessDashboardQueryHandler>();
+        services.AddScoped<IValidator<GetBusinessDashboardQuery>, GetBusinessDashboardQueryValidator>();
         return services;
     }
 }
