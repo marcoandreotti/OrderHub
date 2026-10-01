@@ -158,6 +158,7 @@ onUnmounted(() => request?.abort())
       </div>
       <q-btn
         color="primary"
+        icon="person_add"
         label="Cadastrar cliente"
         :disable="!session.unitId"
         @click="open()"
@@ -195,18 +196,22 @@ onUnmounted(() => request?.abort())
           <td>{{ row.phone }}<br />{{ row.email }}</td>
           <td class="text-center">
             <q-btn
-              flat
-              label="Editar"
+              square
+              class="collection-action-btn"
+              color="primary"
+              icon="edit"
               :aria-label="`Editar ${row.name}`"
               :disable="loading"
               @click="open(row)"
-            /><q-btn
-              flat
-              label="Endereços"
+            ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn><q-btn
+              square
+              class="collection-action-btn"
+              color="secondary"
+              icon="location_on"
               :aria-label="`Endereços de ${row.name}`"
               :disable="loading"
               @click="open(row, true)"
-            />
+            ><q-tooltip>Endereços de {{ row.name }}</q-tooltip></q-btn>
           </td>
         </tr></tbody
     ></q-markup-table>
@@ -274,6 +279,7 @@ onUnmounted(() => request?.abort())
               /><q-btn
                 type="submit"
                 color="primary"
+                icon="save"
                 label="Salvar"
                 :loading="busy"
               />
@@ -304,16 +310,20 @@ onUnmounted(() => request?.abort())
               — {{ item.city }}/{{ item.state }} — {{ item.postalCode }}
             </p>
             <q-btn
-              flat
-              label="Editar endereço"
+              square
+              class="collection-action-btn"
+              color="primary"
+              icon="edit_location_alt"
               :aria-label="`Editar endereço ${item.label}`"
               @click="openAddress(item)"
-            /><q-btn
-              flat
-              label="Remover endereço"
+            ><q-tooltip>Editar endereço {{ item.label }}</q-tooltip></q-btn><q-btn
+              square
+              class="collection-action-btn"
+              color="negative"
+              icon="delete"
               :aria-label="`Remover endereço ${item.label}`"
               @click="askRemove(item)"
-            />
+            ><q-tooltip>Remover endereço {{ item.label }}</q-tooltip></q-btn>
           </div>
           <div class="row justify-end q-gutter-sm">
             <q-btn
@@ -323,6 +333,7 @@ onUnmounted(() => request?.abort())
               @click="addresses = false"
             /><q-btn
               color="primary"
+              icon="add"
               label="Adicionar endereço"
               @click="openAddress()"
             />
@@ -363,6 +374,7 @@ onUnmounted(() => request?.abort())
               /><q-btn
                 type="submit"
                 color="primary"
+                icon="save"
                 label="Salvar endereço"
                 :loading="busy"
               /></div
@@ -388,8 +400,9 @@ onUnmounted(() => request?.abort())
             label="Voltar"
             :disable="busy"
             @click="confirmation = null" /><q-btn
-            color="primary"
-            label="Confirmar"
+            :color="confirmation === 'remove' ? 'negative' : 'primary'"
+            :icon="confirmation === 'remove' ? 'delete' : 'save'"
+            :label="confirmation === 'remove' ? 'Remover endereço' : 'Salvar alterações'"
             :loading="busy"
             @click="save" /></q-card-actions></q-card
     ></q-dialog>

@@ -121,24 +121,24 @@ onUnmounted(() => { alive = false; request.abort() })
               <q-select v-model="hours.dayOfWeek" :options="days" emit-value map-options label="Dia da semana" outlined class="col-12 col-sm-4" :disable="busy" />
               <q-input v-model="hours.opensAt" type="time" label="Abertura" outlined class="col-6 col-sm-3" :rules="[required]" :disable="busy" />
               <q-input v-model="hours.closesAt" type="time" label="Fechamento" outlined class="col-6 col-sm-3" :rules="[required, v => v > hours.opensAt || 'Feche após a abertura']" :disable="busy" />
-              <q-btn label="Remover" flat class="col-12 col-sm-2" :disable="busy" @click="configuration.hours.splice(index, 1)" />
+              <div class="col-12 col-sm-2 hours-remove-cell"><q-btn square color="negative" icon="delete" class="collection-action-btn hours-remove-btn" :aria-label="'Remover intervalo ' + (index + 1)" :disable="busy" @click="configuration.hours.splice(index, 1)"><q-tooltip>Remover intervalo</q-tooltip></q-btn></div>
             </div>
-            <q-btn label="Adicionar intervalo" outline class="q-mb-md" :disable="busy || configuration.hours.length >= 100" @click="configuration.hours.push({ dayOfWeek: 1, opensAt: '09:00', closesAt: '18:00' })" />
+            <q-btn label="Adicionar intervalo" icon="add" outline class="q-mb-md" :disable="busy || configuration.hours.length >= 100" @click="configuration.hours.push({ dayOfWeek: 1, opensAt: '09:00', closesAt: '18:00' })" />
           </template>
-          <div class="q-mt-md"><q-btn type="submit" label="Salvar e continuar" color="primary" :loading="busy" :disable="busy" /></div>
+          <div class="q-mt-md"><q-btn type="submit" icon="save" label="Salvar e continuar" color="primary" :loading="busy" :disable="busy" /></div>
         </q-form>
         <template v-if="step === 'mesas'">
           <p>Mesas são opcionais. Uma nova tentativa após falha de comunicação reutiliza a intenção de cadastro.</p>
           <q-form @submit="createTable" class="row q-col-gutter-sm q-mb-lg">
             <q-input v-model="draft.code" label="Código da mesa" outlined maxlength="30" :rules="[required]" class="col-12 col-sm-4" :disable="busy" />
             <q-input v-model="draft.description" label="Descrição" outlined maxlength="100" class="col-12 col-sm-5" :disable="busy" />
-            <div class="col-12 col-sm-3"><q-btn type="submit" label="Criar mesa" color="primary" :disable="busy" /></div>
+            <div class="col-12 col-sm-3"><q-btn type="submit" icon="add" label="Criar mesa" color="primary" :disable="busy" /></div>
           </q-form>
           <q-card v-for="table in tables" :key="table.id" flat bordered class="q-mb-sm"><q-card-section class="row items-center q-gutter-sm">
             <div class="col"><strong>{{ table.code }}</strong> · {{ table.description }} · {{ table.isActive ? 'Ativa' : 'Inativa' }}</div>
-            <q-btn label="Editar" flat :disable="busy" @click="editing = { ...table }" />
-            <q-btn label="QR Code" flat :disable="busy || !table.isActive" @click="showQr(table)" />
-            <q-btn label="Renovar token" flat :disable="busy" @click="rotating = table" />
+            <q-btn square class="collection-action-btn" color="primary" icon="edit" :aria-label="'Editar mesa ' + table.code" :disable="busy" @click="editing = { ...table }"><q-tooltip>Editar mesa {{ table.code }}</q-tooltip></q-btn>
+            <q-btn square class="collection-action-btn" color="secondary" icon="qr_code_2" :aria-label="'QR Code da mesa ' + table.code" :disable="busy || !table.isActive" @click="showQr(table)"><q-tooltip>QR Code da mesa {{ table.code }}</q-tooltip></q-btn>
+            <q-btn square class="collection-action-btn" color="warning" text-color="dark" icon="key" :aria-label="'Renovar token da mesa ' + table.code" :disable="busy" @click="rotating = table"><q-tooltip>Renovar token da mesa {{ table.code }}</q-tooltip></q-btn>
           </q-card-section></q-card>
           <p v-if="!tables.length">Nenhuma mesa cadastrada.</p>
           <q-pagination v-if="total > 20" v-model="page" :max="Math.ceil(total / 20)" :disable="busy" @update:model-value="run(loadTables)" />
@@ -148,7 +148,7 @@ onUnmounted(() => { alive = false; request.abort() })
           <dl><dt>Dados</dt><dd>{{ progress.dataReady ? 'Prontos' : 'Pendentes' }}</dd><dt>Horários</dt><dd>{{ progress.hoursReady ? 'Configurados' : 'Adicione um horário válido' }}</dd><dt>Acessos</dt><dd>{{ progress.accessReady ? 'Administrador ativo associado' : 'Associe um administrador ativo' }}</dd><dt>Mesas ativas (opcional)</dt><dd>{{ progress.activeTables }}</dd></dl>
           <p v-if="!progress.isReady" role="status">Etapas pendentes: {{ progress.pendingSteps.join(', ') }}.</p>
           <q-btn label="Atualizar prontidão" outline :disable="busy" @click="run(refresh)" class="q-mr-sm" />
-          <q-btn label="Concluir configuração" color="primary" :disable="busy || !progress.isReady" @click="complete" />
+          <q-btn label="Concluir configuração" icon="check" color="primary" :disable="busy || !progress.isReady" @click="complete" />
         </template>
       </q-card-section></q-card>
       <footer class="row justify-between q-mt-lg">
@@ -159,15 +159,17 @@ onUnmounted(() => { alive = false; request.abort() })
     <q-dialog :model-value="!!editing" @update:model-value="!busy && (editing = null)" persistent>
       <q-card v-if="editing" style="width: 480px; max-width: 95vw"><q-card-section><h2 class="text-h6">Editar mesa</h2><ProblemBanner :error="error" /><q-form @submit="saveTable">
         <q-input v-model="editing.code" label="Código" outlined maxlength="30" :rules="[required]" :disable="busy" /><q-input v-model="editing.description" label="Descrição" outlined maxlength="100" :disable="busy" /><q-checkbox v-model="editing.isActive" label="Mesa ativa" :disable="busy" />
-        <div><q-btn label="Cancelar" flat :disable="busy" @click="editing = null" /><q-btn label="Salvar mesa" type="submit" color="primary" :disable="busy" /></div>
+        <div><q-btn label="Cancelar" flat :disable="busy" @click="editing = null" /><q-btn label="Salvar mesa" icon="save" type="submit" color="primary" :disable="busy" /></div>
       </q-form></q-card-section></q-card>
     </q-dialog>
-    <q-dialog :model-value="!!rotating" persistent><q-card><q-card-section><h2 class="text-h6">Renovar token da mesa {{ rotating?.code }}?</h2><p>O QR Code anterior deixará de funcionar imediatamente. Reimprima o novo QR Code.</p><ProblemBanner :error="error" /></q-card-section><q-card-actions><q-btn label="Cancelar" :disable="busy" @click="rotating = null" /><q-btn label="Confirmar renovação" color="primary" :disable="busy" @click="rotate" /></q-card-actions></q-card></q-dialog>
+    <q-dialog :model-value="!!rotating" persistent><q-card><q-card-section><h2 class="text-h6">Renovar token da mesa {{ rotating?.code }}?</h2><p>O QR Code anterior deixará de funcionar imediatamente. Reimprima o novo QR Code.</p><ProblemBanner :error="error" /></q-card-section><q-card-actions><q-btn label="Cancelar" :disable="busy" @click="rotating = null" /><q-btn label="Renovar token" icon="key" color="warning" text-color="dark" :disable="busy" @click="rotate" /></q-card-actions></q-card></q-dialog>
     <q-dialog :model-value="!!qr" @update:model-value="qr = null"><q-card v-if="qr"><q-card-section class="text-center"><h2 class="text-h6">Mesa {{ qr.code }}</h2><img :src="qr.image" :alt="`QR Code da mesa ${qr.code}`" width="320" height="320" style="max-width: 100%; height: auto" /><p><a :href="qr.url" target="_blank" rel="noopener">Abrir página pública da mesa</a></p><a :href="qr.image" :download="`mesa-${qr.code}.png`">Baixar QR Code</a><div class="q-mt-md"><q-btn label="Fechar" @click="qr = null" /></div></q-card-section></q-card></q-dialog>
   </q-page>
 </template>
 <style scoped>
 .onboarding-page { max-width: 1050px; margin: 0 auto; }
+.hours-remove-cell { display: flex; align-items: flex-start; }
+.hours-remove-btn { align-self: flex-start; height: 56px; }
 dt { font-weight: 600; margin-top: 1rem; }
 dd { margin: .25rem 0 1rem; }
 </style>

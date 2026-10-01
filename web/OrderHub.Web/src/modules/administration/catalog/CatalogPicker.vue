@@ -85,11 +85,15 @@ onUnmounted(() => request?.abort())
             ></q-item-section
           ><q-item-section side
             ><q-btn
-              flat
-              label="Selecionar"
+              square
+              class="collection-action-btn"
+              color="primary"
+              icon="add"
               :aria-label="`Selecionar ${item.name}`"
               :disable="loading || excludedIds.includes(item.id)"
-              @click="emit('selected', item)" /></q-item-section></q-item
+              @click="emit('selected', item)"
+              ><q-tooltip>Selecionar {{ item.name }}</q-tooltip></q-btn
+            ></q-item-section></q-item
       ></q-list>
       <p v-if="loading" role="status">Carregando…</p>
       <p v-else-if="!items.length && !error" role="status">Nenhum resultado.</p>

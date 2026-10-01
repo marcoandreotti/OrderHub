@@ -2,7 +2,9 @@
 import { orderStatusTone, type OrderAction } from './actions'
 import type { OrderSummary } from './types'
 
-defineProps<{
+import { computed } from 'vue'
+
+const props = defineProps<{
   order: OrderSummary
   statusLabel: string
   serviceLabel: string
@@ -15,6 +17,18 @@ defineProps<{
   productionDue?: boolean
   nextAction?: OrderAction
 }>()
+
+const actionIcons: Record<OrderAction['transition'], string> = {
+  prepare: 'play_arrow',
+  reject: 'block',
+  cancel: 'cancel',
+  ready: 'check',
+  dispatch: 'local_shipping',
+  complete: 'task_alt'
+}
+const nextActionIcon = computed(() => props.nextAction
+  ? actionIcons[props.nextAction.transition]
+  : undefined)
 
 defineEmits<{
   select: [order: OrderSummary]
@@ -47,8 +61,10 @@ defineEmits<{
     <q-btn
       v-if="nextAction"
       class="order-card-action"
+      square
       color="primary"
       no-caps
+      :icon="nextActionIcon"
       :label="nextAction.label"
       @click="$emit('action', order, nextAction)"
     />
@@ -59,10 +75,9 @@ defineEmits<{
 .order-card-shell {
   margin-bottom: 10px;
   overflow: hidden;
-  border: 2px solid transparent;
+  border: 1px solid var(--oh-border-subtle);
   border-radius: 10px;
   background: var(--oh-surface-raised);
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--oh-text-primary) 10%, transparent);
 }
 .order-card-shell:hover, .order-card-shell.selected { border-color: var(--oh-brand-primary); }
 .order-card-shell.late { border-color: var(--oh-status-urgency); }
@@ -80,6 +95,7 @@ defineEmits<{
   cursor: pointer;
   min-height: 44px;
 }
+.order-card:focus-visible { outline-offset: -3px; }
 .order-card-title { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .order-card-state { color: var(--oh-text-muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; }
 .order-card-state.status-confirmed { padding: 4px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-confirmed) 12%, white); color: var(--oh-status-confirmed); }

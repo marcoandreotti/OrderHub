@@ -129,7 +129,7 @@ onUnmounted(() => request?.abort())
         <h1 class="text-h4 q-my-sm">Formas de pagamento</h1>
         <p>Configure as opções disponíveis para novas cobranças.</p>
       </div>
-      <q-btn color="primary" label="Cadastrar forma" :disable="!session.unitId" @click="open()" />
+      <q-btn color="primary" icon="add" label="Cadastrar forma" :disable="!session.unitId" @click="open()" />
     </header>
     <q-banner v-if="!session.unitId" class="bg-amber-1"
       >Selecione uma unidade autorizada.</q-banner
@@ -178,18 +178,22 @@ onUnmounted(() => request?.abort())
           <td class="text-center">{{ row.isActive ? 'Ativa' : 'Inativa' }}</td>
           <td class="text-center">
             <q-btn
-              flat
-              label="Editar"
+              square
+              class="collection-action-btn"
+              color="primary"
+              icon="edit"
               :aria-label="`Editar forma ${row.name}`"
               :disable="loading"
               @click="open(row)"
-            /><q-btn
-              flat
-              :label="row.isActive ? 'Desativar' : 'Ativar'"
+            ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn><q-btn
+              square
+              class="collection-action-btn"
+              :color="row.isActive ? 'negative' : 'positive'"
+              :icon="row.isActive ? 'toggle_off' : 'toggle_on'"
               :aria-label="`${row.isActive ? 'Desativar' : 'Ativar'} forma ${row.name}`"
               :disable="loading"
               @click="toggle(row)"
-            />
+            ><q-tooltip>{{ row.isActive ? 'Desativar' : 'Ativar' }} forma {{ row.name }}</q-tooltip></q-btn>
           </td>
         </tr></tbody
     ></q-markup-table>
@@ -258,6 +262,7 @@ onUnmounted(() => request?.abort())
               /><q-btn
                 type="submit"
                 color="primary"
+                icon="save"
                 label="Salvar"
                 :loading="busy"
               />
@@ -287,8 +292,9 @@ onUnmounted(() => request?.abort())
             label="Voltar"
             :disable="busy"
             @click="confirmation = null" /><q-btn
-            color="primary"
-            label="Confirmar"
+            :color="confirmation === 'active' && method.isActive ? 'negative' : confirmation === 'active' ? 'positive' : 'primary'"
+            :icon="confirmation === 'active' ? (method.isActive ? 'toggle_off' : 'toggle_on') : 'save'"
+            :label="confirmation === 'active' ? (method.isActive ? 'Desativar forma' : 'Ativar forma') : 'Salvar alterações'"
             :loading="busy"
             @click="save" /></q-card-actions></q-card
     ></q-dialog>

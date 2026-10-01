@@ -292,6 +292,7 @@ onUnmounted(() => request?.abort())
       </div>
       <q-btn
         color="primary"
+        icon="add"
         label="Cadastrar"
         :disable="!session.unitId"
         @click="open()"
@@ -485,10 +486,13 @@ onUnmounted(() => request?.abort())
                   min="0"
                   :rules="[nonnegative]"
                 /><q-btn
-                  flat
-                  label="Remover vínculo"
+                  square
+                  class="collection-action-btn"
+                  color="negative"
+                  icon="delete"
+                  :aria-label="'Remover vínculo com ' + item.name"
                   @click="group.items.splice(index, 1)"
-                />
+                ><q-tooltip>Remover vínculo</q-tooltip></q-btn>
                 <div v-for="(rule, ruleIndex) in (item.compatibilityRules ??= [])" :key="ruleIndex" class="row col-12 items-center q-gutter-sm">
                   <q-select v-model="rule.kind" outlined dense label="Regra" emit-value map-options
                     :options="[{label:'Exige',value:'Requires'},{label:'Exclui',value:'Excludes'}]" style="min-width: 150px" />
@@ -496,12 +500,13 @@ onUnmounted(() => request?.abort())
                     :options="Array.from(new Map(modifierTargets.map(target => [target.groupId, {label:target.groupName,value:target.groupId}])).values())" style="min-width: 180px" />
                   <q-select v-model="rule.targetAdditionalId" outlined dense label="Opção alvo" emit-value map-options
                     :options="targetOptions(rule.targetGroupId)" style="min-width: 200px" />
-                  <q-btn flat label="Remover regra" @click="item.compatibilityRules?.splice(ruleIndex, 1)" />
+                  <q-btn square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover regra ' + (ruleIndex + 1)" @click="item.compatibilityRules?.splice(ruleIndex, 1)"><q-tooltip>Remover regra</q-tooltip></q-btn>
                 </div>
-                <q-btn flat label="Adicionar dependência/exclusão" @click="(item.compatibilityRules ??= []).push({targetGroupId:'',targetAdditionalId:'',kind:'Requires'})" />
+                <q-btn flat icon="add" label="Adicionar dependência/exclusão" @click="(item.compatibilityRules ??= []).push({targetGroupId:'',targetAdditionalId:'',kind:'Requires'})" />
               </div>
               <q-btn
                 outline
+                icon="add"
                 label="Adicionar vínculo"
                 @click="picker = 'additionals'"
               />
@@ -573,13 +578,17 @@ onUnmounted(() => request?.abort())
                   v-model="item.isPrincipal"
                   label="Principal"
                 /><q-btn
-                  flat
-                  label="Remover imagem"
+                  square
+                  class="collection-action-btn"
+                  color="negative"
+                  icon="delete"
+                  :aria-label="'Remover imagem ' + (index + 1)"
                   @click="product.images.splice(index, 1)"
-                />
+                ><q-tooltip>Remover imagem</q-tooltip></q-btn>
               </div>
               <q-btn
                 outline
+                icon="add"
                 label="Adicionar imagem"
                 @click="
                   product.images.push({
@@ -620,13 +629,17 @@ onUnmounted(() => request?.abort())
                   v-model="item.isActive"
                   label="Variação ativa"
                 /><q-btn
-                  flat
-                  label="Remover variação"
+                  square
+                  class="collection-action-btn"
+                  color="negative"
+                  icon="delete"
+                  :aria-label="'Remover variação ' + item.name"
                   @click="product.variations.splice(index, 1)"
-                />
+                ><q-tooltip>Remover variação</q-tooltip></q-btn>
               </div>
               <q-btn
                 outline
+                icon="add"
                 label="Adicionar variação"
                 @click="
                   product.variations.push({
@@ -655,13 +668,17 @@ onUnmounted(() => request?.abort())
                   :rules="[nonnegative]"
                   style="width: 110px"
                 /><q-btn
-                  flat
-                  label="Remover grupo"
+                  square
+                  class="collection-action-btn"
+                  color="negative"
+                  icon="delete"
+                  :aria-label="'Remover grupo ' + item.name"
                   @click="product.additionalGroups.splice(index, 1)"
-                />
+                ><q-tooltip>Remover grupo</q-tooltip></q-btn>
               </div>
               <q-btn
                 outline
+                icon="add"
                 label="Vincular grupo"
                 @click="picker = 'additional-groups'"
               />
@@ -675,6 +692,7 @@ onUnmounted(() => request?.abort())
               /><q-btn
                 type="submit"
                 color="primary"
+                icon="save"
                 label="Salvar"
                 :loading="busy"
               />
@@ -714,7 +732,8 @@ onUnmounted(() => request?.abort())
             :disable="busy"
             @click="confirmation = false" /><q-btn
             color="primary"
-            label="Confirmar"
+            icon="save"
+            label="Salvar alterações"
             :loading="busy"
             @click="save" /></q-card-actions></q-card
     ></q-dialog>

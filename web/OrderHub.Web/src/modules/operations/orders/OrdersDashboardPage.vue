@@ -184,15 +184,14 @@ function elapsed(value: string) {
   <q-page class="operations-page">
     <header class="operations-heading">
       <div>
-        <p class="text-overline text-primary q-mb-xs">CENTRAL OPERACIONAL</p>
         <h1 class="text-h4 q-my-none">{{ route.path.endsWith('/delivery') ? 'Entregas em andamento' : 'Pedidos em andamento' }}</h1>
-        <p class="text-grey-7 q-mb-none">
+        <p class="operations-description q-mb-none">
           Tempo real com reconciliação autoritativa e fallback automático
         </p>
       </div>
       <q-btn
         color="primary"
-        outline
+        unelevated
         no-caps
         label="Atualizar agora"
         :loading="store.loading"
@@ -246,9 +245,14 @@ function elapsed(value: string) {
 
     <div v-else class="operations-workspace">
       <section class="status-board" aria-label="Pedidos por estado" :aria-busy="store.loading">
-        <article v-for="group in grouped" :key="group.status" class="status-column">
+        <article
+          v-for="group in grouped"
+          :key="group.status"
+          class="status-column"
+          :class="`status-column--${orderStatusTone[group.status]}`"
+        >
           <h2 :class="`status-heading--${orderStatusTone[group.status]}`">
-            {{ statusLabels[group.status] }}
+            <span>{{ statusLabels[group.status] }}</span>
             <q-badge :label="group.orders.length" color="grey-8" />
           </h2>
           <h3 v-if="group.immediate.length" class="queue-subheading">Imediatos</h3>
@@ -352,9 +356,11 @@ function elapsed(value: string) {
           <q-btn
             v-for="action in selectedActions"
             :key="action.transition"
+            square
             :color="action.destructive ? 'negative' : 'primary'"
             :outline="action.destructive"
             no-caps
+            :icon="action.transition === 'prepare' ? 'play_arrow' : action.transition === 'reject' ? 'block' : action.transition === 'cancel' ? 'cancel' : action.transition === 'ready' ? 'check' : action.transition === 'dispatch' ? 'local_shipping' : 'task_alt'"
             :label="action.label"
             :loading="actionBusy"
             @click="requestAction(action)"
@@ -375,7 +381,7 @@ function elapsed(value: string) {
         </q-card-section>
         <q-card-actions align="right">
           <q-btn v-close-popup flat no-caps label="Voltar" />
-          <q-btn color="negative" no-caps label="Confirmar" :loading="actionBusy" @click="execute()" />
+          <q-btn :color="pendingAction?.destructive ? 'negative' : 'primary'" no-caps icon="check" :label="pendingAction?.label ? `Confirmar: ${pendingAction.label.toLowerCase()}` : 'Confirmar ação'" :loading="actionBusy" @click="execute()" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -383,21 +389,61 @@ function elapsed(value: string) {
 </template>
 
 <style scoped>
-.operations-page { padding: 24px; background: var(--oh-surface-page); min-height: calc(100vh - 72px); }
+.operations-page { min-height: calc(100vh - 72px); padding: 28px; background: var(--oh-surface-page); }
 .operations-heading, .detail-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
-.operations-heading { margin-bottom: 16px; }
-.operations-filters { display: grid; grid-template-columns: repeat(3, minmax(160px, 240px)); gap: 12px; margin-bottom: 20px; }
+.operations-heading { margin-bottom: 22px; }
+.operations-heading h1 { color: var(--oh-text-primary); font-size: 1.85rem; font-weight: 750; letter-spacing: -.025em; }
+.operations-description { margin-top: 5px; color: var(--oh-text-muted); }
+.operations-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(160px, 240px));
+  gap: 12px;
+  margin-bottom: 20px;
+  padding: 14px;
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: var(--oh-border-radius);
+  background: var(--oh-surface-raised);
+}
 .operations-workspace { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 420px); gap: 20px; align-items: start; }
 .status-board { display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 16px; padding-bottom: 12px; }
-.status-column { min-height: 240px; padding: 12px; border-radius: var(--oh-border-radius); background: color-mix(in srgb, var(--oh-border-subtle) 42%, var(--oh-surface-page)); }
-.status-column h2 { display: flex; justify-content: space-between; align-items: center; margin: 0 0 12px; font-size: 1rem; }
+.status-column {
+  --status-accent: var(--oh-border-subtle);
+  min-width: 0;
+  min-height: 220px;
+  padding: 14px;
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: var(--oh-border-radius);
+  background: var(--oh-surface-raised);
+}
+.status-column--confirmed { --status-accent: var(--oh-status-confirmed); }
+.status-column--preparing { --status-accent: var(--oh-status-warning); }
+.status-column--ready, .status-column--success { --status-accent: var(--oh-status-success); }
+.status-column--info { --status-accent: var(--oh-status-info); }
+.status-column--danger { --status-accent: var(--oh-status-danger); }
+.status-column h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 16px; font-size: 1rem; font-weight: 750; }
+.status-column h2::before {
+  content: '';
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--status-accent);
+}
+.status-column :deep(.q-badge) { min-width: 26px; justify-content: center; margin-left: auto; border-radius: 7px; }
 .status-heading--confirmed { color: var(--oh-status-confirmed); }
 .status-heading--preparing { color: var(--oh-status-warning-text); }
 .status-heading--ready { color: var(--oh-status-success-text); }
 .status-heading--success { color: var(--oh-status-success-text); }
 .status-heading--info { color: var(--oh-status-info); }
 .status-heading--danger { color: var(--oh-status-cancelled); }
-.empty-state { color: var(--oh-text-muted); font-size: .875rem; }
+.empty-state {
+  margin: 0;
+  padding: 14px 12px;
+  border: 1px dashed var(--oh-border-subtle);
+  border-radius: 8px;
+  color: var(--oh-text-muted);
+  font-size: .875rem;
+}
 .queue-subheading { margin: 12px 0 8px; font-size: .9rem; color: var(--oh-text-muted); }
 .order-detail { position: sticky; top: 92px; max-height: calc(100vh - 116px); overflow: auto; padding: 20px; border-radius: var(--oh-border-radius); background: var(--oh-surface-raised); box-shadow: 0 8px 30px color-mix(in srgb, var(--oh-text-primary) 12%, transparent); }
 .detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -412,12 +458,13 @@ function elapsed(value: string) {
 .confirmation-card { width: min(92vw, 520px); }
 @media (max-width: 1100px) {
   .operations-workspace { grid-template-columns: 1fr; }
-  .status-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-board { grid-template-columns: repeat(2, minmax(230px, 1fr)); }
   .order-detail { position: static; max-height: none; }
 }
 @media (max-width: 700px) {
-  .operations-page { padding: 16px; }
+  .operations-page { padding: 20px 16px; }
   .operations-heading { align-items: flex-start; flex-direction: column; }
+  .operations-heading h1 { font-size: 1.55rem; }
   .operations-filters { grid-template-columns: 1fr; }
   .status-board { grid-template-columns: 1fr; }
 }

@@ -83,7 +83,7 @@ onBeforeUnmount(() => { clearTimeout(timer); document.removeEventListener('visib
         <section v-if="canCancel" class="cancel-panel">
           <h3>Precisa cancelar?</h3>
           <q-input v-model="reason" label="Motivo (opcional)" />
-          <q-btn outline color="negative" label="Cancelar pedido"
+          <q-btn outline color="negative" icon="cancel" label="Cancelar pedido"
             :loading="cancelling" :disable="cancelling" @click="cancel" />
         </section>
         <p v-else-if="!terminalOrderStatuses.has(order.status)">

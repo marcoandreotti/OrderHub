@@ -531,7 +531,7 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
           </fieldset>
           <div v-if="simulation" class="grand-total">Total {{ money(simulation.total) }}</div>
           <div class="flow-actions"><q-btn flat label="Voltar ao carrinho" @click="step = 'cart'" />
-            <q-btn type="submit" label="Confirmar pedido" color="primary"
+            <q-btn type="submit" icon="shopping_cart_checkout" label="Confirmar pedido" color="primary"
               :loading="submitting" :disable="submitting || !canCheckout" /></div>
         </q-form>
       </main>
@@ -541,7 +541,7 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
         <p>Pedido nº <strong>{{ confirmation?.number }}</strong></p>
         <p>Total {{ money(confirmation?.total ?? 0) }}</p>
         <p class="public-reference">Referência: {{ confirmation?.reference }}</p>
-        <q-btn label="Acompanhar pedido" color="primary"
+          <q-btn icon="receipt_long" label="Acompanhar pedido" color="primary"
           @click="router.push('/order/track/' + confirmation?.reference)" />
       </main>
     </template>
@@ -587,7 +587,7 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
             <strong>{{ money(composerUnitPrice * Math.max(quantity, 1)) }}</strong>
           </div>
           <q-btn flat label="Cancelar" @click="selected = undefined" />
-          <q-btn color="primary" label="Adicionar" @click="addProduct" />
+          <q-btn color="primary" icon="add_shopping_cart" label="Adicionar" @click="addProduct" />
         </q-card-actions>
       </q-card>
     </q-dialog>

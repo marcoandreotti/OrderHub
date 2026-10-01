@@ -18,6 +18,8 @@ const elapsed = computed(() => {
 const isLate = computed(() => props.now - Date.parse(props.ticket.confirmedAt) >= 15 * 60_000)
 const actionLabel = computed(() => props.ticket.action === 'StartPreparation'
   ? 'Iniciar preparo' : 'Marcar pronto')
+const actionIcon = computed(() => props.ticket.action === 'StartPreparation'
+  ? 'play_arrow' : 'check')
 const priorityLabel = computed(() => props.ticket.status === 'Preparing'
   ? 'Em preparo' : 'Aguardando preparo')
 const serviceLabel = computed(() => {
@@ -58,9 +60,11 @@ const serviceLabel = computed(() => {
 
     <q-btn
       class="ticket-action"
+      square
       color="primary"
       unelevated
       no-caps
+      :icon="actionIcon"
       :label="actionLabel"
       :loading="busyId === ticket.id"
       :disable="busyId !== null && busyId !== ticket.id"

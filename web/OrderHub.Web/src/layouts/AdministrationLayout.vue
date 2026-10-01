@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../modules/session/store'
+import AppearanceControl from '../components/AppearanceControl.vue'
 const drawer = ref(false)
 const session = useSessionStore()
 const router = useRouter()
@@ -31,7 +32,7 @@ async function logout() {
 </script>
 <template>
   <q-layout view="hHh lpR fFf" data-surface="administration">
-    <q-header bordered class="bg-white text-dark">
+    <q-header bordered class="administration-header">
       <a class="skip-link" href="#admin-content">Ir para o conteúdo</a>
       <q-toolbar class="q-px-md q-py-sm administration-toolbar">
         <q-btn flat round aria-label="Abrir navegação" @click="drawer = !drawer"
@@ -43,6 +44,7 @@ async function logout() {
         <span class="administration-active-unit" aria-label="Unidade ativa">
           {{ activeUnitName }}
         </span>
+        <AppearanceControl />
         <q-btn flat no-caps label="Sair" @click="logout" />
       </q-toolbar>
     </q-header>
@@ -70,6 +72,14 @@ async function logout() {
           class="q-mb-lg"
         />
         <q-list>
+          <q-item
+            v-if="session.can('order-read')"
+            clickable
+            to="/operations"
+            class="admin-nav-link rounded-borders admin-nav-link--operations"
+          >
+            <q-item-section>Voltar às operações</q-item-section>
+          </q-item>
           <q-item
             v-if="session.context?.isPlatformUser"
             clickable
@@ -173,5 +183,9 @@ async function logout() {
   background: rgb(255 255 255 / 12%);
   color: var(--oh-brand-primary) !important;
   font-weight: 700;
+}
+.administration-header {
+  background: var(--oh-surface-raised);
+  color: var(--oh-text-primary);
 }
 </style>

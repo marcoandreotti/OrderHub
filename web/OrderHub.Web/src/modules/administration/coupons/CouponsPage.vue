@@ -132,7 +132,7 @@ onUnmounted(() => request?.abort())
         <h1 class="text-h4 q-my-sm">Cupons</h1>
         <p>Regras, validade e disponibilidade das promoções da unidade.</p>
       </div>
-      <q-btn color="primary" label="Cadastrar cupom" :disable="!session.unitId" @click="open()" />
+      <q-btn color="primary" icon="add" label="Cadastrar cupom" :disable="!session.unitId" @click="open()" />
     </header>
     <q-banner v-if="!session.unitId" class="bg-amber-1"
       >Selecione uma unidade autorizada.</q-banner
@@ -192,18 +192,22 @@ onUnmounted(() => request?.abort())
           <td class="text-center">{{ row.isActive ? 'Ativo' : 'Inativo' }}</td>
           <td class="text-center">
             <q-btn
-              flat
-              label="Editar"
+              square
+              class="collection-action-btn"
+              color="primary"
+              icon="edit"
               :aria-label="`Editar cupom ${row.code}`"
               :disable="loading"
               @click="open(row)"
-            /><q-btn
-              flat
-              :label="row.isActive ? 'Desativar' : 'Ativar'"
+            ><q-tooltip>Editar cupom {{ row.code }}</q-tooltip></q-btn><q-btn
+              square
+              class="collection-action-btn"
+              :color="row.isActive ? 'negative' : 'positive'"
+              :icon="row.isActive ? 'toggle_off' : 'toggle_on'"
               :aria-label="`${row.isActive ? 'Desativar' : 'Ativar'} cupom ${row.code}`"
               :disable="loading"
               @click="toggle(row)"
-            />
+            ><q-tooltip>{{ row.isActive ? 'Desativar' : 'Ativar' }} cupom {{ row.code }}</q-tooltip></q-btn>
           </td>
         </tr></tbody
     ></q-markup-table>
@@ -343,6 +347,7 @@ onUnmounted(() => request?.abort())
               /><q-btn
                 type="submit"
                 color="primary"
+                icon="save"
                 label="Salvar"
                 :loading="busy"
               />
@@ -372,8 +377,9 @@ onUnmounted(() => request?.abort())
             label="Voltar"
             :disable="busy"
             @click="confirmation = null" /><q-btn
-            color="primary"
-            label="Confirmar"
+            :color="confirmation === 'active' && coupon.isActive ? 'negative' : confirmation === 'active' ? 'positive' : 'primary'"
+            :icon="confirmation === 'active' ? (coupon.isActive ? 'toggle_off' : 'toggle_on') : 'save'"
+            :label="confirmation === 'active' ? (coupon.isActive ? 'Desativar cupom' : 'Ativar cupom') : 'Salvar alterações'"
             :loading="busy"
             @click="save" /></q-card-actions></q-card
     ></q-dialog>

@@ -124,6 +124,7 @@ onUnmounted(() => {
           <q-btn
             unelevated
             color="primary"
+            :icon="challengeId ? 'verified' : 'login'"
             type="submit"
             :label="challengeId ? 'Confirmar acesso' : 'Continuar'"
             :loading="busy"

@@ -70,7 +70,7 @@ onBeforeUnmount(() => controller?.abort())
               <q-input class="col" v-model.number="form.fee" label="Taxa (R$)" type="number" min="0" step="0.01" required />
               <q-input class="col" v-model.number="form.estimatedMinutes" label="Prazo (min)" type="number" min="1" max="1440" required />
             </div>
-            <div class="q-gutter-sm"><q-btn color="primary" :loading="busy" type="submit" :label="editingId ? 'Salvar alterações' : 'Adicionar região'" />
+            <div class="q-gutter-sm"><q-btn color="primary" :icon="editingId ? 'save' : 'add'" :loading="busy" type="submit" :label="editingId ? 'Salvar alterações' : 'Adicionar região'" />
               <q-btn v-if="editingId" flat label="Cancelar edição" @click="edit()" /></div>
           </q-form>
         </q-card-section></q-card>
@@ -83,8 +83,8 @@ onBeforeUnmount(() => controller?.abort())
             <q-item v-for="region in regions" :key="region.id" class="q-px-none">
               <q-item-section><q-item-label>{{ region.name }} · {{ region.isActive ? 'Ativa' : 'Inativa' }}</q-item-label>
                 <q-item-label caption>CEP {{ region.postalCodeFrom }}–{{ region.postalCodeTo }} · R$ {{ region.fee.toFixed(2) }} · {{ region.estimatedMinutes }} min</q-item-label></q-item-section>
-              <q-item-section side><div class="q-gutter-xs"><q-btn flat dense label="Editar" @click="edit(region)" />
-                <q-btn flat dense :color="region.isActive ? 'negative' : 'positive'" :label="region.isActive ? 'Desativar' : 'Ativar'" :loading="busy" @click="toggle(region)" /></div></q-item-section>
+              <q-item-section side><div class="row q-gutter-xs"><q-btn square class="collection-action-btn" color="primary" icon="edit" :aria-label="`Editar região ${region.name}`" @click="edit(region)"><q-tooltip>Editar {{ region.name }}</q-tooltip></q-btn>
+                <q-btn square class="collection-action-btn" :color="region.isActive ? 'negative' : 'positive'" :icon="region.isActive ? 'toggle_off' : 'toggle_on'" :aria-label="`${region.isActive ? 'Desativar' : 'Ativar'} região ${region.name}`" :loading="busy" @click="toggle(region)"><q-tooltip>{{ region.isActive ? 'Desativar' : 'Ativar' }} {{ region.name }}</q-tooltip></q-btn></div></q-item-section>
             </q-item>
           </q-list>
           <p v-else class="text-grey-7 q-mt-md">Nenhuma região configurada. Entregas ficarão indisponíveis até ativar uma cobertura.</p>

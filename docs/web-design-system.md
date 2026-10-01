@@ -170,6 +170,26 @@ Esses tokens são oficiais enquanto existirem no código, mas formam apenas a fu
 Os estados de urgência e erro devem ser acompanhados por texto ou ícone; a cor nunca
 é o único sinal.
 
+### Aparência clara e escura
+
+A aplicação oferece três preferências: **Sistema**, **Claro** e **Escuro**. Sistema é o
+padrão inicial e acompanha `prefers-color-scheme`; Claro e Escuro são escolhas explícitas.
+A preferência fica no armazenamento local do navegador (`orderhub.appearance-mode`) e é
+sincronizada entre abas abertas no mesmo navegador. Ela não depende da conta nem é
+sincronizada entre dispositivos.
+
+`src/themes/_tokens.scss` define os mesmos tokens semânticos nas duas aparências. A raiz
+`data-theme` escolhe a paleta, enquanto o boot `appearance` e o plugin Dark do Quasar
+mantêm páginas, controles e overlays na mesma escolha. Novos estilos devem consumir os
+tokens (`--oh-surface-*`, `--oh-text-*`, `--oh-border-*`, `--oh-status-*`) em vez de
+fixar branco, preto ou cinzas de uma única aparência.
+
+O modo escuro preserva o grafite e o laranja da marca, mas usa superfícies elevadas,
+texto e variantes semânticas com contraste apropriado. Public pode aplicar as cores e a
+tipografia do Tenant somente em Claro; em Escuro mantém superfícies escuras e adapta as
+cores de marca para preservar legibilidade. Essa personalização não altera os tokens
+globais nem as outras superfícies.
+
 ### Compatibilidade
 
 Os aliases legados `--oh-color-*` foram removidos depois da migração dos últimos
@@ -246,6 +266,17 @@ Não promover componentes automaticamente. Também não aumentar indefinidamente
 - Usar quando: uma página, painel ou operação precisa comunicar falha recuperável ou erro conhecido da API.
 - Não usar quando: o erro pertence exclusivamente a um campo de formulário ou uma mensagem transitória de sucesso é suficiente.
 
+#### AppearanceControl
+
+- Caminho: `web/OrderHub.Web/src/components/AppearanceControl.vue`.
+- Classificação: Global; controle único de preferência visual usado pelos shells oficiais.
+- Propósito: escolher Sistema, Claro ou Escuro e apresentar a opção atual.
+- Usar uma vez no cabeçalho de Public, Administration, Operations/KDS e Platform.
+- A preferência e a aplicação dos tokens pertencem a `src/themes/appearance.ts`; não
+  duplicar estado ou persistência dentro dos layouts.
+- Não substituir o tema institucional de Operations/KDS nem expandir cores do Tenant
+  para fora do subtree Public.
+
 Não existem atualmente `AppButton`, `AppCard`, `AppDialog`, `AppStatus`, `AppPageHeader` ou equivalentes oficiais. Antes de criar qualquer um deles, comprovar o padrão, pesquisar consumidores e documentar a decisão aqui.
 
 ### Componentes de feature identificados
@@ -294,6 +325,17 @@ Antes de usar diretamente `QBtn`, `QDialog`, `QCard`, `QInput`, `QTable`, `QBann
 5. não criar wrapper que apenas replique props sem acrescentar semântica, comportamento ou consistência.
 
 ## Padrões de experiência
+
+### Ações em coleções e confirmações
+
+- Ações contextuais repetidas em tabelas, grids e listas usam `QBtn` quadrado (`square`) com ícone, alvo mínimo de 44 × 44 px e a classe `collection-action-btn`.
+- Botões apenas com ícone devem ter `aria-label`; use `QTooltip` com a mesma ação em linguagem clara. A dica complementa o nome acessível e não substitui uma ação que precise permanecer visível.
+- Escolha cor e ícone de acordo com a consequência: ações comuns usam `primary`/`secondary`; ativar ou reativar usa `positive`; desativar, remover ou revogar usa `negative`. Estado e ação também devem ser expressos por texto acessível, não somente pela cor.
+- Em Operations/KDS, mantenha visível o rótulo da transição junto ao ícone quando a equipe precisa reconhecer a próxima etapa rapidamente.
+- Ações primárias que salvam, criam, enviam ou confirmam usam ícone à esquerda e rótulo visível que nomeia a operação (por exemplo, “Salvar alterações”, “Adicionar região” ou “Confirmar pedido”). Preserve loading, disabled e o esquema semântico de cor.
+- Confirmações de efeitos destrutivos nomeiam o efeito no próprio botão (“Remover endereço”, “Desativar cupom”); evite o rótulo genérico “Confirmar” quando a ação puder ser descrita diretamente.
+- Botões de navegação, voltar/fechar, pesquisa, atualização e recuperação mantêm o tratamento apropriado à sua função; não recebem aparência de ação de coleção por estarem próximos dela.
+- Use ícones Material já incluídos pelo projeto, sem adicionar uma biblioteca ou wrapper genérico de botão.
 
 ### Estados de dados
 

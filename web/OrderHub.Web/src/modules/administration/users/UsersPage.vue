@@ -27,6 +27,15 @@ const notification = ref('')
 const confirmation = ref<{ message: string; run: () => Promise<void> } | null>(
   null
 )
+const confirmationButton = computed(() => {
+  const message = confirmation.value?.message ?? ''
+  if (message.startsWith('Conceder')) return { label: 'Conceder acesso', icon: 'person_add', color: 'positive' }
+  if (message.startsWith('Remover')) return { label: 'Remover acesso', icon: 'person_remove', color: 'negative' }
+  if (message.startsWith('Ativar')) return { label: 'Ativar usuário', icon: 'toggle_on', color: 'positive' }
+  if (message.startsWith('Desativar')) return { label: 'Desativar usuário', icon: 'toggle_off', color: 'negative' }
+  if (message.startsWith('Revogar')) return { label: 'Revogar acesso', icon: 'block', color: 'negative' }
+  return { label: 'Confirmar', icon: 'check', color: 'primary' }
+})
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 20)))
 const availableRoles = computed(() =>
   roles.filter((role) => role.value !== 1 || session.can('ownership'))
@@ -253,13 +262,14 @@ onUnmounted(() => {
           </td>
           <td>
             <q-btn
-              flat
-              no-caps
-              label="Gerenciar"
+              square
+              class="collection-action-btn"
+              color="primary"
+              icon="manage_accounts"
               :aria-label="`Gerenciar ${user.name}`"
               :disable="loading"
               @click="open(user)"
-            />
+            ><q-tooltip>Gerenciar {{ user.name }}</q-tooltip></q-btn>
           </td>
         </tr>
       </tbody>
@@ -352,6 +362,7 @@ onUnmounted(() => {
                 @click="editor = false"
               /><q-btn
                 color="primary"
+                icon="save"
                 label="Salvar"
                 type="submit"
                 :loading="busy"
@@ -386,8 +397,9 @@ onUnmounted(() => {
             label="Cancelar"
             :disable="busy"
             @click="confirmation = null" /><q-btn
-            color="primary"
-            label="Confirmar"
+            :color="confirmationButton.color"
+            :icon="confirmationButton.icon"
+            :label="confirmationButton.label"
             :loading="busy"
             @click="confirm" /></q-card-actions></q-card
     ></q-dialog>

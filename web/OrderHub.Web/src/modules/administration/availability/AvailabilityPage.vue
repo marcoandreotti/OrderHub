@@ -90,7 +90,7 @@ onUnmounted(() => controller?.abort())
     <div v-else-if="configuration" class="q-gutter-lg">
       <q-card flat bordered><q-card-section><h2 class="text-h6">Fuso da unidade</h2>
         <div class="row q-gutter-md items-start"><q-input v-model="configuration.timeZoneId" outlined label="Fuso IANA" hint="Ex.: America/Sao_Paulo" class="col" />
-          <q-btn color="primary" label="Salvar fuso" :loading="busy" @click="execute(() => availabilityClient.timeZone(session.unitId, configuration!), 'Fuso atualizado.')" /></div>
+          <q-btn color="primary" icon="save" label="Salvar fuso" :loading="busy" @click="execute(() => availabilityClient.timeZone(session.unitId, configuration!), 'Fuso atualizado.')" /></div>
       </q-card-section></q-card>
 
       <q-card v-if="scheduling" flat bordered><q-card-section><h2 class="text-h6">Pedidos agendados</h2>
@@ -103,7 +103,7 @@ onUnmounted(() => controller?.abort())
             <q-input v-model.number="policy.horizonDays" type="number" min="1" max="90" outlined label="Horizonte (dias)" class="col-12 col-md-4" />
             <q-input v-model.number="policy.maximumOrdersPerSlot" type="number" min="1" clearable outlined label="Máx. pedidos por horário (vazio = ilimitado)" class="col-12 col-md-4" />
           </div>
-          <q-btn color="primary" label="Salvar configuração" :loading="busy" @click="execute(() => availabilityClient.saveScheduling(session.unitId, policy), 'Configuração de agendamento atualizada.')" />
+          <q-btn color="primary" icon="save" label="Salvar configuração" :loading="busy" @click="execute(() => availabilityClient.saveScheduling(session.unitId, policy), 'Configuração de agendamento atualizada.')" />
         </div>
       </q-card-section></q-card>
 
@@ -116,32 +116,36 @@ onUnmounted(() => controller?.abort())
           <q-input v-if="exception.isOpen" v-model="exception.closesAt" type="time" outlined label="Fecha" class="col-6 col-md-2" />
           <q-input v-model="exception.reason" outlined label="Motivo" class="col-12 col-md-4" />
         </div>
-        <q-btn outline label="Adicionar exceção" class="q-mt-md" @click="addException" />
+        <q-btn outline icon="add" label="Adicionar exceção" class="q-mt-md" @click="addException" />
         <q-list bordered separator class="q-mt-md"><q-item v-for="(item,index) in configuration.exceptions" :key="item.date + '-' + (item.serviceType ?? '')">
           <q-item-section>{{ item.date }} · {{ item.serviceType ?? 'Todas' }} · {{ item.isOpen ? item.opensAt + '–' + item.closesAt : 'Fechado' }}<small>{{ item.reason }}</small></q-item-section>
-          <q-item-section side><q-btn flat label="Remover" @click="configuration.exceptions.splice(index,1)" /></q-item-section>
+          <q-item-section side><q-btn square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover exceção de ' + item.date" @click="configuration.exceptions.splice(index,1)"><q-tooltip>Remover exceção</q-tooltip></q-btn></q-item-section>
         </q-item></q-list>
-        <q-btn color="primary" label="Salvar exceções" class="q-mt-md" :loading="busy" @click="execute(() => availabilityClient.exceptions(session.unitId, configuration!.exceptions), 'Exceções atualizadas.')" />
+        <q-btn color="primary" icon="save" label="Salvar exceções" class="q-mt-md" :loading="busy" @click="execute(() => availabilityClient.exceptions(session.unitId, configuration!.exceptions), 'Exceções atualizadas.')" />
       </q-card-section></q-card>
 
       <q-card flat bordered><q-card-section><h2 class="text-h6">Pausas por modalidade</h2>
         <q-list v-if="configuration.pauses.length" bordered separator class="q-mb-md"><q-item v-for="item in configuration.pauses" :key="item.serviceType">
           <q-item-section><strong>{{ item.serviceType }}</strong><small>{{ item.reason || 'Pausa manual' }} · até {{ item.endsAt ? new Date(item.endsAt).toLocaleString('pt-BR') : 'reativação manual' }}</small></q-item-section>
-          <q-item-section side><q-btn flat label="Retomar" @click="execute(() => availabilityClient.resume(session.unitId, item.serviceType), 'Modalidade retomada.')" /></q-item-section>
+          <q-item-section side><q-btn square class="collection-action-btn" color="positive" icon="play_arrow" :aria-label="'Retomar ' + item.serviceType" @click="execute(() => availabilityClient.resume(session.unitId, item.serviceType), 'Modalidade retomada.')"><q-tooltip>Retomar modalidade</q-tooltip></q-btn></q-item-section>
         </q-item></q-list>
         <div class="row q-col-gutter-md"><q-select v-model="pause.serviceType" outlined label="Modalidade" :options="serviceTypes" class="col-12 col-md-3" />
           <q-input v-model="pause.endsAt" type="datetime-local" outlined label="Até (opcional)" class="col-12 col-md-3" />
           <q-input v-model="pause.reason" outlined label="Motivo" class="col-12 col-md-4" />
-          <q-btn color="warning" text-color="dark" label="Pausar" :loading="busy" @click="execute(() => availabilityClient.pause(session.unitId, pause.serviceType, pause.endsAt || null, pause.reason), 'Modalidade pausada.')" /></div>
+          <div class="col-12 col-md-2 pause-submit-cell"><q-btn color="warning" text-color="dark" icon="pause_circle" label="Pausar" class="pause-submit-btn" :loading="busy" @click="execute(() => availabilityClient.pause(session.unitId, pause.serviceType, pause.endsAt || null, pause.reason), 'Modalidade pausada.')" /></div></div>
       </q-card-section></q-card>
 
       <q-card flat bordered><q-card-section><h2 class="text-h6">Indisponibilidade de oferta</h2>
         <div class="row q-col-gutter-md"><q-select v-model="offer.key" outlined emit-value map-options label="Produto ou opção" :options="offerOptions" class="col-12 col-md-5" />
           <q-input v-model="offer.endsAt" type="datetime-local" outlined label="Até (opcional)" class="col-12 col-md-3" />
           <q-input v-model="offer.reason" outlined label="Motivo" class="col-12 col-md-4" /></div>
-        <div class="q-mt-md q-gutter-sm"><q-btn v-if="selectedOffer?.available !== false" color="warning" text-color="dark" label="Indisponibilizar" :disable="!offer.key" :loading="busy" @click="execute(() => { const value=offerTarget(); return availabilityClient.unavailable(session.unitId,value.kind,value.id,offer.endsAt || null,offer.reason) }, 'Oferta indisponibilizada.')" />
-          <q-btn v-else color="positive" label="Reativar oferta" :loading="busy" @click="execute(() => { const value=offerTarget(); return availabilityClient.reactivate(session.unitId,value.kind,value.id) }, 'Oferta reativada.')" /></div>
+        <div class="q-mt-md q-gutter-sm"><q-btn v-if="selectedOffer?.available !== false" color="warning" text-color="dark" icon="block" label="Indisponibilizar" :disable="!offer.key" :loading="busy" @click="execute(() => { const value=offerTarget(); return availabilityClient.unavailable(session.unitId,value.kind,value.id,offer.endsAt || null,offer.reason) }, 'Oferta indisponibilizada.')" />
+          <q-btn v-else color="positive" icon="check_circle" label="Reativar oferta" :loading="busy" @click="execute(() => { const value=offerTarget(); return availabilityClient.reactivate(session.unitId,value.kind,value.id) }, 'Oferta reativada.')" /></div>
       </q-card-section></q-card>
     </div>
   </q-page>
 </template>
+<style scoped>
+.pause-submit-cell { display: flex; align-items: flex-start; }
+.pause-submit-btn { height: 56px; }
+</style>

@@ -26,12 +26,14 @@ const emit = defineEmits<{
         <td class="text-center">{{ row.isActive ? 'Ativo' : 'Inativo' }}</td>
         <td class="text-center">
           <q-btn
-            flat
-            label="Editar"
+            square
+            class="collection-action-btn"
+            color="primary"
+            icon="edit"
             :aria-label="`Editar ${row.name}`"
             :disable="loading"
             @click="emit('edit', row)"
-          />
+          ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn>
         </td>
       </tr>
     </tbody>

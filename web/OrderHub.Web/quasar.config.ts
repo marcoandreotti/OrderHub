@@ -1,8 +1,9 @@
 import { defineConfig } from '#q-app/wrappers'
 
 export default defineConfig(() => ({
-  boot: ['http'],
+  boot: ['appearance', 'http'],
   css: ['app.scss'],
+  extras: ['material-icons'],
   build: {
     target: {
       browser: ['es2022'],
@@ -26,7 +27,7 @@ export default defineConfig(() => ({
     }
   },
   framework: {
-    iconSet: 'svg-material-icons',
+    iconSet: 'material-icons',
     config: {
       brand: {
         primary: '#f97316',
@@ -38,6 +39,6 @@ export default defineConfig(() => ({
         info: '#2563eb'
       }
     },
-    plugins: []
+    plugins: ['Dark']
   }
 }))

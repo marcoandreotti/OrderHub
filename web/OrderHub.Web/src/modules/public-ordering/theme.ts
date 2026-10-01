@@ -2,7 +2,8 @@ import type { PublicContext } from './types'
 
 const defaults = {
   primary: '#f97316', onPrimary: '#111827', secondary: '#1f2937',
-  background: '#f8fafc', text: '#374151'
+  background: '#f8fafc', text: '#374151', darkSurface: '#1f2937',
+  darkMuted: '#cbd5e1'
 }
 function hex(value: string) {
   if (!/^#[0-9a-f]{6}$/i.test(value)) return null
@@ -38,13 +39,19 @@ export function applyPublicTheme(value: PublicContext, surface = publicThemeSurf
   const primaryText = contrast(primary, '#ffffff') >= 4.5 ? primary : '#c2410c'
   const fallbackSecondary = contrast(defaults.secondary, background) >= 3 ? defaults.secondary : text
   const secondary = contrast(value.theme.secondaryColor, background) >= 3 ? value.theme.secondaryColor : fallbackSecondary
-  surface.style.setProperty('--oh-brand-primary', primary)
-  surface.style.setProperty('--oh-brand-primary-text', primaryText)
-  surface.style.setProperty('--oh-brand-on-primary', onPrimary)
-  surface.style.setProperty('--oh-brand-secondary', secondary)
-  surface.style.setProperty('--oh-surface-page', background)
-  surface.style.setProperty('--oh-text-primary', text)
-  surface.style.setProperty('--oh-font-family', /^[\w ,'-]+$/.test(value.theme.fontFamily)
+  const primaryTextDark = contrast(primary, defaults.darkSurface) >= 4.5 ? primary : '#fdba74'
+  const secondaryDark = contrast(value.theme.secondaryColor, defaults.darkSurface) >= 4.5
+    ? value.theme.secondaryColor
+    : defaults.darkMuted
+  surface.style.setProperty('--oh-public-theme-background', background)
+  surface.style.setProperty('--oh-public-theme-text', text)
+  surface.style.setProperty('--oh-public-brand-primary', primary)
+  surface.style.setProperty('--oh-public-brand-primary-text', primaryText)
+  surface.style.setProperty('--oh-public-brand-primary-text-dark', primaryTextDark)
+  surface.style.setProperty('--oh-public-brand-on-primary', onPrimary)
+  surface.style.setProperty('--oh-public-brand-secondary', secondary)
+  surface.style.setProperty('--oh-public-brand-secondary-dark', secondaryDark)
+  surface.style.setProperty('--oh-public-font-family', /^[\w ,'-]+$/.test(value.theme.fontFamily)
     ? value.theme.fontFamily : 'system-ui, sans-serif')
   return true
 }

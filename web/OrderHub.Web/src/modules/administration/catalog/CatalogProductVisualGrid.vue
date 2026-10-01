@@ -56,12 +56,14 @@ function associations(product: Product) {
         <strong>A partir de {{ money.format(product.basePrice) }}</strong>
         <p>{{ associations(product) }}</p>
         <q-btn
-          flat
-          label="Editar produto"
+          square
+          class="collection-action-btn"
+          color="primary"
+          icon="edit"
           :aria-label="`Editar ${product.name}`"
           :disable="loading"
           @click="emit('edit', product)"
-        />
+        ><q-tooltip>Editar {{ product.name }}</q-tooltip></q-btn>
       </div>
     </article>
   </div>

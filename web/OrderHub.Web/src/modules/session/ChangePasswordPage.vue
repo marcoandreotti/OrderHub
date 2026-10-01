@@ -93,6 +93,7 @@ onUnmounted(() => {
           />
           <q-btn
             type="submit"
+            icon="save"
             label="Salvar nova senha"
             color="primary"
             unelevated

@@ -49,6 +49,8 @@ const ownerAllowed = computed(() =>
       v-if="!user.roles.includes(1) || ownerAllowed"
       outline
       no-caps
+      :icon="user.isActive ? 'toggle_off' : 'toggle_on'"
+      :color="user.isActive ? 'negative' : 'positive'"
       :label="user.isActive ? 'Desativar usuário' : 'Ativar usuário'"
       :disable="busy"
       @click="$emit('active', !user.isActive)"
