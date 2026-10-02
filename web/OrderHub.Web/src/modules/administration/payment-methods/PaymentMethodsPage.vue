@@ -177,7 +177,7 @@ onUnmounted(() => request?.abort())
           <td class="text-center">{{ row.allowsChange ? 'Sim' : 'Não' }}</td>
           <td class="text-center">{{ row.isActive ? 'Ativa' : 'Inativa' }}</td>
           <td class="text-center">
-            <q-btn
+            <q-btn flat
               square
               class="collection-action-btn"
               color="primary"
@@ -185,7 +185,7 @@ onUnmounted(() => request?.abort())
               :aria-label="`Editar forma ${row.name}`"
               :disable="loading"
               @click="open(row)"
-            ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn><q-btn
+            ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn><q-btn flat
               square
               class="collection-action-btn"
               :color="row.isActive ? 'negative' : 'positive'"

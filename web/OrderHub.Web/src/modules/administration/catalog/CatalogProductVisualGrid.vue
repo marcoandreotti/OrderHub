@@ -36,34 +36,37 @@ function associations(product: Product) {
       class="admin-product-card"
       :class="{ 'admin-product-card--inactive': !product.isActive }"
     >
-      <img
-        v-if="principalImage(product)"
-        :src="principalImage(product)"
-        :alt="`Imagem de ${product.name}`"
-        class="admin-product-card__image"
-      />
-      <div v-else class="admin-product-card__placeholder" aria-hidden="true">▧</div>
+      <img v-if="principalImage(product)" :src="principalImage(product)"
+        :alt="`Imagem de ${product.name}`" class="admin-product-card__image" />
+      <div v-else class="admin-product-card__placeholder" aria-hidden="true">
+        <q-icon name="restaurant_menu" />
+      </div>
       <div class="admin-product-card__body">
         <div class="admin-product-card__heading">
-          <div>
-            <p class="admin-product-card__category">{{ categoryName(product.id) }}</p>
-            <h2>{{ product.name }}</h2>
-          </div>
-          <span class="admin-product-card__state">
+          <p class="admin-product-card__category">{{ categoryName(product.id) }}</p>
+          <span class="admin-product-card__state" :class="{
+            'admin-product-card__state--active': product.isActive,
+            'admin-product-card__state--inactive': !product.isActive
+          }">
+            <q-icon :name="product.isActive ? 'check_circle' : 'pause_circle'" aria-hidden="true" />
             {{ product.isActive ? 'Ativo' : 'Inativo' }}
           </span>
         </div>
-        <strong>A partir de {{ money.format(product.basePrice) }}</strong>
-        <p>{{ associations(product) }}</p>
-        <q-btn
-          square
-          class="collection-action-btn"
-          color="primary"
-          icon="edit"
-          :aria-label="`Editar ${product.name}`"
-          :disable="loading"
-          @click="emit('edit', product)"
-        ><q-tooltip>Editar {{ product.name }}</q-tooltip></q-btn>
+        <h2 class="admin-product-card__name">{{ product.name }}</h2>
+        <p v-if="product.description" class="admin-product-card__description">
+          {{ product.description }}
+        </p>
+        <div class="admin-product-card__footer">
+          <div class="admin-product-card__details">
+            <strong>A partir de {{ money.format(product.basePrice) }}</strong>
+            <small>{{ associations(product) }}</small>
+          </div>
+          <q-btn flat square class="collection-action-btn" color="primary" icon="edit"
+            :aria-label="`Editar ${product.name}`" :disable="loading"
+            @click="emit('edit', product)">
+            <q-tooltip>Editar {{ product.name }}</q-tooltip>
+          </q-btn>
+        </div>
       </div>
     </article>
   </div>

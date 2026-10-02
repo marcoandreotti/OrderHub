@@ -119,7 +119,7 @@ onUnmounted(() => controller?.abort())
         <q-btn outline icon="add" label="Adicionar exceção" class="q-mt-md" @click="addException" />
         <q-list bordered separator class="q-mt-md"><q-item v-for="(item,index) in configuration.exceptions" :key="item.date + '-' + (item.serviceType ?? '')">
           <q-item-section>{{ item.date }} · {{ item.serviceType ?? 'Todas' }} · {{ item.isOpen ? item.opensAt + '–' + item.closesAt : 'Fechado' }}<small>{{ item.reason }}</small></q-item-section>
-          <q-item-section side><q-btn square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover exceção de ' + item.date" @click="configuration.exceptions.splice(index,1)"><q-tooltip>Remover exceção</q-tooltip></q-btn></q-item-section>
+          <q-item-section side><q-btn flat square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover exceção de ' + item.date" @click="configuration.exceptions.splice(index,1)"><q-tooltip>Remover exceção</q-tooltip></q-btn></q-item-section>
         </q-item></q-list>
         <q-btn color="primary" icon="save" label="Salvar exceções" class="q-mt-md" :loading="busy" @click="execute(() => availabilityClient.exceptions(session.unitId, configuration!.exceptions), 'Exceções atualizadas.')" />
       </q-card-section></q-card>
@@ -127,7 +127,7 @@ onUnmounted(() => controller?.abort())
       <q-card flat bordered><q-card-section><h2 class="text-h6">Pausas por modalidade</h2>
         <q-list v-if="configuration.pauses.length" bordered separator class="q-mb-md"><q-item v-for="item in configuration.pauses" :key="item.serviceType">
           <q-item-section><strong>{{ item.serviceType }}</strong><small>{{ item.reason || 'Pausa manual' }} · até {{ item.endsAt ? new Date(item.endsAt).toLocaleString('pt-BR') : 'reativação manual' }}</small></q-item-section>
-          <q-item-section side><q-btn square class="collection-action-btn" color="positive" icon="play_arrow" :aria-label="'Retomar ' + item.serviceType" @click="execute(() => availabilityClient.resume(session.unitId, item.serviceType), 'Modalidade retomada.')"><q-tooltip>Retomar modalidade</q-tooltip></q-btn></q-item-section>
+          <q-item-section side><q-btn flat square class="collection-action-btn" color="positive" icon="play_arrow" :aria-label="'Retomar ' + item.serviceType" @click="execute(() => availabilityClient.resume(session.unitId, item.serviceType), 'Modalidade retomada.')"><q-tooltip>Retomar modalidade</q-tooltip></q-btn></q-item-section>
         </q-item></q-list>
         <div class="row q-col-gutter-md"><q-select v-model="pause.serviceType" outlined label="Modalidade" :options="serviceTypes" class="col-12 col-md-3" />
           <q-input v-model="pause.endsAt" type="datetime-local" outlined label="Até (opcional)" class="col-12 col-md-3" />

@@ -31,6 +31,10 @@ A aplicação SHALL manter localmente itens e escolhas para a mesma unidade, mas
 - **WHEN** a simulação retorna valor diferente do exibido anteriormente
 - **THEN** a aplicação atualiza o resumo e exige que o visitante veja o total atual antes de confirmar
 
+#### Scenario: Revisar adicionais no carrinho
+- **WHEN** o visitante abre o carrinho com opções adicionais selecionadas
+- **THEN** a aplicação mostra os nomes e quantidades dessas opções junto ao produto
+
 ### Requirement: Checkout coleta dados compatíveis com o atendimento
 A aplicação SHALL solicitar somente os dados necessários para mesa, retirada ou entrega e SHALL permitir identificação e endereço conforme os contratos públicos.
 
@@ -66,6 +70,13 @@ A aplicação SHALL operar em dispositivos móveis suportados, com foco visível
 - **WHEN** o visitante percorre cardápio, carrinho e checkout em viewport móvel
 - **THEN** todas as informações e ações essenciais permanecem legíveis e acionáveis
 
+### Requirement: Carrinho vazio retorna ao cardápio
+A aplicação SHALL retirar itens individualmente e, quando o último item for removido, retornar ao cardápio e descartar a simulação associada ao carrinho vazio.
+
+#### Scenario: Remover o último item
+- **WHEN** o visitante remove o único ou último item do carrinho
+- **THEN** a aplicação retorna ao cardápio e não apresenta totais de uma simulação anterior
+
 ### Requirement: Interface comunica indisponibilidade acionável
 A aplicação SHALL distinguir unidade fechada, modalidade pausada e oferta indisponível, informar próxima abertura quando conhecida e impedir envio sabidamente inválido.
 
@@ -75,6 +86,26 @@ A aplicação SHALL distinguir unidade fechada, modalidade pausada e oferta indi
 
 ### Requirement: Checkout apresenta cobertura e custo da entrega
 A aplicação SHALL coletar endereço suficiente, apresentar taxa e estimativa retornadas pelo servidor e exigir aceite de qualquer alteração antes da confirmação.
+
+Ao informar um CEP brasileiro completo no endereço de entrega, a aplicação SHALL consultar o endpoint CEP v1 da BrasilAPI para sugerir logradouro, bairro, cidade e UF. Cada nova consulta SHALL substituir os dados de endereço retornados pela consulta anterior. Bairro, cidade e UF preenchidos pela consulta SHALL ficar bloqueados para edição enquanto forem dados do provedor. A consulta é auxiliar: a falha ou ausência de dados do provedor não pode bloquear a edição manual. Alterar o CEP SHALL marcar a cotação como desatualizada; a taxa e a cobertura só são atualizadas pela simulação do servidor. O CEP deve ser normalizado para oito dígitos antes da consulta, simulação e confirmação, e chamadas anteriores devem ser descartadas quando o visitante alterar o CEP.
+
+No checkout de entrega, a ação principal SHALL apresentar “Recalcular entrega” quando a cotação estiver ausente ou não corresponder ao tipo de serviço e ao CEP atuais. Ao acioná-la, a aplicação SHALL aguardar uma busca de CEP em andamento, executar uma simulação e só então habilitar a confirmação. Uma submissão por teclado também SHALL recalcular antes de confirmar uma cotação desatualizada. Ao sair do campo CEP, a aplicação SHALL iniciar imediatamente a busca pendente. Se a simulação falhar, a ação de recálculo permanece disponível e o pedido não é confirmado.
+
+#### Scenario: CEP completo informado
+- **WHEN** o visitante informa os oito dígitos de um CEP durante a entrega
+- **THEN** a aplicação busca sugestões de endereço, substitui os dados da busca anterior, preserva número e complemento, bloqueia bairro, cidade e UF preenchidos pelo provedor e marca a cotação como desatualizada
+
+#### Scenario: Busca de CEP sem resultado ou indisponível
+- **WHEN** o serviço de CEP não encontra o endereço ou está indisponível
+- **THEN** a aplicação informa que não conseguiu preencher o endereço, mantém o formulário editável e ainda solicita a simulação de entrega pelo CEP informado
+
+#### Scenario: Cotação desatualizada no checkout de entrega
+- **WHEN** a modalidade muda para entrega ou o CEP difere daquele da última simulação
+- **THEN** a ação principal muda para “Recalcular entrega” e, após uma simulação bem-sucedida, muda para confirmar o pedido
+
+#### Scenario: CEP perde o foco com busca pendente
+- **WHEN** o visitante sai do campo CEP antes da busca automática começar
+- **THEN** a aplicação inicia a busca imediatamente, e “Recalcular entrega” aguarda essa busca antes de simular o pedido
 
 #### Scenario: Endereço não atendido
 - **WHEN** a cotação indicar ausência de cobertura

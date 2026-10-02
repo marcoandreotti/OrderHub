@@ -188,12 +188,20 @@ async function logout() {
 .administration-navigation :deep(.admin-nav-link) { min-height: 44px; margin: 3px 0; }
 .administration-navigation :deep(.admin-nav-link:hover) { background: rgb(255 255 255 / 8%); }
 .administration-navigation :deep(.admin-nav-item--active) {
-  background: rgb(255 255 255 / 12%);
-  color: var(--oh-brand-primary) !important;
+  background: color-mix(in srgb, var(--oh-admin-accent) 24%, var(--oh-navigation-background));
+  color: #fff !important;
   font-weight: 700;
 }
 .administration-header {
+  margin: 12px 16px 0;
+  overflow: hidden;
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: var(--oh-border-radius);
   background: var(--oh-surface-raised);
   color: var(--oh-text-primary);
+  box-shadow: 0 3px 14px rgb(31 41 55 / 6%);
+}
+@media (max-width: 600px) {
+  .administration-header { margin: 8px 8px 0; }
 }
 </style>

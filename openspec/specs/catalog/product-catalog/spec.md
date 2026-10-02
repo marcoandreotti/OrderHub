@@ -71,6 +71,10 @@ O sistema SHALL fornecer uma projeção administrativa ordenada do catálogo da 
 - **WHEN** um ator autorizado consulta o catálogo administrativo de sua unidade
 - **THEN** o sistema SHALL retornar somente dados do Tenant e da unidade resolvidos, preservando hierarquia, ordenação, estados de ativação e vínculos cadastrados
 
+#### Scenario: Navegação e visão visual dos produtos
+- **WHEN** o ator autorizado administra o catálogo
+- **THEN** as abas são apresentadas na ordem Categorias, Adicionais, Grupos de adicionais e Produtos; a visão Visual usa cards horizontais no padrão de leitura do cardápio, mantendo categoria, estado, descrição, preço, vínculos e ação de edição legíveis e responsivos
+
 ### Requirement: Cardápio público apresenta somente ofertas vendáveis
 O sistema SHALL permitir consultar o cardápio público por slug ativo da unidade e SHALL retornar uma projeção hierárquica ordenada contendo somente categorias, produtos, variações, grupos e adicionais ativos. A resolução pública MUST determinar Tenant e unidade no servidor e MUST NOT conceder privilégios administrativos.
 

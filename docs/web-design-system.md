@@ -225,6 +225,16 @@ As categorias abaixo são candidatas, não tokens já implementados:
 - camadas e z-index;
 - densidades public, administration e operations.
 
+### Acento analítico da Administration
+
+A superfície Administration utiliza um acento violeta de apoio para navegação selecionada,
+identificação do contexto gerencial e gráficos do dashboard, inspirado em interfaces de
+analytics. Ele é definido no escopo `[data-surface='administration']` como
+`--oh-admin-accent`, `--oh-admin-accent-soft` e `--oh-admin-accent-text`, com variantes
+para tema escuro. O acento não substitui o laranja de marca nos CTAs nem altera Public,
+Operations, KDS ou Platform. Superfícies administrativas seguem claras e elevadas no
+tema claro, com fundo lavanda muito suave, cartões brancos e contornos discretos.
+
 Uma feature não deve introduzir toda a escala antecipadamente. Adicionar somente decisões exigidas por casos concretos.
 
 ## Classificação de componentes
@@ -328,7 +338,7 @@ Antes de usar diretamente `QBtn`, `QDialog`, `QCard`, `QInput`, `QTable`, `QBann
 
 ### Ações em coleções e confirmações
 
-- Ações contextuais repetidas em tabelas, grids e listas usam `QBtn` quadrado (`square`) com ícone, alvo mínimo de 44 × 44 px e a classe `collection-action-btn`.
+- Ações contextuais repetidas em tabelas, grids, listas e coleções de formulário usam `QBtn` quadrado (`square`) com ícone, alvo mínimo de 44 × 44 px e a classe `collection-action-btn`. Quando a ação exibe somente um ícone, usa a variante `flat` e peso e tamanho reforçados. Botões com rótulo visível mantêm seu tratamento próprio.
 - Botões apenas com ícone devem ter `aria-label`; use `QTooltip` com a mesma ação em linguagem clara. A dica complementa o nome acessível e não substitui uma ação que precise permanecer visível.
 - Escolha cor e ícone de acordo com a consequência: ações comuns usam `primary`/`secondary`; ativar ou reativar usa `positive`; desativar, remover ou revogar usa `negative`. Estado e ação também devem ser expressos por texto acessível, não somente pela cor.
 - Em Operations/KDS, mantenha visível o rótulo da transição junto ao ícone quando a equipe precisa reconhecer a próxima etapa rapidamente.

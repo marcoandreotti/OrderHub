@@ -84,7 +84,7 @@ onUnmounted(() => request?.abort())
               >Inativo</span
             ></q-item-section
           ><q-item-section side
-            ><q-btn
+            ><q-btn flat
               square
               class="collection-action-btn"
               color="primary"

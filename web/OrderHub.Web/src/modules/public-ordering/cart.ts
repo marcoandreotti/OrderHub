@@ -98,5 +98,16 @@ export const receiptStorage = {
   read(slug: string) {
     const value = storage()?.getItem('orderhub.public-receipt.' + slug) ?? ''
     return /^[0-9a-f]{48}$/.test(value) ? value : null
+  },
+  findSlug(reference: string) {
+    const store = storage()
+    if (!store) return null
+    const prefix = 'orderhub.public-receipt.'
+    for (let index = 0; index < store.length; index++) {
+      const key = store.key(index)
+      if (key?.startsWith(prefix) && store.getItem(key) === reference)
+        return key.slice(prefix.length)
+    }
+    return null
   }
 }

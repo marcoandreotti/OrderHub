@@ -121,7 +121,7 @@ onUnmounted(() => { alive = false; request.abort() })
               <q-select v-model="hours.dayOfWeek" :options="days" emit-value map-options label="Dia da semana" outlined class="col-12 col-sm-4" :disable="busy" />
               <q-input v-model="hours.opensAt" type="time" label="Abertura" outlined class="col-6 col-sm-3" :rules="[required]" :disable="busy" />
               <q-input v-model="hours.closesAt" type="time" label="Fechamento" outlined class="col-6 col-sm-3" :rules="[required, v => v > hours.opensAt || 'Feche após a abertura']" :disable="busy" />
-              <div class="col-12 col-sm-2 hours-remove-cell"><q-btn square color="negative" icon="delete" class="collection-action-btn hours-remove-btn" :aria-label="'Remover intervalo ' + (index + 1)" :disable="busy" @click="configuration.hours.splice(index, 1)"><q-tooltip>Remover intervalo</q-tooltip></q-btn></div>
+              <div class="col-12 col-sm-2 hours-remove-cell"><q-btn flat square color="negative" icon="delete" class="collection-action-btn hours-remove-btn" :aria-label="'Remover intervalo ' + (index + 1)" :disable="busy" @click="configuration.hours.splice(index, 1)"><q-tooltip>Remover intervalo</q-tooltip></q-btn></div>
             </div>
             <q-btn label="Adicionar intervalo" icon="add" outline class="q-mb-md" :disable="busy || configuration.hours.length >= 100" @click="configuration.hours.push({ dayOfWeek: 1, opensAt: '09:00', closesAt: '18:00' })" />
           </template>
@@ -136,9 +136,9 @@ onUnmounted(() => { alive = false; request.abort() })
           </q-form>
           <q-card v-for="table in tables" :key="table.id" flat bordered class="q-mb-sm"><q-card-section class="row items-center q-gutter-sm">
             <div class="col"><strong>{{ table.code }}</strong> · {{ table.description }} · {{ table.isActive ? 'Ativa' : 'Inativa' }}</div>
-            <q-btn square class="collection-action-btn" color="primary" icon="edit" :aria-label="'Editar mesa ' + table.code" :disable="busy" @click="editing = { ...table }"><q-tooltip>Editar mesa {{ table.code }}</q-tooltip></q-btn>
-            <q-btn square class="collection-action-btn" color="secondary" icon="qr_code_2" :aria-label="'QR Code da mesa ' + table.code" :disable="busy || !table.isActive" @click="showQr(table)"><q-tooltip>QR Code da mesa {{ table.code }}</q-tooltip></q-btn>
-            <q-btn square class="collection-action-btn" color="warning" text-color="dark" icon="key" :aria-label="'Renovar token da mesa ' + table.code" :disable="busy" @click="rotating = table"><q-tooltip>Renovar token da mesa {{ table.code }}</q-tooltip></q-btn>
+            <q-btn flat square class="collection-action-btn" color="primary" icon="edit" :aria-label="'Editar mesa ' + table.code" :disable="busy" @click="editing = { ...table }"><q-tooltip>Editar mesa {{ table.code }}</q-tooltip></q-btn>
+            <q-btn flat square class="collection-action-btn" color="secondary" icon="qr_code_2" :aria-label="'QR Code da mesa ' + table.code" :disable="busy || !table.isActive" @click="showQr(table)"><q-tooltip>QR Code da mesa {{ table.code }}</q-tooltip></q-btn>
+            <q-btn flat square class="collection-action-btn" color="warning" text-color="dark" icon="key" :aria-label="'Renovar token da mesa ' + table.code" :disable="busy" @click="rotating = table"><q-tooltip>Renovar token da mesa {{ table.code }}</q-tooltip></q-btn>
           </q-card-section></q-card>
           <p v-if="!tables.length">Nenhuma mesa cadastrada.</p>
           <q-pagination v-if="total > 20" v-model="page" :max="Math.ceil(total / 20)" :disable="busy" @update:model-value="run(loadTables)" />

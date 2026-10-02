@@ -1,10 +1,15 @@
 import axios, { type AxiosError, type AxiosInstance } from 'axios'
-import { ApiError, type ProblemDetails } from '../../http/client'
+import { ApiError, readCsrfCookie, type ProblemDetails } from '../../http/client'
 import type { Address, Confirmation, ConfirmationRequest, PublicCatalog, PublicContext, SchedulingSlots, ServiceType, Simulation, SimulationRequest, Tracking } from './types'
 
 const path = (slug: string) => '/api/public/ordering/' + encodeURIComponent(slug)
 
 export function createPublicOrderingClient(http: AxiosInstance) {
+  http.interceptors.request.use((config) => {
+    const csrf = readCsrfCookie()
+    if (csrf) config.headers.set('X-CSRF-Token', csrf)
+    return config
+  })
   http.interceptors.response.use(undefined, (error: AxiosError<ProblemDetails>) => {
     if (axios.isCancel(error)) throw error
     throw new ApiError({ ...error.response?.data, status: error.response?.status })

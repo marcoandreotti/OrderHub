@@ -261,7 +261,7 @@ onUnmounted(() => {
             </div>
           </td>
           <td>
-            <q-btn
+            <q-btn flat
               square
               class="collection-action-btn"
               color="primary"

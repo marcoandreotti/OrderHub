@@ -30,6 +30,9 @@ const step = ref<Step>('catalog')
 const catalogSearch = ref('')
 const activeCategoryId = ref<string | null>(null)
 const selected = ref<Product>()
+const selectedImage = computed(() => selected.value
+  ? [...selected.value.images].sort((a, b) => a.order - b.order)[0]
+  : undefined)
 const quantity = ref(1)
 const variationId = ref<string | null>(null)
 const notes = ref('')
@@ -51,6 +54,17 @@ const previousReference = ref<string | null>(null)
 const idempotencyKey = ref<string>()
 let controller: AbortController | undefined
 let slotsController: AbortController | undefined
+let postalCodeController: AbortController | undefined
+let simulationController: AbortController | undefined
+let postalCodeTimer: ReturnType<typeof setTimeout> | undefined
+let lastPostalCodeLookupAttempt = ''
+let postalCodeLookupPromise: Promise<void> | undefined
+const postalCodeLookupLoading = ref(false)
+const postalCodeLookupMessage = ref('')
+const lastPostalCodeValues: Partial<Record<'street' | 'neighborhood' | 'city' | 'state', string>> = {}
+const simulatedServiceType = ref<ServiceType>()
+const simulatedPostalCode = ref('')
+const lookupAddressFields = ['street', 'neighborhood', 'city', 'state'] as const
 
 const customer = reactive({ name: '', phone: '', email: '' })
 const address = reactive<Address>({
@@ -66,6 +80,11 @@ const checkout = reactive({
 const money = (value: number) => new Intl.NumberFormat('pt-BR', {
   style: 'currency', currency: 'BRL'
 }).format(value)
+const normalizedAddress = (value: Address): Address => ({
+  ...value, postalCode: value.postalCode.replace(/\D/g, '')
+})
+const isLookupFilled = (field: typeof lookupAddressFields[number]) =>
+  !!lastPostalCodeValues[field] && address[field] === lastPostalCodeValues[field]
 const pricingLabel = (strategy?: string) => ({
   Additive: 'valores somados', HighestPrice: 'considera o maior preço',
   Proportional: 'preço proporcional às frações', NoPriceChange: 'sem alteração de preço'
@@ -105,11 +124,15 @@ const canCheckout = computed(() => cart.state.items.length > 0 &&
   (schedulingMode.value === 'scheduled'
     ? !!scheduledAtUtc.value && !!scheduling.value?.slots.some(slot => slot.startsAt === scheduledAtUtc.value)
     : selectedServiceAvailability.value?.isAvailable !== false))
+const quoteNeedsRecalculation = computed(() => !simulation.value ||
+  simulatedServiceType.value !== checkout.serviceType ||
+  (checkout.serviceType === 'Delivery' && simulatedPostalCode.value !== address.postalCode.replace(/\D/g, '')))
+const postalCodeDigits = computed(() => address.postalCode.replace(/\D/g, ''))
 const canChooseCheckout = computed(() => cart.state.items.length > 0 &&
   (selectedServiceAvailability.value?.isAvailable !== false ||
     (scheduling.value?.isEnabled === true && scheduling.value.slots.length > 0)))
 const formatOpening = (value: string | null | undefined) => value
-  ? new Date(value).toLocaleString('pt-BR')
+  ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
   : null
 const availabilityMessage = (reason: string) => ({
   CalendarException: 'A unidade está fechada excepcionalmente.',
@@ -117,6 +140,16 @@ const availabilityMessage = (reason: string) => ({
   OutsideBusinessHours: 'Estamos fora do horário de atendimento.',
   EstablishmentInactive: 'A unidade não está recebendo pedidos.'
 }[reason] ?? 'Esta modalidade não está disponível agora.')
+const availabilityNoticeMessage = (reason: string, message: string | null) => {
+  const systemMessages: Record<string, string> = {
+    'Establishment is inactive.': 'A unidade não está recebendo pedidos.',
+    'Establishment is closed by calendar exception.': 'A unidade está fechada excepcionalmente.',
+    'Service is temporarily paused.': 'Esta modalidade está temporariamente pausada.',
+    'Outside exceptional service hours.': 'Esta modalidade está fora do horário excepcional de atendimento.',
+    'Outside business hours.': 'Estamos fora do horário de atendimento.'
+  }
+  return message ? systemMessages[message] ?? message : availabilityMessage(reason)
+}
 
 async function load() {
   controller?.abort()
@@ -290,7 +323,7 @@ function request(deliveryAddress: Address | null = null, scheduledAtOverride?: s
     customerId: null,
     customerAddressId: null,
     tableToken: checkout.serviceType === 'Table' ? context.value?.table?.token ?? null : null,
-    deliveryAddress,
+    deliveryAddress: deliveryAddress ? normalizedAddress(deliveryAddress) : null,
     couponCode: checkout.couponCode.trim() || null,
     paymentMethodId: checkout.paymentMethodId || null,
     items: orderItems(cart.state.items),
@@ -300,6 +333,11 @@ function request(deliveryAddress: Address | null = null, scheduledAtOverride?: s
 }
 async function simulate() {
   if (!cart.state.items.length) return
+  simulationController?.abort()
+  const requestController = new AbortController()
+  simulationController = requestController
+  const requestedServiceType = checkout.serviceType
+  const requestedPostalCode = requestedServiceType === 'Delivery' ? address.postalCode.replace(/\D/g, '') : ''
   simulating.value = true
   error.value = null
   try {
@@ -307,14 +345,118 @@ async function simulate() {
       ? scheduling.value.slots[0]?.startsAt ?? null : undefined
     const result = await publicOrderingClient.simulate(
       slug.value,
-      request(checkout.serviceType === 'Delivery' ? address : null, fallbackSlot)
+      request(requestedServiceType === 'Delivery' ? address : null, fallbackSlot),
+      requestController.signal
     )
+    if (requestController.signal.aborted) return
     priceChanged.value = simulation.value
       ? simulation.value.total !== result.total || simulation.value.subtotal !== result.subtotal
       : result.subtotal !== cart.displayedTotal.value
     simulation.value = result
-  } catch (failure) { error.value = failure; simulation.value = undefined }
-  finally { simulating.value = false }
+    simulatedServiceType.value = requestedServiceType
+    simulatedPostalCode.value = requestedPostalCode
+  } catch (failure) {
+    if (!requestController.signal.aborted) { error.value = failure; simulation.value = undefined }
+  } finally {
+    if (simulationController === requestController) simulating.value = false
+  }
+}
+function removeCartItem(itemKey: string) {
+  cart.remove(itemKey)
+  if (!cart.state.items.length) {
+    simulationController?.abort()
+    simulation.value = undefined
+    priceChanged.value = false
+    simulating.value = false
+    step.value = 'catalog'
+    return
+  }
+  void simulate()
+}
+function cartAdditionalLabels(item: (typeof cart.state.items)[number]) {
+  const product = catalog.value?.categories.flatMap(category => category.products)
+    .find(candidate => candidate.id === item.productId)
+  return item.additionals.flatMap(selection => {
+    const group = product?.additionalGroups.find(candidate => candidate.id === selection.groupId) ??
+      product?.additionalGroups.find(candidate => candidate.items.some(option => option.id === selection.additionalId))
+    const option = group?.items.find(candidate => candidate.id === selection.additionalId)
+    if (!option) return []
+    const amount = selection.portionNumerator !== null && selection.portionDenominator
+      ? `${selection.portionNumerator}/${selection.portionDenominator} `
+      : selection.quantity > 1 ? `${selection.quantity}× ` : ''
+    return [`${amount}${option.name}`]
+  })
+}
+async function lookupPostalCode(postalCode: string) {
+  if (postalCodeLookupLoading.value && lastPostalCodeLookupAttempt === postalCode) return
+  const lookupController = new AbortController()
+  postalCodeController = lookupController
+  lastPostalCodeLookupAttempt = postalCode
+  postalCodeLookupLoading.value = true
+  postalCodeLookupMessage.value = ''
+  for (const field of lookupAddressFields) {
+    address[field] = ''
+    delete lastPostalCodeValues[field]
+  }
+  const lookup = async () => {
+    try {
+      const response = await fetch(`https://brasilapi.com.br/api/cep/v1/${postalCode}`, {
+        signal: lookupController.signal,
+        headers: { Accept: 'application/json' }
+      })
+      if (response.status === 404) throw new Error('CEP não encontrado.')
+      if (!response.ok) throw new Error('Serviço de CEP indisponível.')
+      const result = await response.json() as {
+        street?: string; neighborhood?: string; city?: string; state?: string
+      }
+      if (lookupController.signal.aborted || address.postalCode.replace(/\D/g, '') !== postalCode) return
+      const suggestions = {
+        street: result.street?.trim() ?? '',
+        neighborhood: result.neighborhood?.trim() ?? '',
+        city: result.city?.trim() ?? '',
+        state: result.state?.trim() ?? ''
+      }
+      for (const field of lookupAddressFields) {
+        address[field] = suggestions[field]
+        if (suggestions[field]) lastPostalCodeValues[field] = suggestions[field]
+      }
+      postalCodeLookupMessage.value = 'Endereço localizado. Confira os dados e informe o número.'
+    } catch (failure) {
+      if (!lookupController.signal.aborted && address.postalCode.replace(/\D/g, '') === postalCode) {
+        postalCodeLookupMessage.value = failure instanceof Error && failure.message === 'CEP não encontrado.'
+          ? 'Não encontramos esse CEP. Confira o número ou preencha o endereço manualmente.'
+          : 'Não foi possível buscar o CEP agora. Você pode preencher o endereço manualmente.'
+      }
+    } finally {
+      if (postalCodeController === lookupController) postalCodeLookupLoading.value = false
+    }
+  }
+  const pendingLookup = lookup()
+  postalCodeLookupPromise = pendingLookup
+  await pendingLookup
+  if (postalCodeLookupPromise === pendingLookup) postalCodeLookupPromise = undefined
+}
+async function recalculateDelivery() {
+  const postalCode = postalCodeDigits.value
+  if (checkout.serviceType === 'Delivery' && postalCode.length !== 8) {
+    error.value = new Error('Informe um CEP com 8 dígitos para recalcular a entrega.')
+    return
+  }
+  if (checkout.serviceType === 'Delivery') {
+    if (postalCodeLookupLoading.value && lastPostalCodeLookupAttempt === postalCode && postalCodeLookupPromise) {
+      await postalCodeLookupPromise
+    } else if (lastPostalCodeLookupAttempt !== postalCode) {
+      await lookupPostalCode(postalCode)
+    }
+    if (postalCodeDigits.value !== postalCode) return
+  }
+  await simulate()
+}
+function handlePostalCodeBlur() {
+  const postalCode = postalCodeDigits.value
+  if (postalCode.length !== 8 || postalCode === lastPostalCodeLookupAttempt) return
+  if (postalCodeTimer) clearTimeout(postalCodeTimer)
+  void lookupPostalCode(postalCode)
 }
 function validateCheckout() {
   return checkoutValidation(
@@ -323,6 +465,10 @@ function validateCheckout() {
 }
 async function confirm() {
   if (submitting.value) return
+  if (quoteNeedsRecalculation.value) {
+    await recalculateDelivery()
+    return
+  }
   const validation = validateCheckout()
   if (validation) { error.value = new Error(validation); return }
   submitting.value = true
@@ -334,13 +480,14 @@ async function confirm() {
       const identified = await publicOrderingClient.customer(slug.value, {
         name: customer.name.trim(), phone: customer.phone.trim(),
         email: customer.email.trim() || null,
-        address: checkout.serviceType === 'Delivery' ? address : null
+        address: checkout.serviceType === 'Delivery' ? normalizedAddress(address) : null
       })
       customerId = identified.customerId
       customerAddressId = checkout.serviceType === 'Delivery' ? identified.addressId : null
     }
+    const deliveryAddress = checkout.serviceType === 'Delivery' ? normalizedAddress(address) : null
     const finalSimulation = await publicOrderingClient.simulate(slug.value, {
-      ...request(null), customerId, customerAddressId
+      ...request(deliveryAddress), customerId, customerAddressId
     })
     const deliveryQuoteChanged = checkout.serviceType === 'Delivery' && simulation.value && (
       simulation.value.deliveryRegionId !== finalSimulation.deliveryRegionId ||
@@ -349,14 +496,18 @@ async function confirm() {
     )
     if (simulation.value && (simulation.value.total !== finalSimulation.total || deliveryQuoteChanged)) {
       simulation.value = finalSimulation
+      simulatedServiceType.value = checkout.serviceType
+      simulatedPostalCode.value = checkout.serviceType === 'Delivery' ? address.postalCode.replace(/\D/g, '') : ''
       priceChanged.value = true
       error.value = new Error('O total mudou. Confira os valores atualizados e confirme novamente.')
       return
     }
     simulation.value = finalSimulation
+    simulatedServiceType.value = checkout.serviceType
+    simulatedPostalCode.value = checkout.serviceType === 'Delivery' ? address.postalCode.replace(/\D/g, '') : ''
     idempotencyKey.value ??= crypto.randomUUID()
     const result = await publicOrderingClient.confirm(slug.value, {
-      ...request(null), customerId, customerAddressId,
+      ...request(deliveryAddress), customerId, customerAddressId,
       paymentMethodId: checkout.paymentMethodId,
       receivedAmount: checkout.receivedAmount,
       deliveryRegionId: finalSimulation.deliveryRegionId,
@@ -392,13 +543,26 @@ watch(() => checkout.serviceType, async () => {
   schedulingMode.value = 'immediate'
   await loadSchedulingSlots()
 })
+watch(() => [address.postalCode.replace(/\D/g, ''), checkout.serviceType] as const, ([postalCode, serviceType]) => {
+  if (postalCodeTimer) clearTimeout(postalCodeTimer)
+  postalCodeController?.abort()
+  postalCodeLookupPromise = undefined
+  postalCodeLookupLoading.value = false
+  postalCodeLookupMessage.value = ''
+  lastPostalCodeLookupAttempt = ''
+  if (postalCode.length !== 8 || serviceType !== 'Delivery') return
+  postalCodeTimer = setTimeout(() => { void lookupPostalCode(postalCode) }, 350)
+})
 watch(() => [slug.value, tableToken.value], load)
 onMounted(load)
-onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
+onBeforeUnmount(() => {
+  controller?.abort(); slotsController?.abort(); postalCodeController?.abort(); simulationController?.abort()
+  if (postalCodeTimer) clearTimeout(postalCodeTimer)
+})
 </script>
 
 <template>
-  <q-page id="main-content" class="ordering-page">
+  <q-page id="main-content" class="ordering-page public-menu-page">
     <div v-if="loading" class="state-panel" role="status" aria-live="polite">
       <q-spinner size="42px" /><p>Carregando cardápio…</p>
     </div>
@@ -417,61 +581,82 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
         <q-btn flat label="Retomar acompanhamento"
           @click="router.push('/order/track/' + previousReference)" />
       </aside>
-      <ProblemBanner :error="error">
-        <q-btn v-if="step !== 'catalog'" flat label="Recalcular" @click="simulate" />
-      </ProblemBanner>
-      <q-banner v-if="selectedServiceAvailability?.isAvailable === false" class="bg-amber-1 text-brown-9 q-mb-md" role="status">
-        <strong>{{ selectedServiceAvailability.message || availabilityMessage(selectedServiceAvailability.reason) }}</strong>
+      <ProblemBanner :error="error" />
+      <q-banner v-if="selectedServiceAvailability?.isAvailable === false" class="availability-notice q-mb-md" role="status">
+        <template #avatar><q-icon name="schedule" /></template>
+        <strong>{{ availabilityNoticeMessage(selectedServiceAvailability.reason, selectedServiceAvailability.message) }}</strong>
         <span v-if="selectedServiceAvailability.nextOpening">
           Próxima abertura: {{ formatOpening(selectedServiceAvailability.nextOpening) }}.
         </span>
       </q-banner>
 
-      <main v-if="step === 'catalog'" aria-label="Cardápio">
-        <div class="catalog-controls">
-          <PublicCatalogSearch v-model="catalogSearch" />
-          <PublicCategoryNavigation v-model="activeCategoryId" :categories="sortedCategories" />
-        </div>
-        <section v-for="category in visibleCategories" :key="category.id" class="category">
-          <h2>{{ category.name }}</h2><p v-if="category.description">{{ category.description }}</p>
-          <div class="product-grid">
-            <PublicProductCard
-              v-for="product in category.products"
-              :key="product.id"
-              :product="product"
-              :formatted-price="money(product.basePrice)"
-              @select="openProduct"
-            />
+      <template v-if="step === 'catalog'">
+        <main class="public-menu-content" aria-label="Cardápio">
+          <div class="catalog-controls">
+            <PublicCatalogSearch v-model="catalogSearch" />
+            <PublicCategoryNavigation v-model="activeCategoryId" :categories="sortedCategories" />
           </div>
-        </section>
-        <div v-if="visibleProductCount === 0" class="state-panel" role="status">
-          <p>{{ normalizedSearch ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum item disponível no momento.' }}</p>
-          <q-btn v-if="normalizedSearch" flat label="Limpar busca" @click="catalogSearch = ''" />
-          <q-btn v-else flat label="Atualizar cardápio" @click="load" />
-        </div>
-      </main>
-      <PublicCartAccess
-        v-if="step === 'catalog'"
-        :count="cart.count.value"
-        :total="money(cart.displayedTotal.value)"
-        :disabled="cart.state.items.length === 0"
-        @open="step = 'cart'; simulate()"
-      />
+          <section v-for="category in visibleCategories" :key="category.id" class="category">
+            <div class="category-heading"><h2>{{ category.name }}</h2><p v-if="category.description">{{ category.description }}</p></div>
+            <div class="product-grid">
+              <PublicProductCard
+                v-for="product in category.products"
+                :key="product.id"
+                :product="product"
+                :formatted-price="money(product.basePrice)"
+                @select="openProduct"
+              />
+            </div>
+          </section>
+          <div v-if="visibleProductCount === 0" class="state-panel" role="status">
+            <p>{{ normalizedSearch ? 'Nenhum produto encontrado para esta busca.' : 'Nenhum item disponível no momento.' }}</p>
+            <q-btn v-if="normalizedSearch" flat label="Limpar busca" @click="catalogSearch = ''" />
+            <q-btn v-else flat label="Atualizar cardápio" @click="load" />
+          </div>
+        </main>
+        <PublicCartAccess
+          v-if="cart.state.items.length > 0"
+          :count="cart.count.value"
+          :total="money(cart.displayedTotal.value)"
+          :disabled="cart.state.items.length === 0"
+          @open="step = 'cart'; simulate()"
+        />
+      </template>
 
       <main v-else-if="step === 'cart'" class="flow-panel">
-        <h2>Seu carrinho</h2>
-        <div v-if="!cart.state.items.length" class="state-panel"><p>Seu carrinho está vazio.</p></div>
+        <header class="cart-heading">
+          <h2>Seu carrinho</h2>
+          <p>Revise os itens e valores antes de continuar.</p>
+        </header>
+        <div v-if="!cart.state.items.length" class="cart-empty">
+          <q-icon name="shopping_bag" size="32px" aria-hidden="true" />
+          <div>
+            <strong>Seu carrinho está vazio</strong>
+            <p>Escolha algo no cardápio para montar seu pedido.</p>
+          </div>
+          <q-btn color="primary" label="Voltar ao cardápio" @click="step = 'catalog'" />
+        </div>
         <ul v-else class="cart-list">
-          <li v-for="item in cart.state.items" :key="item.key">
-            <span><strong>{{ item.quantity }}× {{ item.productName }}</strong>
-              <small v-if="item.variationName">{{ item.variationName }}</small></span>
-            <span>{{ money(item.displayedUnitPrice * item.quantity) }}
-              <button type="button" class="text-button" :aria-label="'Remover ' + item.productName"
-                @click="cart.remove(item.key); simulate()">Remover</button></span>
+          <li v-for="item in cart.state.items" :key="item.key" class="cart-item">
+            <div class="cart-item__details">
+              <strong>{{ item.quantity }}× {{ item.productName }}</strong>
+              <small v-if="item.variationName">{{ item.variationName }}</small>
+              <div v-if="item.additionals.length" class="cart-item__modifiers">
+                <small class="cart-item__modifiers-label">Adicionais</small>
+                <span>{{ cartAdditionalLabels(item).join(' · ') }}</span>
+              </div>
+              <small v-if="item.notes">Observação: {{ item.notes }}</small>
+            </div>
+            <strong class="cart-item__price">{{ money(item.displayedUnitPrice * item.quantity) }}</strong>
+            <button type="button" class="cart-remove" :aria-label="'Remover ' + item.productName"
+              @click="removeCartItem(item.key)">
+              <q-icon name="delete_outline" size="18px" aria-hidden="true" />
+              <span>Remover</span>
+            </button>
           </li>
         </ul>
         <div v-if="simulating" role="status">Recalculando totais…</div>
-        <div v-else-if="simulation" class="totals" aria-live="polite">
+        <div v-else-if="simulation && cart.state.items.length" class="totals" aria-live="polite">
           <span>Subtotal <b>{{ money(simulation.subtotal) }}</b></span>
           <span>Desconto <b>− {{ money(simulation.discount) }}</b></span>
           <span>Taxas <b>{{ money(simulation.fees) }}</b></span>
@@ -484,7 +669,7 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
           <span class="grand-total">Total atualizado <b>{{ money(simulation.total) }}</b></span>
           <p v-if="priceChanged" role="alert">O total mudou. Confira os valores atualizados antes de confirmar.</p>
         </div>
-        <div class="flow-actions"><q-btn flat label="Voltar ao cardápio" @click="step = 'catalog'" />
+        <div v-if="cart.state.items.length" class="flow-actions"><q-btn flat label="Voltar ao cardápio" @click="step = 'catalog'" />
           <q-btn label="Continuar" color="primary" :disable="!simulation || !canChooseCheckout"
             @click="step = 'checkout'" /></div>
       </main>
@@ -492,6 +677,11 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
       <main v-else-if="step === 'checkout'" class="flow-panel">
         <h2>Finalizar pedido</h2>
         <q-form @submit="confirm">
+          <fieldset v-if="checkout.serviceType !== 'Table'"><legend>Seus dados</legend>
+            <q-input v-model="customer.name" label="Nome" autocomplete="name" />
+            <q-input v-model="customer.phone" label="Telefone" autocomplete="tel" />
+            <q-input v-model="customer.email" label="E-mail (opcional)" autocomplete="email" type="email" />
+          </fieldset>
           <fieldset><legend>Como você quer receber?</legend>
             <q-option-group v-model="checkout.serviceType" :options="serviceOptions" type="radio" />
           </fieldset>
@@ -508,19 +698,20 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
               <small>Horários no fuso {{ scheduling.timeZoneId }} · pedidos com pelo menos {{ scheduling.minimumAdvanceMinutes }} minutos de antecedência.</small>
             </div>
           </fieldset>
-          <fieldset v-if="checkout.serviceType !== 'Table'"><legend>Seus dados</legend>
-            <q-input v-model="customer.name" label="Nome" autocomplete="name" />
-            <q-input v-model="customer.phone" label="Telefone" autocomplete="tel" />
-            <q-input v-model="customer.email" label="E-mail (opcional)" autocomplete="email" type="email" />
-          </fieldset>
           <fieldset v-if="checkout.serviceType === 'Delivery'"><legend>Endereço de entrega</legend>
-            <q-input v-model="address.postalCode" label="CEP" autocomplete="postal-code" />
+            <q-input v-model="address.postalCode" label="CEP" autocomplete="postal-code"
+              mask="#####-###" unmasked-value :loading="postalCodeLookupLoading"
+              hint="Informe 8 dígitos. O hífen é visual; buscamos o endereço e você atualiza a cotação em Recalcular entrega."
+              persistent-hint @blur="handlePostalCodeBlur" />
+            <p v-if="postalCodeLookupMessage" class="postal-code-feedback" role="status" aria-live="polite">
+              {{ postalCodeLookupMessage }}
+            </p>
             <q-input v-model="address.street" label="Rua" autocomplete="address-line1" />
             <q-input v-model="address.number" label="Número" />
             <q-input v-model="address.complement" label="Complemento (opcional)" />
-            <q-input v-model="address.neighborhood" label="Bairro" />
-            <q-input v-model="address.city" label="Cidade" />
-            <q-input v-model="address.state" label="Estado" maxlength="2" />
+            <q-input v-model="address.neighborhood" label="Bairro" :disable="isLookupFilled('neighborhood')" />
+            <q-input v-model="address.city" label="Cidade" :disable="isLookupFilled('city')" />
+            <q-input v-model="address.state" label="Estado" maxlength="2" :disable="isLookupFilled('state')" />
           </fieldset>
           <fieldset><legend>Pagamento e desconto</legend>
             <q-select v-model="checkout.paymentMethodId" label="Forma de pagamento"
@@ -529,10 +720,19 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
             <q-input v-if="activeMethods.find(x => x.id === checkout.paymentMethodId)?.allowsChange"
               v-model.number="checkout.receivedAmount" label="Troco para" type="number" min="0" />
           </fieldset>
-          <div v-if="simulation" class="grand-total">Total {{ money(simulation.total) }}</div>
+          <div v-if="simulation" class="grand-total checkout-total">
+            Total {{ money(simulation.total) }}
+            <small v-if="quoteNeedsRecalculation" role="status">Cotação anterior; recalcule para atualizar a entrega.</small>
+            <small v-else-if="priceChanged" role="status">O valor foi atualizado. Confira antes de prosseguir.</small>
+          </div>
           <div class="flow-actions"><q-btn flat label="Voltar ao carrinho" @click="step = 'cart'" />
-            <q-btn type="submit" icon="shopping_cart_checkout" label="Confirmar pedido" color="primary"
-              :loading="submitting" :disable="submitting || !canCheckout" /></div>
+            <q-btn v-if="quoteNeedsRecalculation" type="button" icon="refresh" label="Recalcular entrega" color="primary"
+              :loading="simulating" :disable="simulating || !canCheckout ||
+                (checkout.serviceType === 'Delivery' && postalCodeDigits.length !== 8)"
+              @click="recalculateDelivery" />
+            <q-btn v-else type="submit" icon="shopping_cart_checkout"
+              :label="priceChanged ? 'Finalizar o pedido' : 'Confirmar pedido'" color="primary"
+              :loading="submitting" :disable="submitting || simulating || !canCheckout" /></div>
         </q-form>
       </main>
 
@@ -547,16 +747,20 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
     </template>
 
     <q-dialog :model-value="!!selected" @update:model-value="value => { if (!value) selected = undefined }">
-      <q-card v-if="selected" class="composition-card">
+      <q-card v-if="selected" class="composition-card" :class="{ 'composition-card--with-image': !!selectedImage }">
         <q-card-section class="composer-summary">
-          <p class="eyebrow">Monte seu item</p>
-          <h2>{{ selected.name }}</h2>
-          <p>{{ selected.description }}</p>
-          <p v-if="requiredComposerGroups.length" role="status">
-            {{ completedComposerGroups }} de {{ requiredComposerGroups.length }} requisitos concluídos
-          </p>
+          <img v-if="selectedImage" class="composer-product-image" :src="selectedImage.url" alt="">
+          <div class="composer-product-heading">
+            <p class="composer-kicker">{{ requiredComposerGroups.length ? 'Personalize seu pedido' : 'Seu pedido' }}</p>
+            <h2 id="composer-title">{{ selected.name }}</h2>
+            <p v-if="selected.description" class="composer-description">{{ selected.description }}</p>
+          </div>
+          <div v-if="requiredComposerGroups.length" class="composer-progress" role="status">
+            <div><span>Etapas obrigatórias</span><strong>{{ completedComposerGroups }} de {{ requiredComposerGroups.length }}</strong></div>
+            <q-linear-progress :value="completedComposerGroups / requiredComposerGroups.length" color="primary" track-color="grey-4" rounded />
+          </div>
         </q-card-section>
-        <q-card-section class="composition-body">
+        <q-card-section class="composition-body" aria-labelledby="composer-title">
           <fieldset v-if="selected.variations.filter(x => x.isActive).length"><legend>Escolha uma opção · obrigatório</legend>
             <label v-for="variation in selected.variations.filter(x => x.isActive).sort((a,b) => a.order-b.order)" :key="variation.id">
               <input v-model="variationId" type="radio" :value="variation.id" :disabled="variation.isAvailable === false">
@@ -593,3 +797,135 @@ onBeforeUnmount(() => { controller?.abort(); slotsController?.abort() })
     </q-dialog>
   </q-page>
 </template>
+
+<style scoped>
+.public-menu-page :deep(.ordering-hero) {
+  align-items: center;
+  width: min(100%, 1100px);
+  min-height: 190px;
+  margin: 20px auto 24px;
+  padding: clamp(22px, 4vw, 40px);
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: var(--oh-border-radius);
+  background: color-mix(in srgb, var(--oh-brand-primary) 8%, var(--oh-surface-raised));
+}
+.public-menu-page :deep(.ordering-context h1) {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.08;
+  letter-spacing: -.025em;
+}
+.public-menu-page :deep(.ordering-context > p) {
+  margin: 10px 0 0;
+  color: var(--oh-text-muted);
+  font-size: 1.05rem;
+}
+.public-menu-page :deep(.ordering-logo) {
+  width: clamp(64px, 10vw, 96px);
+  height: clamp(64px, 10vw, 96px);
+  padding: 8px;
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: 18px;
+  background: var(--oh-surface-raised);
+}
+.public-menu-page :deep(.ordering-unit-mark) {
+  display: grid;
+  flex: 0 0 clamp(64px, 10vw, 96px);
+  width: clamp(64px, 10vw, 96px);
+  height: clamp(64px, 10vw, 96px);
+  place-items: center;
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: 18px;
+  background: var(--oh-surface-raised);
+  color: var(--oh-brand-primary-text);
+  font-size: 42px;
+}
+.public-menu-page :deep(.ordering-unit-label) {
+  margin: 0 0 7px;
+  color: var(--oh-brand-primary-text);
+  font-size: .78rem;
+  font-weight: 750;
+  letter-spacing: .045em;
+}
+.public-menu-page :deep(.ordering-table-badge) {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--oh-border-subtle);
+  border-radius: 999px;
+  background: var(--oh-surface-raised);
+  color: var(--oh-brand-primary-text);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.public-menu-page :deep(.resume-order) {
+  width: min(100%, 1100px);
+  margin-bottom: 20px;
+  padding: 12px 18px;
+  color: var(--oh-text-primary);
+}
+.public-menu-page :deep(.resume-order .q-btn) { color: var(--oh-brand-primary-text); font-weight: 700; }
+.availability-notice {
+  width: min(100%, 1100px);
+  margin-right: auto;
+  margin-left: auto;
+  border: 1px solid color-mix(in srgb, var(--oh-status-warning) 38%, var(--oh-border-subtle));
+  border-radius: var(--oh-border-radius);
+  background: color-mix(in srgb, var(--oh-status-warning) 12%, var(--oh-surface-raised));
+  color: var(--oh-text-primary);
+}
+.availability-notice :deep(.q-icon) { color: var(--oh-status-warning-text); }
+.public-menu-content { width: min(100%, 1100px); margin: 0 auto; }
+.public-menu-page :deep(.catalog-controls) { width: 100%; margin-bottom: 30px; }
+.public-menu-page :deep(.catalog-search) { gap: 9px; color: var(--oh-text-primary); }
+.public-menu-page :deep(.catalog-search input) { min-height: 54px; border-radius: 14px; }
+.public-menu-page :deep(.catalog-search input:focus-visible) {
+  border-color: var(--oh-brand-primary);
+  outline: 3px solid color-mix(in srgb, var(--oh-focus-ring) 32%, transparent);
+  outline-offset: 1px;
+}
+.public-menu-page :deep(.category-navigation) { gap: 10px; padding-bottom: 10px; }
+.public-menu-page :deep(.category-navigation button) { padding: 9px 18px; border-radius: 999px; font-weight: 650; }
+.public-menu-page :deep(.category-navigation button[aria-pressed='true']) { border-color: var(--oh-brand-primary); background: var(--oh-brand-primary); color: var(--oh-brand-on-primary); }
+.category { margin-top: 34px; }
+.category-heading { margin-bottom: 16px; }
+.category-heading h2 { margin: 0; color: var(--oh-text-primary); font-size: clamp(1.5rem, 3vw, 2rem); letter-spacing: -.02em; }
+.category-heading p { margin: 6px 0 0; color: var(--oh-text-muted); }
+.public-menu-page :deep(.product-grid) { gap: 18px; }
+.public-menu-page :deep(.public-cart-access) { width: min(calc(100vw - 32px), 620px); border-radius: 16px; }
+.public-menu-page :deep(.public-cart-access__button) { border-radius: 12px; font-weight: 750; }
+.public-menu-page :deep(.public-cart-access__button:disabled) { cursor: not-allowed; opacity: .72; }
+.public-menu-page :deep(.state-panel) { border: 1px solid var(--oh-border-subtle); color: var(--oh-text-primary); }
+.checkout-total small { display: block; margin-top: 4px; color: var(--oh-text-muted); font-size: .875rem; font-weight: 400; }
+.cart-heading { margin-bottom: 20px; }
+.cart-heading h2 { color: var(--oh-text-primary); font-size: clamp(1.65rem, 3vw, 2rem); font-weight: 700; letter-spacing: -.025em; }
+.cart-heading p { margin: 5px 0 0; color: var(--oh-text-muted); font-size: .9rem; }
+.public-menu-page :deep(.cart-list) { margin: 0; }
+.public-menu-page :deep(.cart-item) { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 16px 0; border-bottom: 1px solid var(--oh-border-subtle); }
+.cart-item__details { display: grid; min-width: 0; gap: 5px; }
+.cart-item__details strong { overflow-wrap: anywhere; }
+.cart-item__price { font-variant-numeric: tabular-nums; }
+.cart-remove { display: inline-flex; min-height: 44px; align-items: center; gap: 4px; padding: 4px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--oh-status-danger); font: inherit; cursor: pointer; }
+.cart-remove:hover { background: color-mix(in srgb, var(--oh-status-danger) 9%, transparent); }
+.cart-remove:focus-visible { outline: 2px solid var(--oh-focus-ring); outline-offset: 2px; }
+.cart-item__modifiers { display: grid; gap: 2px; color: var(--oh-text-muted); font-size: .9rem; }
+.cart-item__modifiers-label { color: var(--oh-text-primary); font-weight: 650; }
+.cart-empty { display: flex; align-items: center; gap: 16px; padding: 22px; border: 1px dashed var(--oh-border-subtle); border-radius: var(--oh-border-radius); color: var(--oh-text-muted); }
+.cart-empty > div { flex: 1; }
+.cart-empty strong { color: var(--oh-text-primary); }
+.cart-empty p { margin: 4px 0 0; font-size: .9rem; }
+.public-menu-page :deep(.totals) { margin-top: 8px; padding: 18px 0 0; border-top: 1px solid var(--oh-border-subtle); }
+.public-menu-page :deep(.grand-total) { padding-top: 10px; border-top: 1px solid var(--oh-border-subtle); }
+@media (max-width: 700px) {
+  .public-menu-page :deep(.ordering-hero) { min-height: 0; gap: 16px; margin-top: 12px; padding: 22px 18px; }
+  .public-menu-page :deep(.ordering-context) { flex: 1 1 180px; }
+  .public-menu-page :deep(.ordering-table-badge) { padding: 8px 12px; }
+  .public-menu-page :deep(.product-grid) { grid-template-columns: minmax(0, 1fr); }
+  .public-menu-page :deep(.cart-item) { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
+  .cart-item__price { grid-column: 1; grid-row: 2; justify-self: start; }
+  .cart-remove { grid-column: 2; grid-row: 1 / span 2; }
+  .cart-empty { align-items: flex-start; flex-wrap: wrap; }
+  .cart-empty > div { flex-basis: calc(100% - 52px); }
+  .cart-empty :deep(.q-btn) { width: 100%; }
+}
+</style>

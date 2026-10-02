@@ -25,7 +25,7 @@ const emit = defineEmits<{
         <td>{{ row.name }}</td>
         <td class="text-center">{{ row.isActive ? 'Ativo' : 'Inativo' }}</td>
         <td class="text-center">
-          <q-btn
+          <q-btn flat
             square
             class="collection-action-btn"
             color="primary"

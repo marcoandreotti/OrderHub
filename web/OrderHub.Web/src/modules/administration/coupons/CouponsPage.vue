@@ -191,7 +191,7 @@ onUnmounted(() => request?.abort())
           </td>
           <td class="text-center">{{ row.isActive ? 'Ativo' : 'Inativo' }}</td>
           <td class="text-center">
-            <q-btn
+            <q-btn flat
               square
               class="collection-action-btn"
               color="primary"
@@ -199,7 +199,7 @@ onUnmounted(() => request?.abort())
               :aria-label="`Editar cupom ${row.code}`"
               :disable="loading"
               @click="open(row)"
-            ><q-tooltip>Editar cupom {{ row.code }}</q-tooltip></q-btn><q-btn
+            ><q-tooltip>Editar cupom {{ row.code }}</q-tooltip></q-btn><q-btn flat
               square
               class="collection-action-btn"
               :color="row.isActive ? 'negative' : 'positive'"

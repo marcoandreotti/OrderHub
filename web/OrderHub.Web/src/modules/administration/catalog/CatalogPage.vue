@@ -83,9 +83,9 @@ const group = ref<Group>({
 })
 const labels: Record<Resource, string> = {
   categories: 'Categorias',
-  products: 'Produtos',
   additionals: 'Adicionais',
-  'additional-groups': 'Grupos de adicionais'
+  'additional-groups': 'Grupos de adicionais',
+  products: 'Produtos'
 }
 const maxPage = computed(() => Math.max(1, Math.ceil(total.value / 20)))
 const products = computed(() => rows.value as Product[])
@@ -485,7 +485,7 @@ onUnmounted(() => request?.abort())
                   style="width: 100px"
                   min="0"
                   :rules="[nonnegative]"
-                /><q-btn
+                /><q-btn flat
                   square
                   class="collection-action-btn"
                   color="negative"
@@ -500,7 +500,7 @@ onUnmounted(() => request?.abort())
                     :options="Array.from(new Map(modifierTargets.map(target => [target.groupId, {label:target.groupName,value:target.groupId}])).values())" style="min-width: 180px" />
                   <q-select v-model="rule.targetAdditionalId" outlined dense label="Opção alvo" emit-value map-options
                     :options="targetOptions(rule.targetGroupId)" style="min-width: 200px" />
-                  <q-btn square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover regra ' + (ruleIndex + 1)" @click="item.compatibilityRules?.splice(ruleIndex, 1)"><q-tooltip>Remover regra</q-tooltip></q-btn>
+                  <q-btn flat square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover regra ' + (ruleIndex + 1)" @click="item.compatibilityRules?.splice(ruleIndex, 1)"><q-tooltip>Remover regra</q-tooltip></q-btn>
                 </div>
                 <q-btn flat icon="add" label="Adicionar dependência/exclusão" @click="(item.compatibilityRules ??= []).push({targetGroupId:'',targetAdditionalId:'',kind:'Requires'})" />
               </div>
@@ -577,7 +577,7 @@ onUnmounted(() => request?.abort())
                 /><q-checkbox
                   v-model="item.isPrincipal"
                   label="Principal"
-                /><q-btn
+                /><q-btn flat
                   square
                   class="collection-action-btn"
                   color="negative"
@@ -628,7 +628,7 @@ onUnmounted(() => request?.abort())
                 /><q-checkbox
                   v-model="item.isActive"
                   label="Variação ativa"
-                /><q-btn
+                /><q-btn flat
                   square
                   class="collection-action-btn"
                   color="negative"
@@ -667,7 +667,7 @@ onUnmounted(() => request?.abort())
                   min="0"
                   :rules="[nonnegative]"
                   style="width: 110px"
-                /><q-btn
+                /><q-btn flat
                   square
                   class="collection-action-btn"
                   color="negative"

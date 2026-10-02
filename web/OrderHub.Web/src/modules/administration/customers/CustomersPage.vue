@@ -195,7 +195,7 @@ onUnmounted(() => request?.abort())
           <td>{{ row.name }}</td>
           <td>{{ row.phone }}<br />{{ row.email }}</td>
           <td class="text-center">
-            <q-btn
+            <q-btn flat
               square
               class="collection-action-btn"
               color="primary"
@@ -203,7 +203,7 @@ onUnmounted(() => request?.abort())
               :aria-label="`Editar ${row.name}`"
               :disable="loading"
               @click="open(row)"
-            ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn><q-btn
+            ><q-tooltip>Editar {{ row.name }}</q-tooltip></q-btn><q-btn flat
               square
               class="collection-action-btn"
               color="secondary"
@@ -309,14 +309,14 @@ onUnmounted(() => request?.abort())
               }}
               — {{ item.city }}/{{ item.state }} — {{ item.postalCode }}
             </p>
-            <q-btn
+            <q-btn flat
               square
               class="collection-action-btn"
               color="primary"
               icon="edit_location_alt"
               :aria-label="`Editar endereço ${item.label}`"
               @click="openAddress(item)"
-            ><q-tooltip>Editar endereço {{ item.label }}</q-tooltip></q-btn><q-btn
+            ><q-tooltip>Editar endereço {{ item.label }}</q-tooltip></q-btn><q-btn flat
               square
               class="collection-action-btn"
               color="negative"
