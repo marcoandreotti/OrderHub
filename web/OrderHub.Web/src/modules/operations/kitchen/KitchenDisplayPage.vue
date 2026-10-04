@@ -24,9 +24,22 @@ const realtime = new OrderRealtimeCoordinator(
 )
 
 const columns = computed(() => [
-  { key: 'preparing', title: 'Em preparo', tickets: store.preparing },
-  { key: 'waiting', title: 'Aguardando preparo', tickets: store.waiting }
+  { key: 'waiting', title: 'Aguardando preparo', tickets: store.waiting },
+  { key: 'preparing', title: 'Em preparo', tickets: store.preparing }
 ])
+const syncSummary = computed(() => {
+  const connection = realtimeState.value === 'connected'
+    ? 'Tempo real conectado'
+    : realtimeState.value === 'reconnecting'
+      ? 'Reconectando ao tempo real · atualização periódica ativa'
+      : realtimeState.value === 'connecting'
+        ? 'Conectando ao tempo real · atualização periódica ativa'
+        : 'Atualização periódica ativa'
+  const lastSync = store.lastSuccessAt
+    ? `Última sincronização: ${time(store.lastSuccessAt)}`
+    : 'Sincronização ainda não concluída'
+  return `Prioridade por etapa e ordem de confirmação · ${connection} · ${lastSync}`
+})
 
 watch(
   () => session.unitId,
@@ -66,9 +79,8 @@ function time(value: number) {
   <q-page class="kds-page">
     <header class="kds-heading">
       <div>
-        <p class="text-overline text-primary q-mb-xs">COZINHA</p>
-        <h1 class="text-h4 q-my-none">Fila de produção</h1>
-        <p class="text-grey-7 q-mb-none">Prioridade por etapa e ordem de confirmação</p>
+        <h1 class="text-h4 q-my-none"><span class="kds-title-brand">COZINHA</span> - Fila de produção</h1>
+        <p class="sync-status q-mb-none" aria-live="polite">{{ syncSummary }}</p>
       </div>
       <q-btn
         outline
@@ -93,12 +105,6 @@ function time(value: number) {
       {{ store.actionError }}
     </q-banner>
 
-    <p class="sync-status" aria-live="polite">
-      <span v-if="realtimeState === 'connected'">Tempo real conectado. </span>
-      <span v-else>Atualização periódica ativa. </span>
-      <span v-if="store.lastSuccessAt">Última sincronização: {{ time(store.lastSuccessAt) }}</span>
-    </p>
-
     <q-banner v-if="!session.unitId" class="bg-blue-1 text-info">
       Selecione uma unidade autorizada para abrir a fila da cozinha.
     </q-banner>
@@ -121,7 +127,8 @@ function time(value: number) {
 <style scoped>
 .kds-page { min-height: calc(100vh - 72px); padding: 20px; overflow-x: hidden; background: var(--oh-surface-page); }
 .kds-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 12px; }
-.sync-status { min-height: 24px; color: var(--oh-text-muted); }
+.kds-title-brand { color: var(--oh-brand-primary); }
+.sync-status { margin-top: 4px; color: var(--oh-text-muted); }
 .kds-board { display: grid; grid-template-columns: repeat(2, minmax(320px, 1fr)); gap: 20px; align-items: start; }
 @media (max-width: 720px) {
   .kds-board { grid-template-columns: 1fr; }

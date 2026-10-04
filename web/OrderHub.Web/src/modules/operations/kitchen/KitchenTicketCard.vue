@@ -20,26 +20,24 @@ const actionLabel = computed(() => props.ticket.action === 'StartPreparation'
   ? 'Iniciar preparo' : 'Marcar pronto')
 const actionIcon = computed(() => props.ticket.action === 'StartPreparation'
   ? 'play_arrow' : 'check')
-const priorityLabel = computed(() => props.ticket.status === 'Preparing'
-  ? 'Em preparo' : 'Aguardando preparo')
 const serviceLabel = computed(() => {
-  if (props.ticket.tableCode) return `Mesa ${props.ticket.tableCode}`
+  if (props.ticket.serviceType === 'Table') return props.ticket.tableCode ? `Mesa ${props.ticket.tableCode}` : 'Mesa'
   return props.ticket.serviceType === 'Delivery' ? 'Entrega' : 'Retirada'
 })
+const serviceTone = computed(() => `service--${props.ticket.serviceType.toLowerCase()}`)
 </script>
 
 <template>
   <article class="kitchen-ticket" :class="{ late: isLate }" tabindex="0">
     <header>
-      <div>
+      <div class="ticket-identity">
         <span class="ticket-number">#{{ ticket.number }}</span>
-        <span class="service">{{ serviceLabel }}</span>
+        <span class="service-tag" :class="serviceTone">{{ serviceLabel }}</span>
       </div>
       <div class="timer" :aria-label="`Tempo nesta etapa: ${elapsed}`">
         {{ elapsed }}
       </div>
     </header>
-    <p class="priority-label" :class="ticket.status === 'Preparing' ? 'status-preparing' : 'status-confirmed'">{{ priorityLabel }}</p>
     <p v-if="isLate" class="late-label" role="status">Pedido atrasado</p>
     <p v-if="ticket.customerName" class="customer">{{ ticket.customerName }}</p>
 
@@ -77,12 +75,14 @@ const serviceLabel = computed(() => {
 .kitchen-ticket { min-width: 0; margin-bottom: 14px; padding: 18px; overflow-wrap: anywhere; border: 2px solid transparent; border-radius: 12px; background: var(--oh-surface-raised); box-shadow: 0 2px 8px color-mix(in srgb, var(--oh-text-primary) 9%, transparent); }
 .kitchen-ticket.late { border-color: var(--oh-status-urgency); }
 .kitchen-ticket > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
-.ticket-number { display: block; color: var(--oh-text-primary); font-size: 1.45rem; font-weight: 800; }
-.service, .customer { color: var(--oh-text-muted); }
+.ticket-identity { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ticket-number { color: var(--oh-text-primary); font-size: 1.45rem; font-weight: 800; }
+.service-tag { display: inline-flex; align-items: center; min-height: 28px; padding: 3px 10px; border-radius: 999px; font-size: .8125rem; font-weight: 750; }
+.service--delivery { background: color-mix(in srgb, var(--oh-status-info) 14%, var(--oh-surface-raised)); color: var(--oh-status-info-text); }
+.service--pickup { background: color-mix(in srgb, var(--oh-status-warning) 18%, var(--oh-surface-raised)); color: var(--oh-status-warning-text); }
+.service--table { background: color-mix(in srgb, var(--oh-status-success) 14%, var(--oh-surface-raised)); color: var(--oh-status-success-text); }
+.customer { color: var(--oh-text-muted); }
 .timer { font-size: 1.05rem; font-weight: 800; white-space: nowrap; }
-.priority-label { width: fit-content; margin: 10px 0; padding: 5px 9px; border-radius: 999px; font-weight: 700; }
-.priority-label.status-confirmed { background: color-mix(in srgb, var(--oh-status-confirmed) 12%, white); color: var(--oh-status-confirmed); }
-.priority-label.status-preparing { background: color-mix(in srgb, var(--oh-status-preparing) 22%, white); color: var(--oh-status-warning-text); }
 .late-label { width: fit-content; margin: 10px 0; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--oh-status-urgency) 10%, var(--oh-surface-raised)); color: var(--oh-status-urgency); font-weight: 700; }
 .ticket-items { margin: 16px 0; padding: 0; list-style: none; border-top: 1px solid var(--oh-border-subtle); }
 .ticket-items > li { padding: 12px 0; border-bottom: 1px solid var(--oh-border-subtle); }

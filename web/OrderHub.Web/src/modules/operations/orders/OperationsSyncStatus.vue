@@ -26,10 +26,11 @@ defineEmits<{ retry: [] }>()
       A fila permanece visível e usa atualização periódica como fallback.
     </q-banner>
     <p class="sync-status" aria-live="polite">
-      <span v-if="realtimeState === 'connected'">Tempo real conectado. </span>
-      <span v-else>Atualização periódica ativa. </span>
-      <span v-if="lastSuccessLabel">Última sincronização: {{ lastSuccessLabel }}</span>
-      <span v-else>Sincronização ainda não concluída.</span>
+      <span v-if="realtimeState === 'connected'">Tempo real conectado · reconciliação automática</span>
+      <span v-else-if="realtimeState === 'connecting'">Conectando ao tempo real · atualização periódica ativa</span>
+      <span v-else-if="realtimeState === 'reconnecting'">Reconectando ao tempo real · atualização periódica ativa</span>
+      <span v-else>Tempo real indisponível · atualização periódica ativa</span>
+      <span> · {{ lastSuccessLabel ? `Última sincronização: ${lastSuccessLabel}` : 'Sincronização ainda não concluída' }}</span>
     </p>
   </section>
 </template>

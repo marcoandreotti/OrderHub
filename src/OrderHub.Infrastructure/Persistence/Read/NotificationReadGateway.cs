@@ -28,7 +28,7 @@ internal sealed class NotificationReadGateway(IReadConnectionFactory connections
             select id, channel, purpose, destination, is_granted as IsGranted, captured_at_utc as CapturedAtUtc, source
             from communications.notification_consent
             where tenant_id = @TenantId and establishment_id = @EstablishmentId
-            order by captured_at_utc desc limit 500;
+            order by captured_at_utc desc, id desc limit 500;
             """;
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
         var rows = await connection.QueryAsync<ConsentRow>(new CommandDefinition(sql, scope, cancellationToken: cancellationToken));
@@ -36,19 +36,21 @@ internal sealed class NotificationReadGateway(IReadConnectionFactory connections
             x.IsGranted, new DateTimeOffset(DateTime.SpecifyKind(x.CapturedAtUtc, DateTimeKind.Utc)), x.Source)).ToArray();
     }
 
-    public async Task<IReadOnlyList<NotificationHistoryView>> ListHistoryAsync(OperationalScope scope, int page, int pageSize, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<NotificationHistoryView>> ListHistoryAsync(OperationalScope scope, int page, int pageSize, DateTimeOffset? fromUtc, DateTimeOffset? toUtcExclusive, CancellationToken cancellationToken)
     {
         const string sql = """
             select id, channel, purpose, destination, status, provider_message_id as ProviderMessageId,
                    attempt_count as AttemptCount, last_error as LastError, created_at_utc as CreatedAtUtc, updated_at_utc as UpdatedAtUtc
             from communications.notification
             where tenant_id = @TenantId and establishment_id = @EstablishmentId
+              and (@FromUtc is null or created_at_utc >= @FromUtc)
+              and (@ToUtcExclusive is null or created_at_utc < @ToUtcExclusive)
             order by created_at_utc desc
             offset @Offset limit @PageSize;
             """;
         await using var connection = await connections.OpenConnectionAsync(cancellationToken);
         var rows = await connection.QueryAsync<HistoryRow>(new CommandDefinition(sql,
-            new { scope.TenantId, scope.EstablishmentId, Offset = (page - 1) * pageSize, PageSize = pageSize }, cancellationToken: cancellationToken));
+            new { scope.TenantId, scope.EstablishmentId, Offset = (page - 1) * pageSize, PageSize = pageSize, FromUtc = fromUtc?.UtcDateTime, ToUtcExclusive = toUtcExclusive?.UtcDateTime }, cancellationToken: cancellationToken));
         return rows.Select(x => new NotificationHistoryView(x.Id, Enum.Parse<NotificationChannel>(x.Channel), x.Purpose, x.Destination,
             Enum.Parse<NotificationDeliveryStatus>(x.Status), x.ProviderMessageId, x.AttemptCount, x.LastError,
             new DateTimeOffset(DateTime.SpecifyKind(x.CreatedAtUtc, DateTimeKind.Utc)), x.UpdatedAtUtc is null ? null : new DateTimeOffset(DateTime.SpecifyKind(x.UpdatedAtUtc.Value, DateTimeKind.Utc)))).ToArray();

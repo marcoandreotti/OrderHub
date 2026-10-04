@@ -5,6 +5,7 @@ import { useSessionStore } from '../../session/store'
 import { catalogClient } from '../catalog/client'
 import {
   availabilityClient,
+  serviceTypeLabels,
   type AvailabilityConfiguration,
   type OrderSchedulingConfiguration,
   type OfferKind,
@@ -21,6 +22,7 @@ const busy = ref(false)
 const error = ref<unknown>(null)
 const message = ref('')
 const serviceTypes: ServiceType[] = ['Table', 'Pickup', 'Delivery']
+const serviceTypeOptions = serviceTypes.map(value => ({ label: serviceTypeLabels[value], value }))
 const exception = reactive<ScheduleException>({
   date: '', serviceType: null, isOpen: false,
   opensAt: null, closesAt: null, reason: null
@@ -110,7 +112,7 @@ onUnmounted(() => controller?.abort())
       <q-card flat bordered><q-card-section><h2 class="text-h6">Exceções de calendário</h2>
         <div class="row q-col-gutter-md">
           <q-input v-model="exception.date" type="date" outlined label="Data" class="col-12 col-md-3" />
-          <q-select v-model="exception.serviceType" clearable outlined label="Modalidade (todas se vazio)" :options="serviceTypes" class="col-12 col-md-3" />
+          <q-select v-model="exception.serviceType" clearable outlined emit-value map-options label="Modalidade (todas se vazio)" :options="serviceTypeOptions" class="col-12 col-md-3" />
           <q-checkbox v-model="exception.isOpen" label="Aberto em horário especial" class="col-12 col-md-3" />
           <q-input v-if="exception.isOpen" v-model="exception.opensAt" type="time" outlined label="Abre" class="col-6 col-md-2" />
           <q-input v-if="exception.isOpen" v-model="exception.closesAt" type="time" outlined label="Fecha" class="col-6 col-md-2" />
@@ -126,10 +128,10 @@ onUnmounted(() => controller?.abort())
 
       <q-card flat bordered><q-card-section><h2 class="text-h6">Pausas por modalidade</h2>
         <q-list v-if="configuration.pauses.length" bordered separator class="q-mb-md"><q-item v-for="item in configuration.pauses" :key="item.serviceType">
-          <q-item-section><strong>{{ item.serviceType }}</strong><small>{{ item.reason || 'Pausa manual' }} · até {{ item.endsAt ? new Date(item.endsAt).toLocaleString('pt-BR') : 'reativação manual' }}</small></q-item-section>
-          <q-item-section side><q-btn flat square class="collection-action-btn" color="positive" icon="play_arrow" :aria-label="'Retomar ' + item.serviceType" @click="execute(() => availabilityClient.resume(session.unitId, item.serviceType), 'Modalidade retomada.')"><q-tooltip>Retomar modalidade</q-tooltip></q-btn></q-item-section>
+          <q-item-section><strong>{{ serviceTypeLabels[item.serviceType] }}</strong><small>{{ item.reason || 'Pausa manual' }} · até {{ item.endsAt ? new Date(item.endsAt).toLocaleString('pt-BR') : 'reativação manual' }}</small></q-item-section>
+          <q-item-section side><q-btn flat square class="collection-action-btn" color="positive" icon="play_arrow" :aria-label="'Retomar ' + serviceTypeLabels[item.serviceType]" @click="execute(() => availabilityClient.resume(session.unitId, item.serviceType), 'Modalidade retomada.')"><q-tooltip>Retomar modalidade</q-tooltip></q-btn></q-item-section>
         </q-item></q-list>
-        <div class="row q-col-gutter-md"><q-select v-model="pause.serviceType" outlined label="Modalidade" :options="serviceTypes" class="col-12 col-md-3" />
+        <div class="row q-col-gutter-md"><q-select v-model="pause.serviceType" outlined emit-value map-options label="Modalidade" :options="serviceTypeOptions" class="col-12 col-md-3" />
           <q-input v-model="pause.endsAt" type="datetime-local" outlined label="Até (opcional)" class="col-12 col-md-3" />
           <q-input v-model="pause.reason" outlined label="Motivo" class="col-12 col-md-4" />
           <div class="col-12 col-md-2 pause-submit-cell"><q-btn color="warning" text-color="dark" icon="pause_circle" label="Pausar" class="pause-submit-btn" :loading="busy" @click="execute(() => availabilityClient.pause(session.unitId, pause.serviceType, pause.endsAt || null, pause.reason), 'Modalidade pausada.')" /></div></div>

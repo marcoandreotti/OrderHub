@@ -25,13 +25,18 @@ const stateOrder: OrderStatus[] = ['Confirmed', 'Preparing', 'Ready', 'OutForDel
 const status = ref<OrderStatus | undefined>(parseStatus(route.query.status))
 const serviceType = ref<OrderServiceType | undefined>(parseService(route.query.serviceType) ?? (route.path.endsWith('/delivery') ? 'Delivery' : undefined))
 const search = ref<string | null>(typeof route.query.search === 'string' ? route.query.search : '')
+const defaultPeriod = lastTwoDays()
+const fromDate = ref(readDate(route.query.from) ?? defaultPeriod.from)
+const toDate = ref(readDate(route.query.to) ?? defaultPeriod.to)
 const pendingAction = ref<OrderAction | null>(null)
 const note = ref('')
 const actionBusy = ref(false)
 const detailPanel = ref<HTMLElement | null>(null)
 const realtimeState = ref<OrderRealtimeState>('disconnected')
 
+const periodValid = computed(() => !!readDate(fromDate.value) && !!readDate(toDate.value) && fromDate.value <= toDate.value)
 const filters = computed<OrderFilters>(() => ({
+  ...(periodValid.value ? { from: localDayStart(fromDate.value), to: localDayStart(addDays(toDate.value, 1)) } : {}),
   status: status.value,
   serviceType: serviceType.value,
   number: /^[1-9]\d*$/.test((search.value ?? '').trim()) ? Number(search.value) : undefined
@@ -67,7 +72,7 @@ function promisedTime(order: Pick<OrderSummary, 'scheduledAtUtc' | 'scheduledTim
   }).format(new Date(order.scheduledAtUtc))
 }
 const poller = new PollingCoordinator(
-  () => store.synchronize(session.unitId, filters.value),
+  () => periodValid.value ? store.synchronize(session.unitId, filters.value) : Promise.resolve(),
   {
     intervalMs: interval,
     maxIntervalMs: Math.max(interval, 120_000),
@@ -82,13 +87,15 @@ const realtime = new OrderRealtimeCoordinator(
   }
 )
 
-watch([status, serviceType, search], () => {
+watch([status, serviceType, search, fromDate, toDate], () => {
   const query: Record<string, string> = {}
   if (status.value) query.status = status.value
   if (serviceType.value) query.serviceType = serviceType.value
   if (search.value?.trim()) query.search = search.value.trim()
+  if (readDate(fromDate.value)) query.from = fromDate.value
+  if (readDate(toDate.value)) query.to = toDate.value
   void router.replace({ query })
-  void poller.refresh(true)
+  if (periodValid.value) void poller.refresh(true)
 })
 
 watch(() => route.path, (path) => {
@@ -163,6 +170,26 @@ function parseService(value: unknown): OrderServiceType | undefined {
     ? (value as OrderServiceType)
     : undefined
 }
+function readDate(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day ? value : undefined
+}
+function localDayStart(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day).toISOString()
+}
+function addDays(value: string, amount: number) {
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(year, month - 1, day + amount)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+function lastTwoDays() {
+  const today = new Date()
+  const to = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  return { from: addDays(to, -1), to }
+}
 function time(value: string | number) {
   return new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit',
@@ -178,6 +205,12 @@ function elapsed(value: string) {
   const minutes = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 60_000))
   return minutes < 1 ? 'agora' : 'há ' + minutes + ' min'
 }
+function createdTimeLabel(value: string, orderStatus: OrderStatus) {
+  const isHistorical = ['Completed', 'Cancelled', 'Rejected'].includes(orderStatus)
+  return isHistorical
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value))
+    : elapsed(value)
+}
 </script>
 
 <template>
@@ -185,9 +218,6 @@ function elapsed(value: string) {
     <header class="operations-heading">
       <div>
         <h1 class="text-h4 q-my-none">{{ route.path.endsWith('/delivery') ? 'Entregas em andamento' : 'Pedidos em andamento' }}</h1>
-        <p class="operations-description q-mb-none">
-          Tempo real com reconciliação autoritativa e fallback automático
-        </p>
       </div>
       <q-btn
         color="primary"
@@ -209,6 +239,8 @@ function elapsed(value: string) {
     />
 
     <section class="operations-filters" aria-label="Filtros de pedidos">
+      <q-input v-model="fromDate" outlined dense type="date" label="De" />
+      <q-input v-model="toDate" outlined dense type="date" label="Até" />
       <q-select
         v-model="status"
         :options="statusOptions"
@@ -238,6 +270,9 @@ function elapsed(value: string) {
         label="Número do pedido"
       />
     </section>
+    <q-banner v-if="!periodValid" class="bg-orange-1 text-brown-9 q-mb-md" role="status">
+      Escolha um período válido: a data inicial deve ser igual ou anterior à data final.
+    </q-banner>
 
     <q-banner v-if="!session.unitId" class="bg-blue-1 text-info">
       Selecione uma unidade autorizada para acompanhar os pedidos.
@@ -255,14 +290,13 @@ function elapsed(value: string) {
             <span>{{ statusLabels[group.status] }}</span>
             <q-badge :label="group.orders.length" color="grey-8" />
           </h2>
-          <h3 v-if="group.immediate.length" class="queue-subheading">Imediatos</h3>
+          <h3 v-if="group.immediate.length && !['Completed', 'Cancelled', 'Rejected'].includes(group.status)" class="queue-subheading">Imediatos</h3>
           <OperationsOrderCard
             v-for="order in group.immediate"
             :key="order.id"
             :order="order"
-            :status-label="statusLabels[order.status]"
             :service-label="serviceLabels[order.serviceType]"
-            :time-label="elapsed(order.createdAt)"
+            :time-label="createdTimeLabel(order.createdAt, order.status)"
             :total-label="money(order.total)"
             :selected="store.selectedId === order.id"
             :is-new="store.isNew(order.id)"
@@ -278,7 +312,6 @@ function elapsed(value: string) {
             v-for="order in group.scheduled"
             :key="order.id"
             :order="order"
-            :status-label="statusLabels[order.status]"
             :service-label="serviceLabels[order.serviceType]"
             :time-label="promisedTime(order)"
             :total-label="money(order.total)"
@@ -393,10 +426,9 @@ function elapsed(value: string) {
 .operations-heading, .detail-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
 .operations-heading { margin-bottom: 22px; }
 .operations-heading h1 { color: var(--oh-text-primary); font-size: 1.85rem; font-weight: 750; letter-spacing: -.025em; }
-.operations-description { margin-top: 5px; color: var(--oh-text-muted); }
 .operations-filters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(160px, 240px));
+  grid-template-columns: repeat(5, minmax(145px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
   padding: 14px;
@@ -459,6 +491,7 @@ function elapsed(value: string) {
 @media (max-width: 1100px) {
   .operations-workspace { grid-template-columns: 1fr; }
   .status-board { grid-template-columns: repeat(2, minmax(230px, 1fr)); }
+  .operations-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .order-detail { position: static; max-height: none; }
 }
 @media (max-width: 700px) {

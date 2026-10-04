@@ -19,6 +19,10 @@ using OrderHub.Application.Abstractions.Ordering;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Mensagens padrão dos validators seguem o idioma da interface.
+FluentValidation.ValidatorOptions.Global.LanguageManager.Culture =
+    System.Globalization.CultureInfo.GetCultureInfo("pt-BR");
+
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddPlatformProvisioning();
@@ -71,7 +75,7 @@ builder.Services.AddRateLimiter(options =>
     options.OnRejected = async (context, cancellationToken) =>
     {
         context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        await context.HttpContext.Response.WriteAsJsonAsync(new { title = "Authentication could not be completed.", status = 429 }, cancellationToken);
+        await context.HttpContext.Response.WriteAsJsonAsync(new { title = "Não foi possível concluir a autenticação.", status = 429 }, cancellationToken);
     };
 });
 builder.Services.AddAuthorization(options =>

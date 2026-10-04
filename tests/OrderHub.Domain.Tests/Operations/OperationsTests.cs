@@ -44,6 +44,9 @@ public sealed class OperationsTests
 
         var beforeOpening = AvailabilityEvaluator.Evaluate(true, "UTC", hours, [], [], OrderServiceType.Pickup, monday.AddHours(-2));
         Assert.Equal(new DateTimeOffset(2026, 9, 21, 11, 0, 0, TimeSpan.Zero), beforeOpening.NextOpening);
+
+        var outsideHours = AvailabilityEvaluator.Evaluate(true, "UTC", [], [], [], OrderServiceType.Pickup, monday);
+        Assert.Equal("Estamos fora do horário de atendimento.", outsideHours.Message);
     }
 
     [Fact]

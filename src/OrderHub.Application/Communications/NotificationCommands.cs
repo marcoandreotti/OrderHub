@@ -21,9 +21,9 @@ public sealed class UpsertNotificationTemplateValidator : AbstractValidator<Upse
         RuleFor(x => x.Subject).MaximumLength(250);
         RuleFor(x => x.Body).NotEmpty().MaximumLength(10000);
         RuleFor(x => x.Body).Must((command, body) => HasSupportedOrderParameters(command.Purpose, body))
-            .WithMessage("Customer order templates can only use supported order placeholders.");
+            .WithMessage("Os modelos de pedido só podem usar os campos de substituição compatíveis.");
         RuleFor(x => x.Subject).Must((command, subject) => HasSupportedOrderParameters(command.Purpose, subject))
-            .WithMessage("Customer order templates can only use supported order placeholders.");
+            .WithMessage("Os modelos de pedido só podem usar os campos de substituição compatíveis.");
         RuleFor(x => x.ProviderTemplateName).NotEmpty().MaximumLength(200).When(x => x.Channel == NotificationChannel.WhatsApp && x.IsActive);
         RuleFor(x => x.Subject).NotEmpty().When(x => x.Channel == NotificationChannel.Email && x.IsActive);
     }
@@ -60,7 +60,7 @@ public sealed class SetNotificationConsentValidator : AbstractValidator<SetNotif
         RuleFor(x => x.Destination).NotEmpty().MaximumLength(254);
         RuleFor(x => x.Destination).EmailAddress().When(x => x.Channel == NotificationChannel.Email);
         RuleFor(x => x.Destination).Matches("^\\+?[1-9][0-9]{7,14}$").When(x => x.Channel == NotificationChannel.WhatsApp);
-        RuleFor(x => x.Source).Must(value => !string.IsNullOrWhiteSpace(value)).WithMessage("A verifiable consent source is required.").MaximumLength(200);
+        RuleFor(x => x.Source).Must(value => !string.IsNullOrWhiteSpace(value)).WithMessage("Informe uma origem verificável para o consentimento.").MaximumLength(200);
     }
 }
 
@@ -100,21 +100,21 @@ public sealed class RequestNotificationHandler(EstablishmentScopeResolver scopes
     {
         var scope = await scopes.ResolveAsync(command.EstablishmentId, cancellationToken);
         var template = await repository.FindTemplateAsync(scope, command.TemplateId, cancellationToken)
-            ?? throw new NotFoundException("Notification template was not found.");
+            ?? throw new NotFoundException("Modelo de notificação não encontrado.");
         if (!template.IsActive) throw new ConflictException("Notification template is inactive.");
         if (template.Channel != command.Channel)
-            throw new ConflictException("Notification channel does not match the selected template.");
+            throw new ConflictException("O canal de notificação não corresponde ao modelo selecionado.");
 
         var requiredParameters = System.Text.RegularExpressions.Regex.Matches(template.Body + "\n" + template.Subject,
                 "\\{\\{([a-zA-Z0-9_.-]{1,50})\\}\\}")
             .Select(match => match.Groups[1].Value).ToHashSet(StringComparer.Ordinal);
         if (!requiredParameters.SetEquals(command.Parameters.Keys))
-            throw new FluentValidation.ValidationException("Notification parameters must match the placeholders in the selected template.");
+            throw new FluentValidation.ValidationException("Os parâmetros da notificação devem corresponder aos campos do modelo selecionado.");
         if (command.Channel == NotificationChannel.WhatsApp)
         {
             var indexes = requiredParameters.Select(value => int.TryParse(value, out var index) ? index : -1).Order().ToArray();
             if (!indexes.SequenceEqual(Enumerable.Range(1, indexes.Length)))
-                throw new FluentValidation.ValidationException("WhatsApp template placeholders must be sequential numeric values starting at {{1}}.");
+                throw new FluentValidation.ValidationException("Os campos do modelo de WhatsApp devem ser numéricos e sequenciais, começando em {{1}}.");
         }
 
         var parametersJson = System.Text.Json.JsonSerializer.Serialize(command.Parameters.OrderBy(x => x.Key, StringComparer.Ordinal)
@@ -147,7 +147,7 @@ public sealed class ListNotificationConsentsHandler(EstablishmentScopeResolver s
     }
 }
 
-public sealed record ListNotificationHistoryQuery(Guid EstablishmentId, int Page, int PageSize) : IQuery<IReadOnlyList<NotificationHistoryView>>;
+public sealed record ListNotificationHistoryQuery(Guid EstablishmentId, int Page, int PageSize, DateTimeOffset? FromUtc, DateTimeOffset? ToUtcExclusive) : IQuery<IReadOnlyList<NotificationHistoryView>>;
 public sealed class ListNotificationHistoryValidator : AbstractValidator<ListNotificationHistoryQuery>
 {
     public ListNotificationHistoryValidator()
@@ -155,6 +155,8 @@ public sealed class ListNotificationHistoryValidator : AbstractValidator<ListNot
         RuleFor(x => x.EstablishmentId).NotEmpty();
         RuleFor(x => x.Page).GreaterThan(0);
         RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+        RuleFor(x => x).Must(x => x.FromUtc is null || x.ToUtcExclusive is null || x.FromUtc < x.ToUtcExclusive)
+            .WithMessage("A data inicial deve ser anterior à data final.");
     }
 }
 public sealed class ListNotificationHistoryHandler(EstablishmentScopeResolver scopes, INotificationReadGateway reads)
@@ -163,7 +165,7 @@ public sealed class ListNotificationHistoryHandler(EstablishmentScopeResolver sc
     public async Task<IReadOnlyList<NotificationHistoryView>> HandleAsync(ListNotificationHistoryQuery query, CancellationToken cancellationToken)
     {
         var scope = await scopes.ResolveAsync(query.EstablishmentId, cancellationToken);
-        return await reads.ListHistoryAsync(scope, query.Page, query.PageSize, cancellationToken);
+        return await reads.ListHistoryAsync(scope, query.Page, query.PageSize, query.FromUtc, query.ToUtcExclusive, cancellationToken);
     }
 }
 

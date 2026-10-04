@@ -179,7 +179,7 @@ public interface INotificationReadGateway
 {
     Task<IReadOnlyList<NotificationTemplateView>> ListTemplatesAsync(OperationalScope scope, CancellationToken cancellationToken);
     Task<IReadOnlyList<NotificationConsentView>> ListConsentsAsync(OperationalScope scope, CancellationToken cancellationToken);
-    Task<IReadOnlyList<NotificationHistoryView>> ListHistoryAsync(OperationalScope scope, int page, int pageSize, CancellationToken cancellationToken);
+    Task<IReadOnlyList<NotificationHistoryView>> ListHistoryAsync(OperationalScope scope, int page, int pageSize, DateTimeOffset? fromUtc, DateTimeOffset? toUtcExclusive, CancellationToken cancellationToken);
     Task<IReadOnlyList<NotificationAttemptView>> ListAttemptsAsync(OperationalScope scope, Guid notificationId, CancellationToken cancellationToken);
 }
 

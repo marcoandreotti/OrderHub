@@ -85,11 +85,11 @@ export const communicationsClient = {
       await api.post<{ id: string }>(`${path(unit)}/notifications`, data)
     ).data
   },
-  async history(unit: string, signal?: AbortSignal) {
+  async history(unit: string, filters: { fromUtc?: string; toUtcExclusive?: string; signal?: AbortSignal } = {}) {
     return (
       await api.get<NotificationHistory[]>(`${path(unit)}/notifications`, {
-        params: { page: 1, pageSize: 50 },
-        signal
+        params: { page: 1, pageSize: 100, fromUtc: filters.fromUtc, toUtcExclusive: filters.toUtcExclusive },
+        signal: filters.signal
       })
     ).data
   },

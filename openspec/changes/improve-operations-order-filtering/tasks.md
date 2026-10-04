@@ -1,0 +1,6 @@
+- [x] 1. Registrar requisitos de período e redundância visual da fila.
+- [x] 2. Adicionar período inclusivo padrão de dois dias ao filtro e à URL.
+- [x] 3. Remover o estado redundante dos cartões e simplificar sua apresentação.
+- [x] 4. Revisar arquivos alterados e validar mecanicamente a interface.
+- [x] 5. Consolidar modo de atualização, conexão e última sincronização em uma única linha.
+- [x] 6. Exibir minutos nos pedidos criados hoje e data/hora nos pedidos históricos.

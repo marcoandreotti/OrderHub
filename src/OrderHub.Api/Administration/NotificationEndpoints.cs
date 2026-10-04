@@ -21,7 +21,7 @@ internal static class NotificationEndpoints
         group.MapPut("/templates", async (Guid establishmentId, NotificationTemplateRequest request, ICommandDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             if (!Enum.TryParse<NotificationChannel>(request.Channel, true, out var channel))
-                throw new FluentValidation.ValidationException("Channel must be Email or WhatsApp.");
+                throw new FluentValidation.ValidationException("O canal deve ser E-mail ou WhatsApp.");
             var id = await dispatcher.DispatchAsync<UpsertNotificationTemplateCommand, Guid>(new(establishmentId, request.Id,
                 request.Purpose, channel, request.Language, request.Subject ?? string.Empty, request.Body, request.ProviderTemplateName,
                 request.RequiresConsent, request.IsActive), cancellationToken);
@@ -36,7 +36,7 @@ internal static class NotificationEndpoints
         group.MapPut("/consents", async (Guid establishmentId, NotificationConsentRequest request, ICommandDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             if (!Enum.TryParse<NotificationChannel>(request.Channel, true, out var channel))
-                throw new FluentValidation.ValidationException("Channel must be Email or WhatsApp.");
+                throw new FluentValidation.ValidationException("O canal deve ser E-mail ou WhatsApp.");
             await dispatcher.DispatchAsync(new SetNotificationConsentCommand(establishmentId, channel, request.Purpose,
                 request.Destination, request.IsGranted, request.Source), cancellationToken);
             return Results.NoContent();
@@ -44,15 +44,15 @@ internal static class NotificationEndpoints
         group.MapPost("/notifications", async (Guid establishmentId, NotificationCreateRequest request, ICommandDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             if (!Enum.TryParse<NotificationChannel>(request.Channel, true, out var channel))
-                throw new FluentValidation.ValidationException("Channel must be Email or WhatsApp.");
+                throw new FluentValidation.ValidationException("O canal deve ser E-mail ou WhatsApp.");
             var id = await dispatcher.DispatchAsync<RequestNotificationCommand, Guid>(new(establishmentId, request.TemplateId,
                 channel, request.Destination, request.Parameters, request.IdempotencyKey), cancellationToken);
             return Results.Accepted(value: new { id });
         });
-        group.MapGet("/notifications", async (Guid establishmentId, int? page, int? pageSize, IQueryDispatcher dispatcher, CancellationToken cancellationToken) =>
+        group.MapGet("/notifications", async (Guid establishmentId, int? page, int? pageSize, DateTimeOffset? fromUtc, DateTimeOffset? toUtcExclusive, IQueryDispatcher dispatcher, CancellationToken cancellationToken) =>
         {
             var items = await dispatcher.DispatchAsync<ListNotificationHistoryQuery, IReadOnlyList<NotificationHistoryView>>(
-                new(establishmentId, page ?? 1, pageSize ?? 20), cancellationToken);
+                new(establishmentId, page ?? 1, pageSize ?? 20, fromUtc, toUtcExclusive), cancellationToken);
             return Results.Ok(items.Select(Map).ToArray());
         });
         group.MapGet("/notifications/{notificationId:guid}/attempts", async (Guid establishmentId, Guid notificationId, IQueryDispatcher dispatcher, CancellationToken cancellationToken) =>

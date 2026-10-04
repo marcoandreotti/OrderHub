@@ -9,8 +9,8 @@ public sealed class ScheduleExceptionInputValidator : AbstractValidator<Schedule
         RuleFor(x => x.ServiceType).IsInEnum().When(x => x.ServiceType is not null);
         RuleFor(x => x.OpensAt).NotNull().When(x => x.IsOpen);
         RuleFor(x => x.ClosesAt).NotNull().When(x => x.IsOpen);
-        RuleFor(x => x).Must(x => !x.IsOpen || x.OpensAt != x.ClosesAt).WithMessage("Open schedule exception requires a valid interval.");
-        RuleFor(x => x).Must(x => x.IsOpen || x.OpensAt is null && x.ClosesAt is null).WithMessage("Closed schedule exception cannot contain an interval.");
+        RuleFor(x => x).Must(x => !x.IsOpen || x.OpensAt != x.ClosesAt).WithMessage("Informe um intervalo válido para a exceção de horário aberto.");
+        RuleFor(x => x).Must(x => x.IsOpen || x.OpensAt is null && x.ClosesAt is null).WithMessage("Exceções de horário fechado não podem conter um intervalo.");
         RuleFor(x => x.Reason).MaximumLength(250);
     }
 }

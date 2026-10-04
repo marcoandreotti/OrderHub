@@ -141,15 +141,17 @@ const availabilityMessage = (reason: string) => ({
   EstablishmentInactive: 'A unidade não está recebendo pedidos.'
 }[reason] ?? 'Esta modalidade não está disponível agora.')
 const availabilityNoticeMessage = (reason: string, message: string | null) => {
-  const systemMessages: Record<string, string> = {
-    'Establishment is inactive.': 'A unidade não está recebendo pedidos.',
-    'Establishment is closed by calendar exception.': 'A unidade está fechada excepcionalmente.',
-    'Service is temporarily paused.': 'Esta modalidade está temporariamente pausada.',
-    'Outside exceptional service hours.': 'Esta modalidade está fora do horário excepcional de atendimento.',
-    'Outside business hours.': 'Estamos fora do horário de atendimento.'
-  }
-  return message ? systemMessages[message] ?? message : availabilityMessage(reason)
+  return message || availabilityMessage(reason)
 }
+const pageError = computed(() => {
+  const failure = error.value
+  const availability = selectedServiceAvailability.value
+  if (failure instanceof ApiError && availability?.isAvailable === false &&
+      failure.message === availabilityNoticeMessage(availability.reason, availability.message)) {
+    return null
+  }
+  return failure
+})
 
 async function load() {
   controller?.abort()
@@ -581,7 +583,7 @@ onBeforeUnmount(() => {
         <q-btn flat label="Retomar acompanhamento"
           @click="router.push('/order/track/' + previousReference)" />
       </aside>
-      <ProblemBanner :error="error" />
+      <ProblemBanner :error="pageError" />
       <q-banner v-if="selectedServiceAvailability?.isAvailable === false" class="availability-notice q-mb-md" role="status">
         <template #avatar><q-icon name="schedule" /></template>
         <strong>{{ availabilityNoticeMessage(selectedServiceAvailability.reason, selectedServiceAvailability.message) }}</strong>

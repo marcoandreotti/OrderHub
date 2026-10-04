@@ -63,4 +63,15 @@ public sealed class NotificationCommandValidationTests
 
         Assert.Contains(result.Errors, error => error.PropertyName == nameof(command.Source));
     }
+
+    [Fact]
+    public async Task Notification_history_requires_start_before_exclusive_end()
+    {
+        var query = new ListNotificationHistoryQuery(Guid.NewGuid(), 1, 100,
+            DateTimeOffset.Parse("2026-10-02T00:00:00Z"), DateTimeOffset.Parse("2026-10-02T00:00:00Z"));
+
+        var result = await new ListNotificationHistoryValidator().ValidateAsync(query);
+
+        Assert.Contains(result.Errors, error => error.ErrorMessage == "A data inicial deve ser anterior à data final.");
+    }
 }

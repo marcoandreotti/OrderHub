@@ -1,6 +1,11 @@
 import { api } from '../../../http/client'
 
 export type ServiceType = 'Table' | 'Pickup' | 'Delivery'
+export const serviceTypeLabels: Record<ServiceType, string> = {
+  Table: 'Mesa',
+  Pickup: 'Retirada',
+  Delivery: 'Entrega'
+}
 export type OfferKind = 'Product' | 'Variation' | 'Additional'
 export interface ScheduleException {
   date: string

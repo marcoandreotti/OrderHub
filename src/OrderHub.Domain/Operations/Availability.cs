@@ -147,30 +147,30 @@ public static class AvailabilityEvaluator
         DateTimeOffset instant)
     {
         if (!establishmentActive)
-            return new(false, AvailabilityReason.EstablishmentInactive, "Establishment is inactive.", null);
+            return new(false, AvailabilityReason.EstablishmentInactive, "A unidade não está recebendo pedidos.", null);
 
         var local = TimeZoneInfo.ConvertTime(instant, zone).DateTime;
         var today = SelectException(exceptions, DateOnly.FromDateTime(local), serviceType);
         if (today is { IsOpen: false })
-            return new(false, AvailabilityReason.CalendarException, today.Reason ?? "Establishment is closed by calendar exception.", null);
+            return new(false, AvailabilityReason.CalendarException, today.Reason ?? "A unidade está fechada excepcionalmente.", null);
 
         var activePause = pauses
             .Where(x => x.ServiceType == serviceType && x.IsActiveAt(instant))
             .OrderByDescending(x => x.StartsAt)
             .FirstOrDefault();
         if (activePause is not null)
-            return new(false, AvailabilityReason.ServicePaused, activePause.Reason ?? "Service is temporarily paused.", activePause.EndsAt);
+            return new(false, AvailabilityReason.ServicePaused, activePause.Reason ?? "Esta modalidade está temporariamente pausada.", activePause.EndsAt);
 
         var previous = SelectException(exceptions, DateOnly.FromDateTime(local).AddDays(-1), serviceType);
         var openException = today is { IsOpen: true } ? today : previous is { IsOpen: true } && previous.Contains(local) ? previous : null;
         if (openException is not null)
             return openException.Contains(local)
                 ? AvailabilityDecision.Available()
-                : new(false, AvailabilityReason.CalendarException, openException.Reason ?? "Outside exceptional service hours.", null);
+                : new(false, AvailabilityReason.CalendarException, openException.Reason ?? "Esta modalidade está fora do horário excepcional de atendimento.", null);
 
         return hours.Any(x => x.Contains(local))
             ? AvailabilityDecision.Available()
-            : new(false, AvailabilityReason.OutsideBusinessHours, "Outside business hours.", null);
+            : new(false, AvailabilityReason.OutsideBusinessHours, "Estamos fora do horário de atendimento.", null);
     }
 
     private static DateTimeOffset? FindNextOpening(

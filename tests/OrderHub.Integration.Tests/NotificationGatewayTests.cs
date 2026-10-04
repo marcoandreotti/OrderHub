@@ -166,9 +166,9 @@ public sealed class NotificationGatewayTests : IAsyncLifetime
             new(templateId, "order.update", NotificationChannel.Email, "pt_BR", "Changed", "Changed", null, false, true),
             now, CancellationToken.None));
         Assert.Empty(await reads.ListTemplatesAsync(scopeB, CancellationToken.None));
-        Assert.Empty(await reads.ListHistoryAsync(scopeB, 1, 10, CancellationToken.None));
+        Assert.Empty(await reads.ListHistoryAsync(scopeB, 1, 10, null, null, CancellationToken.None));
         Assert.Single(await reads.ListTemplatesAsync(scopeA, CancellationToken.None));
-        Assert.Single(await reads.ListHistoryAsync(scopeA, 1, 10, CancellationToken.None));
+        Assert.Single(await reads.ListHistoryAsync(scopeA, 1, 10, null, null, CancellationToken.None));
     }
 
     [Fact]
@@ -390,7 +390,7 @@ public sealed class NotificationGatewayTests : IAsyncLifetime
         var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
         Assert.Equal(OrderStatus.Confirmed, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
         var history = await verifyScope.ServiceProvider.GetRequiredService<INotificationReadGateway>()
-            .ListHistoryAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), 1, 10, CancellationToken.None);
+            .ListHistoryAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), 1, 10, null, null, CancellationToken.None);
         Assert.Equal(NotificationDeliveryStatus.AcceptedByProvider, Assert.Single(history).Status);
         Assert.Equal(2, sender.Calls);
     }
@@ -469,7 +469,7 @@ public sealed class NotificationGatewayTests : IAsyncLifetime
         var verifyContext = verifyScope.ServiceProvider.GetRequiredService<OrderHubDbContext>();
         Assert.Equal(OrderStatus.Confirmed, (await verifyContext.Orders.SingleAsync(item => item.Id == fixture.OrderId)).Status);
         var history = await verifyScope.ServiceProvider.GetRequiredService<INotificationReadGateway>()
-            .ListHistoryAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), 1, 10, CancellationToken.None);
+            .ListHistoryAsync(new OperationalScope(fixture.TenantId, Guid.NewGuid(), fixture.EstablishmentId), 1, 10, null, null, CancellationToken.None);
         Assert.Equal(expectedStatus, Assert.Single(history).Status);
     }
 

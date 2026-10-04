@@ -89,6 +89,8 @@ export interface OrderPage {
 }
 
 export interface OrderFilters {
+  from?: string
+  to?: string
   status?: OrderStatus
   serviceType?: OrderServiceType
   number?: number
