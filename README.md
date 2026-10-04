@@ -80,6 +80,12 @@ docker compose -f docker-compose.yml up --build
 
 EF Core atende escrita e migrations; Dapper atende leitura. MediatR e AutoMapper são proibidos. Consulte `openspec/architecture.md`, `openspec/conventions.md` e os ADRs em `openspec/decisions/`.
 
+## Cérebro do projeto
+
+O conhecimento de produto, domínio, arquitetura, fluxos e orientações para agentes do OrderHub está organizado no cofre Obsidian **Cérebro do Arquiteto**, no repositório `Obsidian`, em `Arquiteturando/Projetos/OrderHub/`. Quando o cofre estiver disponível, desenvolvedores e agentes devem consultá-lo no início de uma tarefa para entender o contexto e navegar até as notas relacionadas. Comece por `00 - Home/Home.md` ou `00 - Home/Mapa do Projeto.md`; a nota `Arquiteturando/Bússola de desenvolvimento para agentes.md` reúne as orientações gerais para agentes.
+
+O Cérebro e a memória disponível ajudam a compreender o projeto e seu histórico. Para requisitos vigentes e decisões normativas, confirme sempre no `AGENTS.md`, nas specs e changes do OpenSpec, nos ADRs, no Design System e no código atual, conforme aplicável. Se houver divergência, prevalecem essas fontes oficiais. As notas podem ficar desatualizadas; confirme informações voláteis no repositório.
+
 ## Configuração
 
 Configurações não sensíveis ficam em `appsettings*.json`. Valores por ambiente usam variáveis com separador `__`, por exemplo `ConnectionStrings__OrderHub`. Senhas reais, tokens e arquivos `.env` não devem ser versionados.
