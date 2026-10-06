@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -39,8 +40,35 @@ public sealed class ApiFoundationTests : IClassFixture<ApiFactory>
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
-        Assert.Equal("Forbidden", problem?.Title);
+        Assert.Equal("Acesso negado", problem?.Title);
+        Assert.Equal("Você não tem permissão para realizar esta operação.", problem?.Detail);
         Assert.True(problem?.Extensions.ContainsKey("traceId"));
+    }
+
+    [Fact]
+    public async Task Public_validation_errors_use_portuguese_messages_in_problem_details()
+    {
+        using var response = await client.PostAsJsonAsync(
+            "/api/public/ordering/unit/simulate",
+            new
+            {
+                ServiceType = "Pickup",
+                Items = Array.Empty<object>()
+            },
+            CancellationToken.None);
+
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken.None));
+        var root = document.RootElement;
+        var errors = root.GetProperty("errors").EnumerateObject()
+            .SelectMany(property => property.Value.EnumerateArray())
+            .Select(value => value.GetString() ?? string.Empty)
+            .ToArray();
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("Falha na validação", root.GetProperty("title").GetString());
+        Assert.NotEmpty(errors);
+        Assert.Contains("'Items' deve ser informado.", errors);
+        Assert.True(root.TryGetProperty("traceId", out _));
     }
 }
 

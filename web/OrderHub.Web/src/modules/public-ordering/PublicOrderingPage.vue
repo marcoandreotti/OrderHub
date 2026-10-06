@@ -147,7 +147,7 @@ const pageError = computed(() => {
   const failure = error.value
   const availability = selectedServiceAvailability.value
   if (failure instanceof ApiError && availability?.isAvailable === false &&
-      failure.message === availabilityNoticeMessage(availability.reason, availability.message)) {
+      failure.problem.reason === availability.reason) {
     return null
   }
   return failure

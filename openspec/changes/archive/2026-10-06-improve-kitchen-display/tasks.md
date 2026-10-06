@@ -2,4 +2,4 @@
 - [x] 2. Reorganizar etapas em faixas coloridas com aguardando primeiro.
 - [x] 3. Simplificar tickets e identificar atendimento com etiquetas semânticas.
 - [x] 4. Consolidar título, prioridade e estado de sincronização.
-- [ ] 5. Revisar a interface e executar typecheck.
+- [x] 5. Revisar a interface e executar typecheck.

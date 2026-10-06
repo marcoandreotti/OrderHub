@@ -9,6 +9,7 @@ export interface ProblemDetails {
   status?: number
   detail?: string
   traceId?: string
+  reason?: string
   errors?: Record<string, string[]>
   currentDeliveryFee?: number
   currentTotal?: number

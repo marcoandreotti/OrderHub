@@ -248,6 +248,58 @@ describe('catálogo público', () => {
     expect(productButton.text()).toContain('Indisponível')
     wrapper.unmount()
   })
+
+  it('suprime o erro de disponibilidade quando o motivo já aparece no aviso da modalidade', async () => {
+    vi.mocked(publicOrderingClient.context).mockResolvedValue({
+      ...context,
+      availability: [{
+        serviceType: 'Pickup', isAvailable: false, reason: 'ServicePaused',
+        message: 'Pausa para organização.', nextOpening: null
+      }]
+    })
+    vi.mocked(publicOrderingClient.simulate).mockRejectedValue(new ApiError({
+      status: 409, detail: 'Esta modalidade está temporariamente pausada.',
+      reason: 'ServicePaused', traceId: 'availability-ref'
+    }))
+
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text().includes('Pizza'))!.trigger('click')
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await wrapper.findAll('button').find(button => button.text() === 'Adicionar')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text().startsWith('Carrinho'))!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text().split('Pausa para organização.')).toHaveLength(2)
+    expect(wrapper.text()).not.toContain('availability-ref')
+    wrapper.unmount()
+  })
+
+  it('mantém visíveis erros sem relação com a disponibilidade e sua referência', async () => {
+    vi.mocked(publicOrderingClient.context).mockResolvedValue({
+      ...context,
+      availability: [{
+        serviceType: 'Pickup', isAvailable: false, reason: 'ServicePaused',
+        message: 'Pausa para organização.', nextOpening: null
+      }]
+    })
+    vi.mocked(publicOrderingClient.simulate).mockRejectedValue(new ApiError({
+      status: 409, detail: 'Uma opção mudou. Revise o carrinho.',
+      reason: 'OfferUnavailable', traceId: 'offer-ref'
+    }))
+
+    const wrapper = mount(PublicOrderingPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text().includes('Pizza'))!.trigger('click')
+    await wrapper.get('input[type="checkbox"]').setValue(true)
+    await wrapper.findAll('button').find(button => button.text() === 'Adicionar')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text().startsWith('Carrinho'))!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Uma opção mudou. Revise o carrinho.')
+    expect(wrapper.text()).toContain('offer-ref')
+    wrapper.unmount()
+  })
 })
 
 describe('checkout idempotente', () => {

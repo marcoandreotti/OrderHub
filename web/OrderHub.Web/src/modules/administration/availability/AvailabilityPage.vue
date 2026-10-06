@@ -120,7 +120,7 @@ onUnmounted(() => controller?.abort())
         </div>
         <q-btn outline icon="add" label="Adicionar exceção" class="q-mt-md" @click="addException" />
         <q-list bordered separator class="q-mt-md"><q-item v-for="(item,index) in configuration.exceptions" :key="item.date + '-' + (item.serviceType ?? '')">
-          <q-item-section>{{ item.date }} · {{ item.serviceType ?? 'Todas' }} · {{ item.isOpen ? item.opensAt + '–' + item.closesAt : 'Fechado' }}<small>{{ item.reason }}</small></q-item-section>
+          <q-item-section>{{ item.date }} · {{ item.serviceType ? serviceTypeLabels[item.serviceType] : 'Todas' }} · {{ item.isOpen ? item.opensAt + '–' + item.closesAt : 'Fechado' }}<small>{{ item.reason }}</small></q-item-section>
           <q-item-section side><q-btn flat square class="collection-action-btn" color="negative" icon="delete" :aria-label="'Remover exceção de ' + item.date" @click="configuration.exceptions.splice(index,1)"><q-tooltip>Remover exceção</q-tooltip></q-btn></q-item-section>
         </q-item></q-list>
         <q-btn color="primary" icon="save" label="Salvar exceções" class="q-mt-md" :loading="busy" @click="execute(() => availabilityClient.exceptions(session.unitId, configuration!.exceptions), 'Exceções atualizadas.')" />

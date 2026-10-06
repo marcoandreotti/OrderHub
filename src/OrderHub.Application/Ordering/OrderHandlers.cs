@@ -174,7 +174,7 @@ public sealed class TransitionOrderCommandHandler(
                 case OrderStatus.Completed: order.Complete(now, scope.UserId); break;
                 case OrderStatus.Cancelled: order.Cancel(now, scope.UserId, command.Note); break;
                 case OrderStatus.Rejected: order.Reject(now, scope.UserId, command.Note); break;
-                default: throw new ValidationException([new ValidationFailure(nameof(command.NewStatus), "Requested order status is not an operational transition.")]);
+                default: throw new ValidationException([new ValidationFailure(nameof(command.NewStatus), "O status solicitado não é uma transição operacional válida.")]);
             }
         }
         catch (DomainException exception)

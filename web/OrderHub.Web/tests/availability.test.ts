@@ -58,3 +58,21 @@ it('carrega os controles operacionais e permite pausar uma modalidade', async ()
   expect(availabilityClient.pause).toHaveBeenCalledWith('unit', 'Pickup', null, '')
   wrapper.unmount()
 })
+
+it('mostra o rótulo em português para exceções sem alterar o valor técnico da modalidade', async () => {
+  vi.mocked(availabilityClient.configuration).mockResolvedValue({
+    tradeName: 'Unit', slug: 'unit', timeZoneId: 'America/Sao_Paulo',
+    exceptions: [{ date: '2026-10-06', serviceType: 'Table', isOpen: false, opensAt: null, closesAt: null, reason: null }],
+    pauses: []
+  })
+
+  const wrapper = mount(AvailabilityPage, { global: { stubs } })
+  await flushPromises()
+
+  expect(wrapper.text()).toContain('2026-10-06 · Mesa · Fechado')
+  expect(wrapper.text()).not.toContain('2026-10-06 · Table')
+  await wrapper.findAll('button').find(button => button.text() === 'Pausar')!.trigger('click')
+  await flushPromises()
+  expect(availabilityClient.pause).toHaveBeenCalledWith('unit', 'Pickup', null, '')
+  wrapper.unmount()
+})

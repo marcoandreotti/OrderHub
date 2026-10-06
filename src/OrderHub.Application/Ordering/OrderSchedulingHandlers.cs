@@ -64,7 +64,7 @@ public sealed class SetOrderSchedulingPolicyCommandValidator : AbstractValidator
         RuleFor(x => x.MinimumAdvanceMinutes).InclusiveBetween(0, OrderSchedulingPolicy.MaximumHorizonDays * 24 * 60);
         RuleFor(x => x.HorizonDays).InclusiveBetween(1, OrderSchedulingPolicy.MaximumHorizonDays);
         RuleFor(x => x).Must(x => x.MinimumAdvanceMinutes <= x.HorizonDays * 24 * 60)
-            .WithMessage("Minimum advance cannot exceed the scheduling horizon.");
+            .WithMessage("O prazo mínimo de antecedência não pode exceder o horizonte de agendamento.");
         RuleFor(x => x.MaximumOrdersPerSlot).GreaterThan(0).When(x => x.MaximumOrdersPerSlot.HasValue);
     }
 }
